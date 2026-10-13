@@ -155,11 +155,13 @@ fn save_prefs(ui: &UiState) {
 
 fn services() -> Services {
     Services {
-        pick_open: Some(Box::new(|purpose: &str, _exts: &[&str]| {
+        pick_open: Some(Box::new(|purpose: &str, exts: &[&str]| {
             let d = rfd::FileDialog::new();
             let d = match purpose {
+                _ if !exts.is_empty() => d.add_filter(if purpose == "image" { "Image" } else { "Files" }, exts),
                 "session.open" => d.add_filter("TalkCraft Session", &["scraft"]),
                 "file.import_midi" => d.add_filter("MIDI", &["mid", "midi", "smf"]),
+                "subtitle.import" => d.add_filter("Subtitles", &["srt", "vtt"]),
                 _ => d.add_filter(
                     "Audio",
                     &["wav", "wave", "bwf", "aif", "aiff", "aifc", "flac", "mp3", "ogg", "oga", "m4a", "aac", "mp4", "caf", "mkv", "webm"],
@@ -167,9 +169,19 @@ fn services() -> Services {
             };
             d.pick_file().map(|p| p.to_string_lossy().into_owned())
         })),
-        pick_save: Some(Box::new(|_purpose: &str, default: &str| {
+        pick_save: Some(Box::new(|purpose: &str, default: &str| {
             let path = std::path::Path::new(default);
-            let mut d = rfd::FileDialog::new().add_filter("TalkCraft Session", &["scraft"]);
+            // Sessions save as .scraft; anything else keeps the extension the field already has.
+            let ext = path.extension().and_then(|x| x.to_str()).filter(|x| !x.is_empty());
+            let mut d = rfd::FileDialog::new();
+            if purpose.starts_with("session") {
+                d = d.add_filter("TalkCraft Session", &["scraft"]);
+            } else if let Some(x) = ext {
+                d = d.add_filter(x.to_uppercase(), &[x]);
+            }
+            if let Some(dir) = path.parent().filter(|p| p.is_dir()) {
+                d = d.set_directory(dir);
+            }
             if let Some(n) = path.file_name().and_then(|n| n.to_str()) {
                 d = d.set_file_name(n);
             }

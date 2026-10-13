@@ -87,9 +87,17 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                             }
                         }
                         _ => {
-                            if ui.small_button(if path.is_empty() { "Set file…" } else { "Change…" }).clicked() {
-                                w.editing = Some((i, path.clone()));
-                            }
+                            ui.horizontal(|ui| {
+                                if let Some(pick) = &app.services.pick_open
+                                    && ui.small_button(crate::i18n::tr("Browse…")).on_hover_text("Choose an audio file").clicked()
+                                    && let Some(p) = pick("jingle", &[])
+                                {
+                                    store = Some((i, p));
+                                }
+                                if ui.small_button("✎").on_hover_text("Type or paste a path").clicked() {
+                                    w.editing = Some((i, path.clone()));
+                                }
+                            });
                         }
                     }
                 });

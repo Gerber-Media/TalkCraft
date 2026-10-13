@@ -342,6 +342,40 @@ fn path_key(id: &str) -> Option<&'static str> {
     }
 }
 
+/// What a path field's Browse button opens.
+#[derive(Debug, Clone, Copy)]
+pub enum Pick<'a> {
+    /// An existing file: (purpose, extensions; empty = by purpose).
+    Open(&'a str, &'a [&'a str]),
+    /// A file to write (the dialog suggests the field's name and filters by its extension).
+    Save(&'a str),
+    Folder,
+}
+
+/// A path text field with a Browse… button next to it (when the host offers file dialogs).
+/// True when the path changed through the dialog.
+pub fn path_field(ui: &mut egui::Ui, services: &crate::Services, path: &mut String, width: f32, pick: Pick, hint: &str) -> bool {
+    let mut picked = false;
+    ui.horizontal(|ui| {
+        let browse_w = 90.0;
+        ui.add(egui::TextEdit::singleline(path).hint_text(hint).desired_width((width - browse_w).max(80.0)));
+        let chosen = match pick {
+            Pick::Open(purpose, exts) => {
+                services.pick_open.as_ref().and_then(|f| ui.button(crate::i18n::tr("Browse…")).clicked().then(|| f(purpose, exts)).flatten())
+            }
+            Pick::Save(purpose) => {
+                services.pick_save.as_ref().and_then(|f| ui.button(crate::i18n::tr("Browse…")).clicked().then(|| f(purpose, path)).flatten())
+            }
+            Pick::Folder => services.pick_folder.as_ref().and_then(|f| ui.button(crate::i18n::tr("Browse…")).clicked().then(|| f(path)).flatten()),
+        };
+        if let Some(p) = chosen {
+            *path = p;
+            picked = true;
+        }
+    });
+    picked
+}
+
 fn path_dialog(id: &str, home: &str, name: &str) -> Option<Dialog> {
     let spec = soundcraft_engine::command_specs().iter().find(|c| c.id == id)?;
     let key = path_key(id)?;
@@ -524,8 +558,8 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                 }
                 Dialog::Bounce { path, format, bit_depth, normalize, loudness } => {
                     ui.horizontal(|ui| {
-                        ui.label(crate::i18n::tr("File"));
-                        ui.add(egui::TextEdit::singleline(path).desired_width(360.0));
+                        ui.label(crate::i18n::tr("File:").trim_end_matches(':'));
+                        path_field(ui, &app.services, path, 450.0, Pick::Save("file.bounce_mix"), "");
                     });
                     ui.horizontal(|ui| {
                         egui::ComboBox::from_label("Format").selected_text(format.to_uppercase()).show_ui(ui, |ui| {
@@ -574,30 +608,14 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                     }
                 }
                 Dialog::PathPrompt { cmd, path, key, .. } => {
-                    ui.add(egui::TextEdit::singleline(path).desired_width(420.0));
-                    if let Some(pick) = &app.services.pick_open
-                        && cmd != "session.save_as"
-                        && cmd != "session.save_copy"
-                        && key != "dir"
-                        && ui.button("Browse…").clicked()
-                        && let Some(p) = pick(cmd, &[])
-                    {
-                        *path = p;
-                    }
-                    if let Some(pick) = &app.services.pick_folder
-                        && key == "dir"
-                        && ui.button("Browse…").clicked()
-                        && let Some(p) = pick(path)
-                    {
-                        *path = p;
-                    }
-                    if let Some(pick) = &app.services.pick_save
-                        && (cmd == "session.save_as" || cmd == "session.save_copy")
-                        && ui.button("Browse…").clicked()
-                        && let Some(p) = pick(cmd, path)
-                    {
-                        *path = p;
-                    }
+                    let pick = if key == "dir" {
+                        Pick::Folder
+                    } else if cmd.contains("import") || cmd.contains("open") {
+                        Pick::Open(cmd, &[])
+                    } else {
+                        Pick::Save(cmd)
+                    };
+                    path_field(ui, &app.services, path, 520.0, pick, "");
                     let file = soundcraft_engine::io::session_file(path);
                     let replaces = soundcraft_engine::io::replaces(&app.engine, cmd, &file);
                     if replaces {
@@ -674,8 +692,8 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                 }
                 Dialog::Audiogram { path, portrait } => {
                     ui.horizontal(|ui| {
-                        ui.label(crate::i18n::tr("File"));
-                        ui.add(egui::TextEdit::singleline(path).desired_width(380.0));
+                        ui.label(crate::i18n::tr("File:").trim_end_matches(':'));
+                        path_field(ui, &app.services, path, 470.0, Pick::Save("audiogram"), "");
                     });
                     ui.horizontal(|ui| {
                         ui.radio_value(portrait, false, crate::i18n::tr("Square 1080 × 1080 (feed)"));
@@ -774,7 +792,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                     }
                 }
                 Dialog::ExportEpisode { path, settings } => {
-                    if export_episode_ui(ui, Some(path), settings, enter) {
+                    if export_episode_ui(ui, &app.services, Some(path), settings, enter) {
                         let s = serde_json::to_value(settings.as_ref()).unwrap_or_default();
                         before = Some(("podcast.set".into(), s));
                         action = Some(("file.export_podcast".into(), json!({"path": path})));
@@ -1020,9 +1038,15 @@ const LOUDNESS_PRESETS: [(&str, Option<f32>); 5] = [
 
 /// The Export Episode dialog: format, quality, loudness and ID3 metadata. True when Export is pressed.
 /// The Export Episode dialog's body and its Export button.
-fn export_episode_ui(ui: &mut egui::Ui, path: Option<&mut String>, s: &mut soundcraft_model::PodcastSettings, enter: bool) -> bool {
+fn export_episode_ui(
+    ui: &mut egui::Ui,
+    services: &crate::Services,
+    path: Option<&mut String>,
+    s: &mut soundcraft_model::PodcastSettings,
+    enter: bool,
+) -> bool {
     let dim = Tokens::current().text_dim;
-    export_settings_ui(ui, path, s, false);
+    export_settings_ui(ui, services, path, s, false);
     ui.label(egui::RichText::new("Exports the edit selection, or the whole session. Settings are saved with the session.").small().color(dim));
     buttons(ui, "Export", enter && !ui.ctx().egui_wants_keyboard_input())
 }
@@ -1032,9 +1056,9 @@ fn export_episode_ui(ui: &mut egui::Ui, path: Option<&mut String>, s: &mut sound
 fn preferences_ui(app: &mut SoundApp, ui: &mut egui::Ui, s: &mut soundcraft_model::PodcastSettings, enter: bool) -> bool {
     let dim = Tokens::current().text_dim;
     egui::ScrollArea::vertical().max_height(ui.ctx().content_rect().height() * 0.7).show(ui, |ui| {
-        episode_ui(ui, &mut s.episode);
+        episode_ui(ui, &app.services, &mut s.episode);
         ui.separator();
-        export_settings_ui(ui, None, s, true);
+        export_settings_ui(ui, &app.services, None, s, true);
         ui.separator();
         ui.label(egui::RichText::new(crate::i18n::tr("Recording")).strong());
         ui.label(
@@ -1080,12 +1104,18 @@ fn preferences_ui(app: &mut SoundApp, ui: &mut egui::Ui, s: &mut soundcraft_mode
 
 /// Format, loudness and side files; with `path`, its extension follows the format. The episode
 /// tags follow for MP3 unless `episode_shown` (Preferences shows them on their own).
-fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut soundcraft_model::PodcastSettings, episode_shown: bool) {
+fn export_settings_ui(
+    ui: &mut egui::Ui,
+    services: &crate::Services,
+    mut path: Option<&mut String>,
+    s: &mut soundcraft_model::PodcastSettings,
+    episode_shown: bool,
+) {
     let x = &mut s.export;
     if let Some(path) = path.as_mut() {
         ui.horizontal(|ui| {
-            ui.label(crate::i18n::tr("File"));
-            ui.add(egui::TextEdit::singleline(&mut **path).desired_width(380.0));
+            ui.label(crate::i18n::tr("File:").trim_end_matches(':'));
+            path_field(ui, services, path, 470.0, Pick::Save("file.export_podcast"), "");
         });
     }
     ui.label(egui::RichText::new(crate::i18n::tr("Format")).strong());
@@ -1175,12 +1205,12 @@ fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut 
     });
     if matches!(x.format.as_str(), "mp3" | "m4a" | "m4b") && !episode_shown {
         ui.separator();
-        episode_ui(ui, &mut s.episode);
+        episode_ui(ui, services, &mut s.episode);
     }
 }
 
 /// Episode details: ID3 tags in MP3s, shownotes, transcription language.
-fn episode_ui(ui: &mut egui::Ui, e: &mut soundcraft_model::EpisodeInfo) {
+fn episode_ui(ui: &mut egui::Ui, services: &crate::Services, e: &mut soundcraft_model::EpisodeInfo) {
     {
         ui.label(egui::RichText::new(crate::i18n::tr("Episode")).strong());
         egui::Grid::new("ep_meta").num_columns(2).spacing(vec2(12.0, 6.0)).show(ui, |ui| {
@@ -1203,7 +1233,14 @@ fn episode_ui(ui: &mut egui::Ui, e: &mut soundcraft_model::EpisodeInfo) {
             });
             ui.end_row();
             ui.label(crate::i18n::tr("Cover"));
-            ui.add(egui::TextEdit::singleline(&mut e.cover).hint_text("path to a square JPEG or PNG").desired_width(300.0));
+            path_field(
+                ui,
+                services,
+                &mut e.cover,
+                300.0,
+                Pick::Open("image", &["jpg", "jpeg", "png"]),
+                crate::i18n::tr("path to a square JPEG or PNG"),
+            );
             ui.end_row();
             ui.label(crate::i18n::tr("Description"));
             ui.add(egui::TextEdit::multiline(&mut e.description).desired_rows(3).desired_width(300.0));

@@ -345,6 +345,9 @@ const DE: &[(&str, &str)] = &[
     ("Ends the call for this guest", "Beendet das Gespräch für diesen Gast"),
     ("connecting …", "verbindet …"),
     ("muted themselves", "hat sich stummgeschaltet"),
+    ("Browse…", "Durchsuchen …"),
+    ("File:", "Datei"),
+    ("path to a square JPEG or PNG", "Pfad zu einem quadratischen JPEG oder PNG"),
     (
         "Record starts every guest's own recording too. After Stop, their files arrive on their tracks, synced to the call.",
         "Record startet auch die Aufnahme bei jedem Gast. Nach Stop kommen ihre Dateien auf ihre Spuren, passend zum Gespräch ausgerichtet.",
