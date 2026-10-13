@@ -9,7 +9,9 @@ use soundcraft_audio_io::{AudioBuffer, BitDepth, EncodeOptions};
 use soundcraft_model::{MarkerKind, PodcastSettings};
 
 /// Formats an episode can be exported as.
-pub const EXPORT_FORMATS: [&str; 4] = ["mp3", "wav", "flac", "aiff"];
+/// M4A (AAC) first: better sound than MP3 at the same size and played by every podcast app;
+/// M4B is the audiobook variant.
+pub const EXPORT_FORMATS: [&str; 6] = ["m4a", "mp3", "m4b", "wav", "flac", "aiff"];
 /// Covers larger than this are refused (ID3 readers choke on huge tags).
 const MAX_COVER_BYTES: u64 = 10 * 1024 * 1024;
 
@@ -23,7 +25,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Podcast Settings...",
             [],
             None,
-            "{export?: {format?: mp3|wav|flac|aiff, bitrate_kbps?, sample_rate?, mono?, bit_depth?: 16|24|32f, loudness_lufs?: LUFS|null, chapters?}, episode?: {title?, author?, show?, episode?, year?, genre?, description?, language?, cover?}}",
+            "{export?: {format?: m4a|mp3|m4b|wav|flac|aiff, bitrate_kbps?, sample_rate?, mono?, bit_depth?: 16|24|32f, loudness_lufs?: LUFS|null, chapters?}, episode?: {title?, author?, show?, episode?, year?, genre?, description?, language?, cover?}}",
             always,
             set
         ),
@@ -80,7 +82,9 @@ fn checked(id: &str, v: Value) -> Result<PodcastSettings> {
     if !MP3_BITRATES.contains(&x.bitrate_kbps) {
         return Err(bad(id, format!("bitrate {} kbit/s is not one of {MP3_BITRATES:?}", x.bitrate_kbps)));
     }
-    if !MP3_SAMPLE_RATES.contains(&x.sample_rate) && !(x.format != "mp3" && matches!(x.sample_rate, 88_200 | 96_000)) {
+    if !MP3_SAMPLE_RATES.contains(&x.sample_rate)
+        && !(matches!(x.format.as_str(), "wav" | "flac" | "aiff") && matches!(x.sample_rate, 88_200 | 96_000))
+    {
         return Err(bad(id, format!("sample rate {} Hz is not one of {MP3_SAMPLE_RATES:?}", x.sample_rate)));
     }
     if !matches!(x.bit_depth.as_str(), "16" | "24" | "32f") {
@@ -179,7 +183,7 @@ fn export(e: &mut Engine, p: &Value) -> Result<Value> {
 
     let buf = AudioBuffer { sample_rate: x.sample_rate, channels: ch };
     let mut chapter_count = 0;
-    let bytes = if x.format == "mp3" {
+    let bytes = if matches!(x.format.as_str(), "mp3" | "m4a" | "m4b") {
         let ep = &settings.episode;
         let chaps = if x.chapters { chapters(e, r) } else { Vec::new() };
         chapter_count = chaps.len();
@@ -195,8 +199,12 @@ fn export(e: &mut Engine, p: &Value) -> Result<Value> {
             cover: cover(ID, &ep.cover)?,
             chapters: chaps,
         };
-        soundcraft_audio_io::mp3::encode_mp3(&buf, &Mp3Options { bitrate_kbps: x.bitrate_kbps }, Some(&tags))
-            .map_err(|err| bad(ID, err.to_string()))?
+        if x.format == "mp3" {
+            soundcraft_audio_io::mp3::encode_mp3(&buf, &Mp3Options { bitrate_kbps: x.bitrate_kbps }, Some(&tags))
+                .map_err(|err| bad(ID, err.to_string()))?
+        } else {
+            crate::aac::encode(&buf, x.bitrate_kbps, &tags, x.format == "m4b").map_err(|err| bad(ID, err))?
+        }
     } else {
         let format = soundcraft_audio_io::encode_format_for(&x.format).ok_or_else(|| bad(ID, format!("cannot write `{}`", x.format)))?;
         let bit_depth = match x.bit_depth.as_str() {
@@ -356,11 +364,31 @@ mod tests {
     }
 
     #[test]
+    fn m4a_is_the_default_and_exports_aac_in_mp4() {
+        if crate::aac::find_encoder().is_none() {
+            eprintln!("skipping: no AAC encoder");
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("sc-podcast-m4a-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut e = episode_engine(&dir);
+        assert_eq!(e.session().podcast.export.format, "m4a");
+        let v = e.execute("file.export_podcast", &json!({"path": dir.join("folge.mp3").to_string_lossy()})).unwrap();
+        let path = v["path"].as_str().unwrap().to_string();
+        assert!(path.ends_with("folge.m4a"), "the extension follows the format: {path}");
+        let bytes = std::fs::read(&path).unwrap();
+        assert_eq!(&bytes[4..8], b"ftyp");
+        assert_eq!(v["chapters"], 2, "{v}");
+        assert!(std::fs::remove_dir_all(&dir).is_ok());
+    }
+
+    #[test]
     fn settings_merge_validate_and_persist_in_the_session() {
         let mut e = Engine::default();
         let v = e.execute("podcast.set", &json!({"export": {"bitrate_kbps": 96, "mono": true}, "episode": {"show": "Europa 2.0"}})).unwrap();
         assert_eq!(v["export"]["bitrate_kbps"], 96);
-        assert_eq!(v["export"]["format"], "mp3", "untouched keys keep their value");
+        assert_eq!(v["export"]["format"], "m4a", "untouched keys keep their value");
         assert_eq!(e.session().podcast.episode.show, "Europa 2.0");
         for bad in [json!({"export": {"bitrate_kbps": 100}}), json!({"export": {"format": "ogg"}}), json!({"export": {"loudness_lufs": 3}})] {
             assert!(e.execute("podcast.set", &bad).is_err(), "{bad}");
@@ -388,7 +416,7 @@ mod tests {
         assert!(v["true_peak_db"].as_f64().unwrap() <= -0.9, "{v}");
         let (info, _) = soundcraft_audio_io::decode(&std::fs::read(dir.join("folge.wav")).unwrap(), Some("wav")).unwrap();
         assert_eq!(info.sample_rate, 44_100);
-        assert_eq!(e.session().podcast.export.format, "mp3", "overrides are for this file only");
+        assert_eq!(e.session().podcast.export.format, "m4a", "overrides are for this file only");
         assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 

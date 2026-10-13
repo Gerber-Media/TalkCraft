@@ -5,9 +5,9 @@
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct PodcastExport {
-    /// `mp3`, `wav`, `flac` or `aiff`.
+    /// `m4a` (AAC, the default), `mp3`, `m4b` (audiobook), `wav`, `flac` or `aiff`.
     pub format: String,
-    /// MP3 constant bitrate (kbit/s).
+    /// MP3/AAC bitrate (kbit/s).
     pub bitrate_kbps: u32,
     /// Output sample rate (Hz); the mix is resampled when the session differs.
     pub sample_rate: u32,
@@ -17,7 +17,7 @@ pub struct PodcastExport {
     pub bit_depth: String,
     /// Integrated loudness target (LUFS), `None` = no loudness normalization.
     pub loudness_lufs: Option<f32>,
-    /// Write the session's markers as MP3 chapters.
+    /// Write the session's markers as chapters (MP3, M4A, M4B).
     pub chapters: bool,
     /// Also write shownotes (`.md`) and Podcasting 2.0 chapters (`.chapters.json`) next to the file.
     pub shownotes: bool,
@@ -28,7 +28,7 @@ pub struct PodcastExport {
 impl Default for PodcastExport {
     fn default() -> Self {
         Self {
-            format: "mp3".into(),
+            format: "m4a".into(),
             bitrate_kbps: 128,
             sample_rate: 44_100,
             mono: false,

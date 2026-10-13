@@ -997,8 +997,16 @@ fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut 
         let before = x.format.clone();
         egui::ComboBox::from_id_salt("ep_format").selected_text(x.format.to_uppercase()).show_ui(ui, |ui| {
             for f in soundcraft_engine::cmd::podcast::EXPORT_FORMATS {
-                let label =
-                    if f == "mp3" && !soundcraft_audio_io::mp3::mp3_supported() { "MP3 (not in this build)".to_string() } else { f.to_uppercase() };
+                let aac = soundcraft_engine::aac::find_encoder().is_some();
+                let label = match f {
+                    "m4a" if aac => "M4A (AAC) – recommended".to_string(),
+                    "m4a" => "M4A (needs ffmpeg)".to_string(),
+                    "m4b" if aac => "M4B (audiobook, chapters)".to_string(),
+                    "m4b" => "M4B (needs ffmpeg)".to_string(),
+                    "mp3" if !soundcraft_audio_io::mp3::mp3_supported() => "MP3 (not in this build)".to_string(),
+                    "mp3" => "MP3 (most compatible)".to_string(),
+                    _ => f.to_uppercase(),
+                };
                 ui.selectable_value(&mut x.format, f.to_string(), label);
             }
         });
@@ -1009,7 +1017,7 @@ fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut 
             **path = std::path::Path::new(path.as_str()).with_extension(ext).to_string_lossy().to_string();
         }
         ui.end_row();
-        if x.format == "mp3" {
+        if matches!(x.format.as_str(), "mp3" | "m4a" | "m4b") {
             ui.label("Bitrate");
             egui::ComboBox::from_id_salt("ep_bitrate").selected_text(format!("{} kbit/s", x.bitrate_kbps)).show_ui(ui, |ui| {
                 for b in soundcraft_audio_io::mp3::MP3_BITRATES {
@@ -1056,7 +1064,7 @@ fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut 
             }
         });
         ui.end_row();
-        if x.format == "mp3" {
+        if matches!(x.format.as_str(), "mp3" | "m4a" | "m4b") {
             ui.label("Chapters");
             ui.checkbox(&mut x.chapters, "Write markers as chapters");
             ui.end_row();
@@ -1068,7 +1076,7 @@ fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut 
         });
         ui.end_row();
     });
-    if x.format == "mp3" && !episode_shown {
+    if matches!(x.format.as_str(), "mp3" | "m4a" | "m4b") && !episode_shown {
         ui.separator();
         episode_ui(ui, &mut s.episode);
     }
