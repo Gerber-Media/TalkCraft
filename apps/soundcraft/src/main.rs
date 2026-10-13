@@ -243,6 +243,7 @@ fn main() -> eframe::Result {
     };
     // First start: follow the system's language (UiState::default() is English, for tests).
     let prefs = load_prefs().unwrap_or_else(|| UiState { language: "auto".into(), ..UiState::default() });
+    let prefs_devices = (prefs.output_device.clone(), prefs.input_device.clone());
     let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("TalkCraft")
@@ -263,6 +264,8 @@ fn main() -> eframe::Result {
         "TalkCraft",
         options,
         Box::new(move |cc| {
+            // The interface picked in Setup > Audio Interface, when it is connected.
+            soundcraft_playback::record::set_preferred_devices(prefs_devices.0.clone(), prefs_devices.1.clone());
             let player = if no_audio { None } else { Some(soundcraft_playback::Player::new(Arc::new(engine.session().clone()))) };
             let mut app = SoundApp::new(engine, player, services());
             app.autosave_dir = prefs_path().and_then(|p| p.parent().map(|d| d.join("Autosave")));

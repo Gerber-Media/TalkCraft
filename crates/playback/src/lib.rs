@@ -714,7 +714,10 @@ fn fold_gains(s: &Session) -> [(f32, f32); MAX_CHANNELS] {
 fn open_device(want_rate: u32, want_ch: u16) -> Result<(cpal::Device, cpal::StreamConfig, String), String> {
     use cpal::traits::{DeviceTrait, HostTrait};
     let host = cpal::default_host();
-    let device = host.default_output_device().ok_or_else(|| "no default output device".to_string())?;
+    // The device picked in the audio setup, if it is connected; else the system default.
+    #[allow(deprecated)]
+    let wanted = record::preferred_output().and_then(|want| host.output_devices().ok()?.find(|d| d.name().is_ok_and(|n| n == want)));
+    let device = wanted.or_else(|| host.default_output_device()).ok_or_else(|| "no default output device".to_string())?;
     #[allow(deprecated)]
     let name = device.name().unwrap_or_else(|_| "Audio device".into());
     // Prefer an f32 config at the session rate; else the device default (we resample).

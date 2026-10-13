@@ -80,8 +80,108 @@ impl Shared {
     }
 }
 
+/// An audio device as the setup window lists it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DeviceInfo {
+    pub name: String,
+    /// Most channels any of its configurations offers.
+    pub channels: u16,
+    /// Its default sample rate.
+    pub sample_rate: u32,
+    pub is_default: bool,
+}
+
+/// The devices the user picked (by name); `None` = the system default. Kept here so every
+/// place that opens a device (playback, recording, reconnect) honours the choice.
+static PREFERRED: Mutex<(Option<String>, Option<String>)> = Mutex::new((None, None));
+
+/// Sets the preferred output and input device names (`None` = system default).
+pub fn set_preferred_devices(output: Option<String>, input: Option<String>) {
+    if let Ok(mut p) = PREFERRED.lock() {
+        *p = (output, input);
+    }
+}
+
+pub(crate) fn preferred_output() -> Option<String> {
+    PREFERRED.lock().ok().and_then(|p| p.0.clone())
+}
+
+fn preferred_input() -> Option<String> {
+    PREFERRED.lock().ok().and_then(|p| p.1.clone())
+}
+
+/// (outputs, inputs) on this machine.
+#[cfg(not(target_os = "freebsd"))]
+pub fn list_devices() -> (Vec<DeviceInfo>, Vec<DeviceInfo>) {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    let host = cpal::default_host();
+    #[allow(deprecated)]
+    let name = |d: &cpal::Device| d.name().unwrap_or_default();
+    let def_out = host.default_output_device().map(|d| name(&d));
+    let def_in = host.default_input_device().map(|d| name(&d));
+    let outs = host
+        .output_devices()
+        .map(|it| {
+            it.map(|d| DeviceInfo {
+                name: name(&d),
+                channels: d.supported_output_configs().map(|c| c.map(|x| x.channels()).max().unwrap_or(0)).unwrap_or(0),
+                sample_rate: d.default_output_config().map(|c| c.sample_rate().0).unwrap_or(0),
+                is_default: Some(name(&d)) == def_out,
+            })
+            .collect()
+        })
+        .unwrap_or_default();
+    let ins = host
+        .input_devices()
+        .map(|it| {
+            it.map(|d| DeviceInfo {
+                name: name(&d),
+                channels: d.supported_input_configs().map(|c| c.map(|x| x.channels()).max().unwrap_or(0)).unwrap_or(0),
+                sample_rate: d.default_input_config().map(|c| c.sample_rate().0).unwrap_or(0),
+                is_default: Some(name(&d)) == def_in,
+            })
+            .collect()
+        })
+        .unwrap_or_default();
+    (outs, ins)
+}
+
+#[cfg(target_os = "freebsd")]
+pub fn list_devices() -> (Vec<DeviceInfo>, Vec<DeviceInfo>) {
+    (Vec::new(), Vec::new())
+}
+
+/// Peak level per input channel since the UI last looked (linear, as f32 bits: for non-negative
+/// floats the bit patterns order like the values, so `fetch_max` works without a lock).
+pub struct InputLevels {
+    peaks: Box<[AtomicU32]>,
+}
+
+impl InputLevels {
+    fn new(channels: usize) -> Arc<InputLevels> {
+        Arc::new(InputLevels { peaks: (0..channels.max(1)).map(|_| AtomicU32::new(0)).collect() })
+    }
+
+    /// Audio thread: fold an interleaved block in.
+    fn feed(&self, data: &[f32]) {
+        let n = self.peaks.len();
+        for (i, x) in data.iter().enumerate() {
+            if let Some(p) = self.peaks.get(i % n) {
+                p.fetch_max(x.abs().min(16.0).to_bits(), Ordering::Relaxed);
+            }
+        }
+    }
+
+    /// UI: each channel's peak since the last call, then reset.
+    pub fn take(&self) -> Vec<f32> {
+        self.peaks.iter().map(|p| f32::from_bits(p.swap(0, Ordering::Relaxed))).collect()
+    }
+}
+
 pub struct Recorder {
     shared: Arc<Shared>,
+    /// Peak per input channel, for the setup window's meters and the soundcheck.
+    pub levels: Arc<InputLevels>,
     /// Live input for monitoring (always fed while the input stream runs).
     pub monitor: Arc<InputRing>,
     #[cfg(not(target_os = "freebsd"))]
@@ -100,7 +200,9 @@ impl Recorder {
     pub fn open() -> Result<Recorder, String> {
         use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
         let host = cpal::default_host();
-        let device = host.default_input_device().ok_or("no audio input device")?;
+        #[allow(deprecated)]
+        let wanted = preferred_input().and_then(|want| host.input_devices().ok()?.find(|d| d.name().is_ok_and(|n| n == want)));
+        let device = wanted.or_else(|| host.default_input_device()).ok_or("no audio input device")?;
         #[allow(deprecated)]
         let name = device.name().unwrap_or_else(|_| "Input".into());
         let cfg = device.default_input_config().map_err(|e| e.to_string())?;
@@ -114,6 +216,8 @@ impl Recorder {
         let sh = Arc::clone(&shared);
         let monitor = InputRing::new(usize::from(config.channels), config.sample_rate.0);
         let mon = Arc::clone(&monitor);
+        let levels = InputLevels::new(channels);
+        let lv = Arc::clone(&levels);
         let mut owed = 0;
         let stream = device
             .build_input_stream(
@@ -121,6 +225,7 @@ impl Recorder {
                 move |data: &[f32], _: &cpal::InputCallbackInfo| {
                     crate::mark_audio_thread();
                     mon.push(data);
+                    lv.feed(data);
                     if sh.armed.load(Ordering::Acquire) {
                         sh.capture(data, &mut owed);
                     } else {
@@ -138,6 +243,7 @@ impl Recorder {
         stream.play().map_err(|e| e.to_string())?;
         Ok(Recorder {
             monitor,
+            levels,
             shared,
             _stream: Some(stream),
             device_name: name,
@@ -300,6 +406,23 @@ mod tests {
 
     fn decode(path: &PathBuf) -> Vec<Vec<f32>> {
         soundcraft_audio_io::decode(&std::fs::read(path).unwrap(), None).unwrap().1.channels
+    }
+
+    #[test]
+    fn input_levels_keep_the_peak_per_channel_until_taken() {
+        let l = InputLevels::new(2);
+        l.feed(&[0.1, -0.5, 0.3, 0.2]);
+        l.feed(&[-0.2, 0.1]);
+        assert_eq!(l.take(), [0.3, 0.5]);
+        assert_eq!(l.take(), [0.0, 0.0], "taking resets");
+    }
+
+    #[test]
+    fn devices_list_without_panicking() {
+        let (outs, ins) = list_devices();
+        eprintln!("outputs: {outs:?}\ninputs: {ins:?}");
+        assert!(outs.iter().filter(|d| d.is_default).count() <= 1);
+        assert!(ins.iter().filter(|d| d.is_default).count() <= 1);
     }
 
     #[test]

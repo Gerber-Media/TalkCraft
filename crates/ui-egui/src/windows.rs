@@ -18,7 +18,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     midi_keyboard(app, ctx);
     workspace(app, ctx);
     configurations(app, ctx);
-    playback_engine(app, ctx);
+    crate::audio_setup::window(app, ctx);
     io_setup(app, ctx);
     shortcuts_window(app, ctx);
     clip_effects(app, ctx);
@@ -400,42 +400,6 @@ fn configurations(app: &mut SoundApp, ctx: &egui::Context) {
         }
     });
     app.ui.show_configurations = open;
-}
-
-/// Setup › Playback Engine / Hardware.
-pub fn playback_engine(app: &mut SoundApp, ctx: &egui::Context) {
-    let mut open = app.ui.show_playback_engine;
-    win(ctx, &mut open, "Playback Engine", vec2(380.0, 220.0), |ui| {
-        egui::Grid::new("pe").num_columns(2).show(ui, |ui| {
-            ui.label("Output device");
-            ui.label(app.player.as_ref().map_or("none".to_string(), |p| p.device_name.clone()));
-            ui.end_row();
-            ui.label("Device rate");
-            ui.label(app.player.as_ref().map_or("-".to_string(), |p| format!("{} Hz", p.device_rate)));
-            ui.end_row();
-            ui.label("Session rate");
-            ui.label(format!("{} Hz", app.engine.session().sample_rate.hz()));
-            ui.end_row();
-            ui.label("Input device");
-            ui.label(
-                app.recorder
-                    .as_ref()
-                    .map_or("opened on first record".to_string(), |r| format!("{} ({} ch @ {} Hz)", r.device_name, r.channels, r.sample_rate)),
-            );
-            ui.end_row();
-            ui.label("Mix block size");
-            ui.label("512 samples (resampled to the device rate when they differ)");
-            ui.end_row();
-        });
-        let mut dc = app.engine.session().edit.delay_compensation;
-        if ui.checkbox(&mut dc, "Delay compensation").changed() {
-            let _ = app.run("options.delay_compensation", json!({"value": dc}));
-        }
-        if ui.button("Reconnect audio device").clicked() {
-            app.player = Some(soundcraft_playback::Player::new(app.engine.session_arc()));
-        }
-    });
-    app.ui.show_playback_engine = open;
 }
 
 /// Setup › I/O: busses and output paths.

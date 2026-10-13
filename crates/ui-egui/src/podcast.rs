@@ -52,6 +52,7 @@ const HIDDEN_PARTS: &[&str] = &[
 /// Melodyne …), music and film tools (punch modes, click, elastic audio, timecode spotting) and
 /// big-studio views (mic preamps, object, ten sends).
 const HIDDEN_EXACT: &[&str] = &[
+    "Setup > Hardware...",
     "AudioSuite > Delay > Mod Delay III",
     "AudioSuite > Harmonic > Eleven Lite",
     "AudioSuite > Harmonic > Lo-Fi",
@@ -191,6 +192,7 @@ pub fn menu_label(label: &str) -> &str {
         "Maxim" => "Maximizer",
         "D-Verb" => "Reverb",
         "Pro Tools Search" => "Search",
+        "Playback Engine..." => "Audio Interface...",
         other => other,
     }
 }

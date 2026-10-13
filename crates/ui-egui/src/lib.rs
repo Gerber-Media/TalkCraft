@@ -4,6 +4,7 @@
 //! executing commands. It can be replaced without touching anything below it.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+pub mod audio_setup;
 pub mod audiogram;
 pub mod control;
 pub mod credits;
@@ -70,6 +71,9 @@ pub struct UiState {
     /// Interface language: "auto" (the system's), "en" or "de".
     #[serde(default = "default_language")]
     pub language: String,
+    /// Audio devices picked in Setup > Audio Interface (`None` = the system default).
+    pub input_device: Option<String>,
+    pub output_device: Option<String>,
     pub show_about: bool,
     pub show_midi_editor: bool,
     pub show_universe: bool,
@@ -131,6 +135,8 @@ impl Default for UiState {
             // English unless chosen: tests and scripted runs read the English labels. The app
             // starts with "auto" (main.rs), and older settings files without the field get it too.
             language: "en".into(),
+            input_device: None,
+            output_device: None,
             show_tracks_list: true,
             show_clip_list: true,
             show_transport: false,
