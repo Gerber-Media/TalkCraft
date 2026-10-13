@@ -32,6 +32,7 @@ pub fn show(app: &mut SoundApp, ui: &mut Ui) {
         counters(app, ui);
         grid_nudge(app, ui);
         transport(app, ui);
+        loudness(app, ui);
         output_meter(app, ui);
     });
 }
@@ -320,6 +321,36 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
             });
         });
     });
+}
+
+/// The episode's integrated loudness and true peak against the export target.
+fn loudness(app: &mut SoundApp, ui: &mut Ui) {
+    let t = Tokens::current();
+    let target = app.engine.session().podcast.export.loudness_lufs;
+    let (r, resp) = ui.allocate_exact_size(vec2(132.0, 64.0), Sense::hover());
+    ui.painter().rect(r, CornerRadius::same(4), t.counter_bg, Stroke::new(1.0, t.counter_border), StrokeKind::Inside);
+    ui.painter().text(pos2(r.min.x + 8.0, r.min.y + 12.0), Align2::LEFT_CENTER, "EPISODE", bold(9.5), t.counter_label);
+    let stale = app.loudness.stale();
+    let (main, sub, col) = match app.loudness.value {
+        Some((lufs, tp)) => {
+            let ok = target.is_none_or(|g| (lufs - g).abs() <= 1.0) && tp <= -1.0;
+            let col = if stale {
+                t.text_dim
+            } else if ok {
+                Color32::from_rgb(120, 230, 140)
+            } else {
+                Color32::from_rgb(240, 180, 80)
+            };
+            (format!("{lufs:.1} LUFS"), format!("TP {tp:.1} dBTP"), col)
+        }
+        None => ("– LUFS".to_string(), if stale { "measuring…".to_string() } else { "no audio".to_string() }, t.text_dim),
+    };
+    ui.painter().text(pos2(r.min.x + 8.0, r.min.y + 33.0), Align2::LEFT_CENTER, main, mono(15.0), col);
+    ui.painter().text(pos2(r.min.x + 8.0, r.min.y + 52.0), Align2::LEFT_CENTER, sub, mono(10.5), t.counter_text);
+    let goal = target.map_or_else(|| "no loudness target set".to_string(), |g| format!("export target {g:.0} LUFS"));
+    resp.on_hover_text(format!(
+        "Loudness of the whole mix (ITU BS.1770), measured a moment after each change. Green: within 1 LU of the {goal} and true peak at or below -1 dBTP. The episode export normalises to the target anyway; this shows how far the mix is from it."
+    ));
 }
 
 fn output_meter(app: &mut SoundApp, ui: &mut Ui) {

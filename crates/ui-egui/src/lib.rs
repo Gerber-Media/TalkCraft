@@ -12,6 +12,7 @@ pub mod edit_window;
 pub mod extra_windows;
 pub mod fonts;
 pub mod icons;
+pub mod loudness;
 pub mod menus;
 pub mod midi_editor;
 pub mod mix_window;
@@ -240,6 +241,8 @@ pub struct SoundApp {
     pub dialogs: dialogs::Dialogs,
     pub meters: HashMap<TrackId, MeterDisplay>,
     pub main_meter: MeterDisplay,
+    /// The whole episode's loudness, measured in the background (toolbar readout).
+    pub loudness: loudness::Loudness,
     /// Reused multichannel snapshot; populated at an adaptive rate by `logic`.
     meter_snapshot: soundcraft_playback::MeterSnapshot,
     pub gesture: Option<Gesture>,
@@ -303,6 +306,7 @@ impl SoundApp {
             dialogs: dialogs::Dialogs::default(),
             meters: HashMap::new(),
             main_meter: MeterDisplay::default(),
+            loudness: loudness::Loudness::default(),
             meter_snapshot: soundcraft_playback::MeterSnapshot::default(),
             gesture: None,
             edit_layout: edit_window::EditLayout::default(),
@@ -812,6 +816,11 @@ impl SoundApp {
     pub fn logic(&mut self, ctx: &egui::Context) {
         if ctx.current_pass_index() > 0 {
             return;
+        }
+        let playing = self.is_playing();
+        self.loudness.update(&self.engine, playing);
+        if self.loudness.stale() {
+            ctx.request_repaint_after(std::time::Duration::from_millis(500));
         }
         // Fonts set now take effect next frame, so draw only from the frame after.
         if !self.fonts_ready {
