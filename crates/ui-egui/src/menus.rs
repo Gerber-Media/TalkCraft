@@ -396,6 +396,8 @@ const MENU_WINDOWS: &[(&str, &str)] = &[
     ("File > Export > Subtitles...", "subtitle.export"),
     ("File > Export > Transcript...", "subtitle.export_text"),
     ("Edit > Shorten Pauses...", "edit.truncate_silence"),
+    ("Edit > Match Speaker Levels", "podcast.match_speakers"),
+    ("Edit > Auto-Duck Music", "podcast.auto_duck"),
     ("Window > Subtitles", "window.subtitles"),
     ("View > Rulers > Subtitles", "view.ruler"),
     ("Setup > Appearance", "window.ui_customization"),
@@ -452,7 +454,22 @@ pub fn invoke_menu(app: &mut SoundApp, id: &str, path: &str) {
         return;
     }
     let params = params_for(path, id);
-    let _ = crate::dialogs::run_or_ask(app, id, params);
+    match crate::dialogs::run_or_ask(app, id, params) {
+        Ok(v) if id == "podcast.match_speakers" => {
+            let parts: Vec<String> = v["tracks"]
+                .as_array()
+                .map(|a| {
+                    a.iter().map(|t| format!("{} {:+.1} dB", t["track"].as_str().unwrap_or("?"), t["change_db"].as_f64().unwrap_or(0.0))).collect()
+                })
+                .unwrap_or_default();
+            app.ui.status = format!("Speakers matched: {}", parts.join(", "));
+        }
+        Ok(v) if id == "podcast.auto_duck" => {
+            app.ui.status = format!("Music ducked by {} dB under {} stretch(es) of speech (volume automation)", v["ducked_db"], v["speech_ranges"]);
+        }
+        Ok(_) => {}
+        Err(e) => app.ui.status = e,
+    }
 }
 
 /// Keyboard shortcut for a dialog command, or one that would close a modified session: open its

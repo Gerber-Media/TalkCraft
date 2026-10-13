@@ -336,7 +336,7 @@ fn rename(e: &mut Engine, p: &Value) -> Result<Value> {
 
 /// The clip's audio as planar channels (its stretch applied to the source span), `None` for
 /// MIDI/video clips or audio not loaded.
-fn clip_audio(s: &soundcraft_model::Session, c: &soundcraft_model::Clip) -> Option<(Vec<Vec<f32>>, f32)> {
+pub(crate) fn clip_audio(s: &soundcraft_model::Session, c: &soundcraft_model::Clip) -> Option<(Vec<Vec<f32>>, f32)> {
     let soundcraft_model::ClipContent::Audio { source, offset } = &c.content else { return None };
     let audio = s.pool.get(*source)?;
     let rate = s.source(*source).map_or(s.sample_rate.hz(), |x| x.sample_rate).max(1);

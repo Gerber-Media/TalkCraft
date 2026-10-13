@@ -56,7 +56,140 @@ pub fn specs() -> Vec<CommandSpec> {
             has_tracks,
             truncate_silence
         ),
+        cmd!(
+            "podcast.match_speakers",
+            "Match Speaker Levels",
+            [],
+            None,
+            "{target_lufs?: -20, tracks?} — sets the clip gains of each speaker track (default: every audio track not locked against recording) so all speakers are equally loud",
+            has_tracks,
+            match_speakers
+        ),
+        cmd!(
+            "podcast.auto_duck",
+            "Auto-Duck Music",
+            [],
+            None,
+            "{music?: track (default: the locked jingle track), amount_db?: -12, attack_ms?: 300, release_ms?: 800, threshold_db?: -40} — writes volume automation that lowers the music while anyone speaks",
+            has_tracks,
+            auto_duck
+        ),
     ]
+}
+
+/// The speaker tracks: `tracks`, else every audio track that records (not locked).
+fn speaker_tracks(e: &Engine, p: &Value) -> Vec<soundcraft_model::TrackId> {
+    match p.get("tracks").and_then(Value::as_array) {
+        Some(a) => a.iter().filter_map(Value::as_u64).map(soundcraft_model::TrackId).collect(),
+        None => crate::podcast::record_targets(e.session()),
+    }
+}
+
+fn match_speakers(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "podcast.match_speakers";
+    let target = f64_or(p, "target_lufs", -20.0).clamp(-40.0, -5.0) as f32;
+    let mut changes: Vec<(soundcraft_model::TrackId, f32)> = Vec::new();
+    for t in speaker_tracks(e, p) {
+        let s = e.session();
+        let Some(track) = s.track(t) else { continue };
+        // The track's clips back to back, each at its clip gain: what the speaker sounds like.
+        let mut joined: Vec<Vec<f32>> = Vec::new();
+        let mut rate = s.sample_rate.as_f64() as f32;
+        for c in track.clips() {
+            let Some((ch, r)) = super::clip::clip_audio(s, c) else { continue };
+            rate = r;
+            let g = 10f32.powf(c.gain_db / 20.0);
+            let mono: Vec<f32> =
+                (0..ch.iter().map(Vec::len).min().unwrap_or(0)).map(|i| ch.iter().map(|x| x[i]).sum::<f32>() / ch.len() as f32 * g).collect();
+            if joined.is_empty() {
+                joined.push(Vec::new());
+            }
+            if let Some(j) = joined.first_mut() {
+                j.extend(mono);
+            }
+        }
+        if joined.first().is_none_or(Vec::is_empty) {
+            continue;
+        }
+        let lufs = soundcraft_dsp::offline::integrated_lufs(&joined, rate);
+        if lufs.is_finite() && lufs > -70.0 {
+            changes.push((t, (target - lufs).clamp(-30.0, 30.0)));
+        }
+    }
+    if changes.is_empty() {
+        return Err(bad(ID, "no speaker track holds audio"));
+    }
+    let s = e.session_mut();
+    let mut out = Vec::new();
+    for (t, delta) in changes {
+        if let Some(track) = s.track_mut(t) {
+            if let Some(pl) = track.playlist_mut() {
+                for c in &mut pl.clips {
+                    c.gain_db = (c.gain_db + delta).clamp(-144.0, 36.0);
+                }
+            }
+            out.push(json!({"track": track.name, "change_db": delta}));
+        }
+    }
+    Ok(json!({"tracks": out}))
+}
+
+fn auto_duck(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "podcast.auto_duck";
+    let s = e.session();
+    let music = match p.get("music").and_then(Value::as_u64) {
+        Some(m) => soundcraft_model::TrackId(m),
+        None => s
+            .tracks
+            .iter()
+            .find(|t| t.kind == soundcraft_model::TrackKind::Audio && t.mixer.record_lock)
+            .map(|t| t.id)
+            .ok_or_else(|| bad(ID, "name the music track (`music`): no locked jingle track found"))?,
+    };
+    let amount = f64_or(p, "amount_db", -12.0).clamp(-40.0, -1.0) as f32;
+    let attack = s.sample_rate.samples(f64_or(p, "attack_ms", 300.0).clamp(10.0, 5000.0) / 1000.0);
+    let release = s.sample_rate.samples(f64_or(p, "release_ms", 800.0).clamp(10.0, 10_000.0) / 1000.0);
+    let threshold = f64_or(p, "threshold_db", -40.0).clamp(-80.0, -10.0) as f32;
+    let end = s.content_end();
+    if end <= 0 {
+        return Err(bad(ID, "the session is empty"));
+    }
+    let r = soundcraft_time::Range::new(0, end);
+    let speakers: Vec<_> = speaker_tracks(e, p).into_iter().filter(|t| *t != music).collect();
+    // Everyone's speech, summed to one channel.
+    let mut speech: Vec<f32> = Vec::new();
+    for t in speakers {
+        let ch = crate::io::render_track(e, r, t, ID)?;
+        let n = ch.iter().map(Vec::len).min().unwrap_or(0);
+        if speech.len() < n {
+            speech.resize(n, 0.0);
+        }
+        for (i, x) in speech.iter_mut().enumerate().take(n) {
+            *x += ch.iter().map(|c| c[i].abs()).fold(0.0, f32::max);
+        }
+    }
+    // Pauses shorter than attack + release stay ducked (no pumping between sentences).
+    let gap = usize::try_from(attack + release).unwrap_or(0).max(1);
+    let ranges = soundcraft_dsp::offline::non_silent_ranges(&[speech], threshold, gap, 0, 0);
+    let base = e.session().track(music).map(|t| t.mixer.volume_db).ok_or_else(|| bad(ID, "no such music track"))?;
+    let ducked = base + amount;
+    let mut points: Vec<soundcraft_model::AutomationPoint> = vec![soundcraft_model::AutomationPoint { at: 0, value: base }];
+    for (a, b) in &ranges {
+        let (a, b) = (*a as i64, *b as i64);
+        let down = (a - attack).max(points.last().map_or(0, |p| p.at + 1));
+        points.push(soundcraft_model::AutomationPoint { at: down, value: base });
+        points.push(soundcraft_model::AutomationPoint { at: a.max(down + 1), value: ducked });
+        points.push(soundcraft_model::AutomationPoint { at: b.max(a.max(down + 1) + 1), value: ducked });
+        points.push(soundcraft_model::AutomationPoint { at: b.max(a.max(down + 1) + 1) + release, value: base });
+    }
+    let n = ranges.len();
+    let s = e.session_mut();
+    let track = s.track_mut(music).ok_or_else(|| bad(ID, "no such music track"))?;
+    let lane = track.lane_mut(&soundcraft_model::AutoParam::Volume);
+    lane.points = points;
+    lane.enabled = true;
+    track.mixer.automation_mode = soundcraft_model::AutomationMode::Read;
+    Ok(json!({"speech_ranges": n, "ducked_db": amount}))
 }
 
 /// `base` with the keys of `patch` replaced (one level deep for objects).
@@ -364,6 +497,54 @@ mod tests {
         e.execute("file.import_audio", &json!({"path": wav.to_string_lossy(), "track": "Moderation", "new_tracks": false})).unwrap();
         e.session_mut().add_marker("Thema", MarkerKind::Marker, 48_000 * 3, 48_000 * 3);
         e
+    }
+
+    /// A podcast session with a tone of `amp` on each named track at `at` seconds for `secs`.
+    fn toned(dir: &std::path::Path, parts: &[(&str, f32, f64, f64)]) -> Engine {
+        let mut e = Engine::default();
+        e.execute("session.new", &json!({"name": "T", "template": "podcast", "speakers": 2})).unwrap();
+        for (i, (track, amp, at, secs)) in parts.iter().enumerate() {
+            let n = (48_000.0 * secs) as usize;
+            let ch: Vec<f32> = (0..n).map(|k| (k as f32 * 0.05).sin() * amp).collect();
+            let buf = AudioBuffer { sample_rate: 48_000, channels: vec![ch] };
+            let wav = dir.join(format!("t{i}.wav"));
+            std::fs::write(&wav, soundcraft_audio_io::encode(&buf, &EncodeOptions::default()).unwrap()).unwrap();
+            e.execute("file.import_audio", &json!({"path": wav.to_string_lossy(), "track": track, "new_tracks": false, "at": {"seconds": at}}))
+                .unwrap();
+        }
+        e
+    }
+
+    #[test]
+    fn speakers_are_matched_to_the_same_loudness() {
+        let dir = std::env::temp_dir().join(format!("sc-podcast-match-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut e = toned(&dir, &[("Moderation", 0.5, 0.0, 3.0), ("Gast 1", 0.05, 3.0, 3.0)]);
+        let v = e.execute("podcast.match_speakers", &json!({"target_lufs": -20.0})).unwrap();
+        assert_eq!(v["tracks"].as_array().unwrap().len(), 2, "{v}");
+        let s = e.session();
+        let gain = |name: &str| s.track_by_name(name).unwrap().clips()[0].gain_db;
+        assert!((gain("Gast 1") - gain("Moderation") - 20.0).abs() < 0.5, "a 20 dB quieter guest gets 20 dB more: {v}");
+        assert!(std::fs::remove_dir_all(&dir).is_ok());
+    }
+
+    #[test]
+    fn music_ducks_while_someone_speaks() {
+        let dir = std::env::temp_dir().join(format!("sc-podcast-duck-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut e = toned(&dir, &[("Jingles & Musik", 0.2, 0.0, 10.0), ("Moderation", 0.3, 3.0, 3.0)]);
+        let v = e.execute("podcast.auto_duck", &json!({})).unwrap();
+        assert_eq!(v["speech_ranges"], 1, "{v}");
+        let s = e.session();
+        let music = s.track_by_name("Jingles & Musik").unwrap();
+        let lane = music.lane(&soundcraft_model::AutoParam::Volume).unwrap();
+        let at = |secs: f64| lane.value_at(s.sample_rate.samples(secs), 0.0);
+        assert_eq!(at(1.0), -6.0, "full level before the speech");
+        assert_eq!(at(4.5), -18.0, "ducked by 12 dB while speaking");
+        assert_eq!(at(8.0), -6.0, "back after the release");
+        assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 
     #[test]
