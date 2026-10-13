@@ -40,6 +40,7 @@ pub fn specs() -> Vec<CommandSpec> {
             }
         ),
         cmd!("subtitle.import", "Import Subtitles...", [], None, "{path, at?: 0, replace?: false} — .srt or .vtt", always, import),
+        cmd!(noundo "subtitle.export_text", "Export Transcript...", [], None, "{path, start?, end?} — readable text (.txt) or Markdown (.md), paragraphs per speaker with times", always, export_text),
         cmd!(noundo "subtitle.export", "Export Subtitles...", [], None, "{path, format?: srt|vtt (from the extension), start?, end?}", always, export),
         cmd!(
             "subtitle.segment",
@@ -207,6 +208,20 @@ fn export(e: &mut Engine, p: &Value) -> Result<Value> {
     }
     let written = write_cues(ID, &path, str_param(p, "format"), &cues)?;
     Ok(json!({"path": written, "cues": cues.len()}))
+}
+
+fn export_text(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "subtitle.export_text";
+    let path = str_param(p, "path").ok_or_else(|| bad(ID, "`path` required"))?.to_string();
+    let r = full_range(e, range_param(e, ID, p)?);
+    let cues = subs::file_cues(e.session(), r);
+    if cues.is_empty() {
+        return Err(bad(ID, "no subtitles with text: transcribe or type them in Window > Subtitles first"));
+    }
+    let md = std::path::Path::new(&path).extension().is_some_and(|x| x.eq_ignore_ascii_case("md"));
+    let path = if md { path } else { std::path::Path::new(&path).with_extension("txt").to_string_lossy().to_string() };
+    crate::io::write_file(&path, subs::write_transcript(&cues, md).as_bytes())?;
+    Ok(json!({"path": path, "cues": cues.len()}))
 }
 
 fn segment(e: &mut Engine, p: &Value) -> Result<Value> {

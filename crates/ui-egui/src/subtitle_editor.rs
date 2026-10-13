@@ -262,6 +262,13 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 if ui.add_enabled(!cues.is_empty(), egui::Button::new("Export…")).clicked() {
                     dialog = Some("subtitle.export");
                 }
+                if ui
+                    .add_enabled(!cues.is_empty(), egui::Button::new("Export Text…"))
+                    .on_hover_text("The transcript as readable text (.txt) or Markdown (.md)")
+                    .clicked()
+                {
+                    dialog = Some("subtitle.export_text");
+                }
                 ui.separator();
                 ui.checkbox(&mut ed.follow, "Follow playhead");
                 ui.add(egui::TextEdit::singleline(&mut ed.filter).hint_text("Search").desired_width(140.0));

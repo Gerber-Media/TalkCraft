@@ -228,6 +228,9 @@ fn export(e: &mut Engine, p: &Value) -> Result<Value> {
             for f in ["srt", "vtt"] {
                 extra.push(super::subtitles::write_cues(ID, &path, Some(f), &cues)?);
             }
+            let txt = std::path::Path::new(&path).with_extension("transcript.txt").to_string_lossy().to_string();
+            crate::io::write_file(&txt, crate::subtitles::write_transcript(&cues, false).as_bytes())?;
+            extra.push(txt);
         }
     }
     Ok(json!({

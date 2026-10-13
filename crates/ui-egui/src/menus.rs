@@ -394,6 +394,7 @@ const MENU_WINDOWS: &[(&str, &str)] = &[
     ("File > Export Shownotes...", "podcast.export_shownotes"),
     ("File > Import > Subtitles...", "subtitle.import"),
     ("File > Export > Subtitles...", "subtitle.export"),
+    ("File > Export > Transcript...", "subtitle.export_text"),
     ("Edit > Shorten Pauses...", "edit.truncate_silence"),
     ("Window > Subtitles", "window.subtitles"),
     ("View > Rulers > Subtitles", "view.ruler"),

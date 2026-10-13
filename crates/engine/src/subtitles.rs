@@ -103,6 +103,38 @@ pub fn write_vtt(cues: &[FileCue]) -> String {
     s
 }
 
+/// A readable transcript: consecutive cues of one speaker form a paragraph, each opened by its
+/// time (`[mm:ss]`) and speaker. `markdown` makes speakers bold.
+pub fn write_transcript(cues: &[FileCue], markdown: bool) -> String {
+    let mut out = String::new();
+    let mut current: Option<&str> = None;
+    for c in cues {
+        let text = c.text.split_whitespace().collect::<Vec<_>>().join(" ");
+        if text.is_empty() {
+            continue;
+        }
+        if current == Some(c.speaker.as_str()) {
+            out.push(' ');
+            out.push_str(&text);
+            continue;
+        }
+        if current.is_some() {
+            out.push_str("\n\n");
+        }
+        current = Some(c.speaker.as_str());
+        let who = match (c.speaker.trim().is_empty(), markdown) {
+            (true, _) => String::new(),
+            (false, true) => format!("**{}:** ", c.speaker.trim()),
+            (false, false) => format!("{}: ", c.speaker.trim()),
+        };
+        out.push_str(&format!("[{}] {who}{text}", clock(c.start_ms)));
+    }
+    if !out.is_empty() {
+        out.push('\n');
+    }
+    out
+}
+
 /// The session's cues inside `r`, in milliseconds from `r.start`, clipped to `r`.
 pub fn file_cues(s: &Session, r: Range) -> Vec<FileCue> {
     let sr = s.sample_rate.as_f64().max(1.0);
@@ -189,6 +221,15 @@ mod tests {
         cut_time(&mut s, Range::new(200, 250));
         let got: Vec<_> = s.subtitles.iter().map(|c| (c.start, c.end)).collect();
         assert_eq!(got, [(0, 100), (150, 210), (250, 350)]);
+    }
+
+    #[test]
+    fn transcript_joins_a_speakers_cues_into_paragraphs() {
+        let c = |a, sp: &str, t: &str| FileCue { start_ms: a, end_ms: a + 1000, speaker: sp.into(), text: t.into() };
+        let cues = vec![c(0, "Dirk", "Hallo und"), c(1000, "Dirk", " willkommen."), c(65_000, "Sven", "Danke!"), c(70_000, "", "(Musik)")];
+        assert_eq!(write_transcript(&cues, false), "[00:00] Dirk: Hallo und willkommen.\n\n[01:05] Sven: Danke!\n\n[01:10] (Musik)\n");
+        assert!(write_transcript(&cues, true).starts_with("[00:00] **Dirk:** Hallo"));
+        assert_eq!(write_transcript(&[], false), "");
     }
 
     #[test]

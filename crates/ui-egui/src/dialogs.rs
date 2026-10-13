@@ -334,6 +334,8 @@ fn path_dialog(id: &str, home: &str, name: &str) -> Option<Dialog> {
         "file.print_score" => ".svg",
         "file.export_clip_groups" => ".scgrp",
         "file.export_session_text" => ".txt",
+        "subtitle.export_text" => " Transcript.txt",
+        "subtitle.export" => ".srt",
         _ if id.contains("session") => ".scraft",
         _ => "",
     };
