@@ -33,7 +33,7 @@ fn fingerprint(s: &soundcraft_model::Session) -> u64 {
 
 impl Loudness {
     /// Called every frame: notices changes, starts a measurement once they settle, picks up results.
-    pub fn update(&mut self, engine: &soundcraft_engine::Engine, playing: bool) {
+    pub fn update(&mut self, engine: &soundcraft_engine::Engine, playing: bool, ctx: &egui::Context) {
         if let Some((fp, rx)) = &self.pending
             && let Ok(v) = rx.try_recv()
         {
@@ -51,7 +51,7 @@ impl Loudness {
         }
         let settled = self.changed_at.is_none_or(|t| t.elapsed() >= SETTLE);
         if self.pending.is_none() && self.measured != self.fingerprint && settled && !playing {
-            self.start(engine.session_arc(), self.fingerprint);
+            self.start(engine.session_arc(), self.fingerprint, ctx);
         }
     }
 
@@ -61,10 +61,13 @@ impl Loudness {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn start(&mut self, s: std::sync::Arc<soundcraft_model::Session>, fp: u64) {
+    fn start(&mut self, s: std::sync::Arc<soundcraft_model::Session>, fp: u64, ctx: &egui::Context) {
         let (tx, rx) = channel();
+        let ctx = ctx.clone();
         let spawned = std::thread::Builder::new().name("loudness".into()).spawn(move || {
             let _ = tx.send(measure(&s));
+            // Show the result now, not at the next input.
+            ctx.request_repaint();
         });
         if spawned.is_ok() {
             self.pending = Some((fp, rx));
@@ -75,7 +78,7 @@ impl Loudness {
 
     /// The browser has no threads for this: no readout there.
     #[cfg(target_arch = "wasm32")]
-    fn start(&mut self, _s: std::sync::Arc<soundcraft_model::Session>, fp: u64) {
+    fn start(&mut self, _s: std::sync::Arc<soundcraft_model::Session>, fp: u64, _ctx: &egui::Context) {
         let _ = channel::<()>();
         self.measured = fp;
     }

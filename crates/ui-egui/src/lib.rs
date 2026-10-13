@@ -818,10 +818,7 @@ impl SoundApp {
             return;
         }
         let playing = self.is_playing();
-        self.loudness.update(&self.engine, playing);
-        if self.loudness.stale() {
-            ctx.request_repaint_after(std::time::Duration::from_millis(500));
-        }
+        self.loudness.update(&self.engine, playing, ctx);
         // Fonts set now take effect next frame, so draw only from the frame after.
         if !self.fonts_ready {
             if self.fonts_installed {
