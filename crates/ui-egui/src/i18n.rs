@@ -346,6 +346,8 @@ const DE: &[(&str, &str)] = &[
     ("connecting …", "verbindet …"),
     ("muted themselves", "hat sich stummgeschaltet"),
     ("Browse…", "Durchsuchen …"),
+    ("Playback Speed", "Wiedergabegeschwindigkeit"),
+    ("Playback speed (the pitch stays the same)", "Wiedergabegeschwindigkeit (die Tonhöhe bleibt gleich)"),
     ("File:", "Datei"),
     ("path to a square JPEG or PNG", "Pfad zu einem quadratischen JPEG oder PNG"),
     (

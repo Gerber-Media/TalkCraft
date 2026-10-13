@@ -23,7 +23,10 @@ pub fn tracks_and_groups(app: &mut SoundApp, ui: &mut Ui) {
         let s = app.engine.session();
         s.tracks.iter().map(|x| (x.id.0, x.name.clone(), !x.hidden, x.color, s.edit.selected_tracks.contains(&x.id))).collect()
     };
-    egui::ScrollArea::vertical().id_salt("tracks_scroll").max_height(total * 0.62).auto_shrink([false, false]).show(ui, |ui| {
+    // TalkCraft has no track groups; the list appears only for sessions that already have some.
+    let has_groups = !app.engine.session().groups.is_empty();
+    let height = if has_groups { total * 0.62 } else { f32::INFINITY };
+    egui::ScrollArea::vertical().id_salt("tracks_scroll").max_height(height).auto_shrink([false, false]).show(ui, |ui| {
         for (id, name, shown, color, sel) in tracks {
             let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 17.0), Sense::click());
             if sel {
@@ -42,6 +45,9 @@ pub fn tracks_and_groups(app: &mut SoundApp, ui: &mut Ui) {
             }
         }
     });
+    if !has_groups {
+        return;
+    }
     ui.add_space(4.0);
     panel_header(ui, "GROUPS");
     let groups: Vec<(u64, char, String, bool, [u8; 3])> =
@@ -53,12 +59,6 @@ pub fn tracks_and_groups(app: &mut SoundApp, ui: &mut Ui) {
         if all.double_clicked() {
             let _ = app.run("edit.select_all", json!({}));
         }
-        all.context_menu(|ui| {
-            if ui.button("New Group…").clicked() {
-                let _ = app.dialogs.open_for_command(&app.engine, "track.group");
-                ui.close();
-            }
-        });
         for (id, letter, name, active, color) in groups {
             let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 17.0), Sense::click());
             if active {

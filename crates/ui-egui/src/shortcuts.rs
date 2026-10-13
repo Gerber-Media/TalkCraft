@@ -91,6 +91,7 @@ pub fn handle(app: &mut SoundApp, ctx: &egui::Context) {
 fn command_for(key: Key, mods: Modifiers, mac: bool) -> Option<&'static str> {
     soundcraft_engine::command_specs()
         .iter()
+        .filter(|c| !crate::podcast::HIDDEN_COMMANDS.contains(&c.id))
         .find(|c| c.shortcut.and_then(parse).is_some_and(|(m, k)| k == key && mods_match(m, mods, mac)))
         .map(|c| c.id)
 }

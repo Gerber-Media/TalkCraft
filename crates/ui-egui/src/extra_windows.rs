@@ -61,6 +61,11 @@ pub fn run(app: &mut SoundApp, id: &str, p: &Value) -> Option<Value> {
         "window.words" => crate::words_window::toggle(app, p),
         "window.jingles" => crate::jingles_window::toggle(app, p),
         "window.remote" => crate::remote::toggle(app, p),
+        "transport.rate" => {
+            let r = p.get("rate").and_then(Value::as_f64).unwrap_or(1.0) as f32;
+            app.ui.playback_rate = if r.is_finite() { r.clamp(0.5, 2.0) } else { 1.0 };
+            json!({"rate": app.ui.playback_rate})
+        }
         "window.audiogram" => {
             app.dialogs.open_audiogram(&app.engine);
             json!({})

@@ -48,7 +48,9 @@ podcast does not need.
 - **Editing.** The blade splits a clip where you click (Alt: every track). Delete/Backspace removes
   the selected section after asking, closing the gap on all tracks so speakers stay in sync.
   A click places the cursor with every tool, the hand too (dragging moves clips, Shift-click
-  selects one). Magnetic snapping, Close Gap, Z/Shift+Z zoom. Edit > Shorten Pauses trims long silences on all
+  selects one). Pull a clip's edge to bring back what was cut (the pointer turns into ↔ at the
+  edge; in Shuffle the rest of the track makes room, with Alt every track). Magnetic snapping,
+  Close Gap, Z/Shift+Z zoom. Edit > Shorten Pauses trims long silences on all
   tracks at once. Markers and subtitles move along.
 - **Clip tools.** Normalize or set a clip's loudness, clip volume, fades with handles, noise
   reduction.
@@ -61,6 +63,7 @@ podcast does not need.
   (speakers named after the loudest track) and a plain-text transcript export.
 - **Filler words.** The transcript as running text with "ähm", "uh" and friends marked; select
   words and cut them out of every track at once.
+- **Playback speed.** 0.5× to 2× from the toolbar, with the voices' pitch unchanged.
 - **Loudness.** The toolbar shows the episode's loudness (LUFS) live.
 - **Delivery.** M4A (AAC, the default), M4B or MP3 (LAME) with tags, cover and chapters from
   markers, or WAV/FLAC/AIFF; loudness normalised to -16 LUFS (or another target). Shownotes
@@ -185,7 +188,8 @@ braucht.
 - **Schnitt.** Die Klinge teilt einen Clip, wo man klickt (Alt: alle Spuren). Entf/Rückschritt
   entfernt nach Rückfrage den markierten Abschnitt und schließt die Lücke auf allen Spuren, damit
   die Sprecher synchron bleiben. Ein Klick setzt mit jedem Werkzeug die Einfügemarke, auch mit der Hand (Ziehen verschiebt
-  Clips, Umschalt-Klick wählt einen aus). Magnetisches Einrasten, Lücke schließen, Zoom mit Z/Umschalt+Z.
+  Clips, Umschalt-Klick wählt einen aus). Eine Clip-Kante lässt sich wieder aufziehen, um Herausgeschnittenes
+  zurückzuholen (der Zeiger wird an der Kante zu ↔; in Shuffle rückt der Rest der Spur nach, mit Alt auf allen Spuren). Magnetisches Einrasten, Lücke schließen, Zoom mit Z/Umschalt+Z.
   Bearbeiten > Pausen kürzen kürzt lange Pausen auf allen Spuren zugleich. Marker und Untertitel
   wandern mit.
 - **Clip-Werkzeuge.** Normalisieren oder Lautheit eines Clips setzen, Clip-Lautstärke, Blenden
@@ -200,6 +204,7 @@ braucht.
   und Export als reiner Text.
 - **Füllwörter.** Das Transkript als Fließtext mit markierten „ähm“, „äh“ und Co.; Wörter
   auswählen und auf allen Spuren zugleich herausschneiden.
+- **Wiedergabegeschwindigkeit.** 0,5× bis 2× über die Werkzeugleiste, die Stimmen behalten ihre Tonhöhe.
 - **Lautheit.** Die Werkzeugleiste zeigt die Lautheit der Folge (LUFS) live.
 - **Ausgabe.** M4A (AAC, Standard), M4B oder MP3 (LAME) mit Tags, Cover und Kapiteln aus Markern,
   oder WAV/FLAC/AIFF; Lautheit auf -16 LUFS (oder ein anderes Ziel) normalisiert. Dazu Shownotes

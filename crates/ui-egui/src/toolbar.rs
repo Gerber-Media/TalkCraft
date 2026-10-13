@@ -249,7 +249,7 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
     let playing = app.is_playing();
     let recording = app.engine.transport.recording;
     let looped = app.engine.session().edit.loop_playback;
-    group(ui, 176.0, 64.0, |ui, _| {
+    group(ui, 222.0, 64.0, |ui, _| {
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing = vec2(3.0, 4.0);
             ui.horizontal(|ui| {
@@ -318,8 +318,37 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
                         let _ = app.run(cmd, json!({}));
                     }
                 }
+                rate_button(app, ui);
             });
         });
+    });
+}
+
+/// Listening rates offered; the pitch stays the same.
+pub const PLAYBACK_RATES: [f32; 7] = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+
+fn rate_label(r: f32) -> String {
+    let s = format!("{r}×");
+    if crate::i18n::tr("Playback Speed") == "Playback Speed" { s } else { s.replace('.', ",") }
+}
+
+/// Faster or slower playback without changing the voices' pitch.
+fn rate_button(app: &mut SoundApp, ui: &mut Ui) {
+    let t = Tokens::current();
+    let rate = app.ui.playback_rate;
+    let label = egui::RichText::new(rate_label(rate)).size(12.0).color(if (rate - 1.0).abs() > 0.001 { t.accent } else { t.counter_text });
+    ui.scope(|ui| {
+        ui.spacing_mut().button_padding = vec2(4.0, 1.0);
+        let r = ui.menu_button(label, |ui| {
+            ui.label(egui::RichText::new(crate::i18n::tr("Playback Speed")).strong());
+            for r in PLAYBACK_RATES {
+                if ui.selectable_label((rate - r).abs() < 0.001, rate_label(r)).clicked() {
+                    let _ = app.run("transport.rate", json!({"rate": r}));
+                    ui.close();
+                }
+            }
+        });
+        r.response.on_hover_text(crate::i18n::tr("Playback speed (the pitch stays the same)"));
     });
 }
 

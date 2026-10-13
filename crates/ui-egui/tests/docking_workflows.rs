@@ -38,7 +38,7 @@ fn drag(h: &mut Harness<'_, SoundApp>, from: egui::Pos2, to: egui::Pos2) {
 fn real_drag_float_close_reopen_reload_retains_transport_and_mixer_commands() {
     let mut h = harness(None, 1400.0, 1.0);
     let source = h.get_by_role_and_label(egui::accesskit::Role::Tab, "Clips").rect().center();
-    let target = h.get_by_role_and_label(egui::accesskit::Role::Tab, "Tracks and Groups").rect().center();
+    let target = h.get_by_role_and_label(egui::accesskit::Role::Tab, "Tracks").rect().center();
     drag(&mut h, source, target);
     assert_eq!(h.state().ui.docking.layout.location(&Panel::Clips).unwrap().anchor, Some(Panel::Tracks));
     h.get_by_role_and_label(egui::accesskit::Role::Tab, "Clips").click_button(PointerButton::Secondary);
@@ -60,7 +60,7 @@ fn real_drag_float_close_reopen_reload_retains_transport_and_mixer_commands() {
     assert_eq!(serde_json::to_value(&reloaded.state().ui.docking).unwrap(), expected);
     reloaded.state_mut().run("ui.dock", json!({"operation":"move","panel":"clips","target":"tracks","zone":"center"})).unwrap();
     reloaded.run_steps(4);
-    reloaded.get_by_role_and_label(egui::accesskit::Role::Tab, "Tracks and Groups").click();
+    reloaded.get_by_role_and_label(egui::accesskit::Role::Tab, "Tracks").click();
     reloaded.run_steps(3);
     reloaded.get_by_label("Trim (F6)").click();
     reloaded.run_steps(3);

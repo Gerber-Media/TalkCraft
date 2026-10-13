@@ -1173,7 +1173,7 @@ fn view_menu(app: &mut SoundApp, ui: &mut Ui, track: &Track) {
 
 fn track_context_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
     let tid = id.0;
-    let items: [(&str, &str); 10] = [
+    let items: [(&str, &str); 9] = [
         ("Rename...", "ui.rename_track"),
         ("Duplicate...", "track.duplicate"),
         ("Make Inactive", "track.make_inactive"),
@@ -1183,7 +1183,6 @@ fn track_context_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
         ("Commit...", "track.commit"),
         ("Freeze", "track.freeze"),
         ("Move to New Folder...", "track.move_to_new_folder"),
-        ("Group...", "track.group"),
     ];
     for (label, cmd) in items {
         if ui.button(label).clicked() {
@@ -1640,27 +1639,23 @@ fn lane_interaction(app: &mut SoundApp, ui: &mut Ui, track: &Track, lane: Rect, 
     };
     // Effective tool under the Smart tool.
     let eff = match tool {
-        Tool::Smart => {
-            if let Some(c) = &hit {
-                if near_edge(c).is_some() {
-                    Tool::Trim
-                } else if upper {
-                    Tool::Selector
-                } else {
-                    Tool::Grabber
-                }
-            } else {
-                Tool::Selector
-            }
-        }
-        // The hand only over a clip: elsewhere a Grabber click places the insertion point.
+        // TalkCraft: at a clip's edge every pointer tool trims (pull a cut back out).
+        Tool::Smart | Tool::Selector | Tool::Grabber if hit.as_ref().is_some_and(|c| near_edge(c).is_some()) => Tool::Trim,
+        Tool::Smart => match &hit {
+            Some(_) if !upper => Tool::Grabber,
+            _ => Tool::Selector,
+        },
+        // Elsewhere a Grabber click places the insertion point; only dragging a clip moves it.
         Tool::Grabber if hit.is_none() => Tool::Selector,
         other => other,
     };
     if resp.hovered() {
         let icon = match eff {
-            Tool::Trim => egui::CursorIcon::ResizeHorizontal,
-            Tool::Grabber => egui::CursorIcon::Grab,
+            // ↔ with a bar: the edge can be pulled either way.
+            Tool::Trim => egui::CursorIcon::ResizeColumn,
+            // The pointer stays a text cursor (a click places the insertion point); the hand
+            // appears only while a clip is being dragged.
+            Tool::Grabber => egui::CursorIcon::Text,
             Tool::Selector => egui::CursorIcon::Text,
             Tool::Zoom => egui::CursorIcon::ZoomIn,
             Tool::Pencil | Tool::Blade => egui::CursorIcon::Crosshair,
@@ -1852,7 +1847,8 @@ fn drive_drag(app: &mut SoundApp, ctx: &egui::Context) {
     let (s, tl) = (app.engine.session_arc(), rect(app.edit_layout.timeline));
     let p = ctx.pointer_latest_pos();
     if !ctx.input(|i| i.pointer.any_down()) {
-        finish_drag(app, &s, tl, p);
+        let alt = ctx.input(|i| i.modifiers.alt);
+        finish_drag(app, &s, tl, p, alt);
         return;
     }
     let Some(p) = p else { return };
@@ -1936,7 +1932,7 @@ fn drive_drag(app: &mut SoundApp, ctx: &egui::Context) {
     }
 }
 
-fn finish_drag(app: &mut SoundApp, s: &Session, tl: Rect, p: Option<Pos2>) {
+fn finish_drag(app: &mut SoundApp, s: &Session, tl: Rect, p: Option<Pos2>, alt: bool) {
     match app.gesture.take() {
         Some(Gesture::MoveClips { clips, delta, from_track, to_track, .. }) => {
             let ids: Vec<u64> = clips.iter().map(|c| c.0).collect();
@@ -1962,8 +1958,8 @@ fn finish_drag(app: &mut SoundApp, s: &Session, tl: Rect, p: Option<Pos2>) {
                 }
             }
         }
-        Some(Gesture::TrimStart { clip, track, to }) => trim_clip(app, clip, track, to, true),
-        Some(Gesture::TrimEnd { clip, track, to }) => trim_clip(app, clip, track, to, false),
+        Some(Gesture::TrimStart { clip, track, to }) => trim_clip(app, clip, track, to, true, alt),
+        Some(Gesture::TrimEnd { clip, track, to }) => trim_clip(app, clip, track, to, false, alt),
         Some(Gesture::Pencil { track, points }) => {
             if let Some(param) = s.track(track).and_then(|t| AutoParam::parse(&t.view)) {
                 let pid = automation_id(&param);
@@ -1999,7 +1995,7 @@ fn automation_id(p: &AutoParam) -> String {
     }
 }
 
-fn trim_clip(app: &mut SoundApp, clip: ClipId, track: TrackId, to: Samples, start: bool) {
+fn trim_clip(app: &mut SoundApp, clip: ClipId, track: TrackId, to: Samples, start: bool, alt: bool) {
     let cmd = if start { "edit.trim_start_to_insertion" } else { "edit.trim_end_to_insertion" };
     // Trims through the command layer: select the clip's track and position the insertion.
     let sel_before = app.engine.session().edit.selection;
@@ -2007,9 +2003,11 @@ fn trim_clip(app: &mut SoundApp, clip: ClipId, track: TrackId, to: Samples, star
     let c = app.engine.session().find_clip(clip).map(|(_, c)| c.clone());
     if let Some(c) = c {
         if start && to < c.start || !start && to > c.end() {
-            // Extending: use trim to fill selection with handles.
-            let r = if start { Range::new(to, c.end()) } else { Range::new(c.start, to) };
-            let _ = app.run("edit.trim_to_fill_selection", json!({"clips": [clip.0], "start": r.start, "end": r.end}));
+            // Extending brings back audio that was cut away. In Shuffle the rest of the track makes
+            // room (Alt: every track, so the speakers stay in sync); in Slip the neighbour stops it.
+            let ripple = app.engine.session().edit.edit_mode == soundcraft_model::EditMode::Shuffle;
+            let edge = if start { "start" } else { "end" };
+            run_report(app, "edit.extend_clip", json!({"clip": clip.0, "edge": edge, "to": to, "ripple": ripple, "all_tracks": alt}));
         } else {
             let _ = app.run(cmd, json!({"tracks": [track.0], "at": to}));
         }

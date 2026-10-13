@@ -23,6 +23,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 pub mod record;
+mod stretch;
 
 use soundcraft_dsp::{Plugin, PluginEditor};
 use soundcraft_mix::{MAX_CHANNELS, MixEngine, PreparedInstance, StripMeter, itu_stereo_fold, main_channels};
@@ -73,6 +74,8 @@ struct Shared {
     playing: AtomicBool,
     /// Speed × 1000.
     speed: AtomicU32,
+    /// Pitch-preserving playback rate × 1000 (listening faster or slower).
+    rate: AtomicU32,
     meters: Mutex<MeterSnapshot>,
     /// The output device went away (unplugged): set by the stream's error callback.
     device_lost: AtomicBool,
@@ -99,6 +102,8 @@ struct AudioState {
     recording: bool,
     /// Retired plugin instances go back to the UI thread to be dropped there.
     garbage: Sender<Vec<Box<dyn Plugin>>>,
+    /// Pitch-preserving rate change between the mix and the device.
+    stretch: stretch::Stretch,
 }
 
 fn new_engine(sr: f32) -> MixEngine {
@@ -129,6 +134,7 @@ impl AudioState {
             device_rate,
             input: None,
             recording: false,
+            stretch: stretch::Stretch::default(),
         }
     }
 
@@ -166,6 +172,7 @@ impl AudioState {
                     self.playing = true;
                     self.pending_len = 0;
                     self.read = 0.0;
+                    self.stretch.reset();
                     self.mix.reset();
                 }
                 Cmd::Stop => {
@@ -178,6 +185,7 @@ impl AudioState {
                     self.pos = at;
                     self.pending_len = 0;
                     self.read = 0.0;
+                    self.stretch.reset();
                 }
             }
         }
@@ -268,29 +276,27 @@ impl AudioState {
         }
         let speed = f64::from(self.shared.speed.load(Ordering::Relaxed)) / 1000.0;
         let step = self.session.sample_rate.as_f64() / self.device_rate.max(1.0) * speed.clamp(0.1, 4.0);
+        let rate = f64::from(self.shared.rate.load(Ordering::Relaxed)) / 1000.0;
+        // Only while playing: monitoring an input never runs ahead or behind.
+        let stretching = self.playing && (rate - 1.0).abs() > 0.005;
         let callback_frames = out.len() / channels;
-        let quantum = ((callback_frames as f64 * step).ceil() as usize).clamp(1, BLOCK);
+        let quantum = ((callback_frames as f64 * step * if stretching { rate.clamp(0.25, 4.0) } else { 1.0 }).ceil() as usize).clamp(1, BLOCK);
+        let nch = self.pending.len().min(MAX_CHANNELS);
+        if stretching && !self.stretch.is_prepared_for(nch) {
+            // A new channel count (a document edit, not steady state).
+            self.stretch.prepare(nch, self.device_rate);
+        }
+        let mut stretch = std::mem::take(&mut self.stretch);
+        let mut cur = [0.0f32; MAX_CHANNELS];
         for frame in out.chunks_mut(channels) {
-            while self.read >= self.pending_len as f64 {
-                self.read -= self.pending_len as f64;
-                if !self.playing && !monitoring {
-                    break;
-                }
-                self.render_next(quantum);
-                if self.pending_len == 0 {
-                    break;
-                }
+            let cur = cur.get_mut(..nch).unwrap_or(&mut []);
+            if stretching {
+                stretch.next_frame(rate, cur, |f| self.input_frame(f, step, quantum, monitoring));
+            } else {
+                self.input_frame(cur, step, quantum, monitoring);
             }
-            let i0 = self.read.floor() as usize;
-            let fr = (self.read - i0 as f64) as f32;
             let sounding = self.playing || monitoring;
-            let nch = self.pending.len();
-            let sample = |c: usize| {
-                let ch = self.pending.get(c);
-                let a = ch.and_then(|v| v.get(i0)).copied().unwrap_or(0.0);
-                let b = ch.and_then(|v| v.get(i0 + 1)).copied().unwrap_or(a);
-                a + (b - a) * fr
-            };
+            let sample = |c: usize| cur.get(c).copied().unwrap_or(0.0);
             if nch > 2 && channels < nch {
                 // Fewer device channels than the main mix: ITU fold-down to stereo.
                 let (mut l, mut r) = (0.0f32, 0.0f32);
@@ -314,8 +320,34 @@ impl AudioState {
                     *o = if c < nch.max(1) && sounding { sample(c).clamp(-1.0, 1.0) } else { 0.0 };
                 }
             }
-            self.read += step;
         }
+        if !stretching {
+            stretch.reset();
+        }
+        self.stretch = stretch;
+    }
+
+    /// The next frame of the mix (all main channels) at the device rate, rendering as needed.
+    fn input_frame(&mut self, frame: &mut [f32], step: f64, quantum: usize, monitoring: bool) {
+        while self.read >= self.pending_len as f64 {
+            self.read -= self.pending_len as f64;
+            if !self.playing && !monitoring {
+                break;
+            }
+            self.render_next(quantum);
+            if self.pending_len == 0 {
+                break;
+            }
+        }
+        let i0 = self.read.floor() as usize;
+        let fr = (self.read - i0 as f64) as f32;
+        for (c, x) in frame.iter_mut().enumerate() {
+            let ch = self.pending.get(c);
+            let a = ch.and_then(|v| v.get(i0)).copied().unwrap_or(0.0);
+            let b = ch.and_then(|v| v.get(i0 + 1)).copied().unwrap_or(a);
+            *x = a + (b - a) * fr;
+        }
+        self.read += step;
     }
 }
 
@@ -388,6 +420,7 @@ impl Player {
             position: AtomicI64::new(0),
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
+            rate: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
             device_lost: AtomicBool::new(false),
         });
@@ -629,6 +662,16 @@ impl Player {
         let _ = self.tx.send(Cmd::Locate(at));
     }
 
+    /// Listening rate that keeps the pitch (0.5–2 is sensible; 1 = normal).
+    pub fn set_rate(&self, rate: f32) {
+        let v = if rate.is_finite() { (rate.clamp(0.25, 4.0) * 1000.0) as u32 } else { 1000 };
+        self.shared.rate.store(v, Ordering::Relaxed);
+    }
+
+    pub fn rate(&self) -> f32 {
+        self.shared.rate.load(Ordering::Relaxed) as f32 / 1000.0
+    }
+
     pub fn set_speed(&self, speed: f32) {
         let v = if speed.is_finite() { (speed.clamp(0.1, 4.0) * 1000.0) as u32 } else { 1000 };
         self.shared.speed.store(v, Ordering::Relaxed);
@@ -787,6 +830,7 @@ mod tests {
             position: AtomicI64::new(0),
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
+            rate: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
             device_lost: AtomicBool::new(false),
         });
@@ -806,6 +850,7 @@ mod tests {
             position: AtomicI64::new(0),
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
+            rate: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
             device_lost: AtomicBool::new(false),
         });
@@ -832,6 +877,7 @@ mod tests {
             position: AtomicI64::new(0),
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
+            rate: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
             device_lost: AtomicBool::new(false),
         });
@@ -892,6 +938,7 @@ mod tests {
             position: AtomicI64::new(0),
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
+            rate: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
             device_lost: AtomicBool::new(false),
         });
@@ -956,6 +1003,7 @@ mod tests {
             position: AtomicI64::new(0),
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
+            rate: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
             device_lost: AtomicBool::new(false),
         });
@@ -979,6 +1027,7 @@ mod tests {
             position: AtomicI64::new(0),
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
+            rate: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
             device_lost: AtomicBool::new(false),
         });

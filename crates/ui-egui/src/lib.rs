@@ -74,6 +74,9 @@ pub struct UiState {
     pub language: String,
     /// Audio devices picked in Setup > Audio Interface (`None` = the system default).
     pub input_device: Option<String>,
+    /// Listening rate that keeps the pitch (1 = normal; the toolbar's 1× button).
+    #[serde(default = "default_rate")]
+    pub playback_rate: f32,
     pub output_device: Option<String>,
     pub show_about: bool,
     pub show_midi_editor: bool,
@@ -123,6 +126,10 @@ pub struct UiState {
     pub ui_scale: f32,
 }
 
+fn default_rate() -> f32 {
+    1.0
+}
+
 fn default_language() -> String {
     "auto".into()
 }
@@ -136,6 +143,7 @@ impl Default for UiState {
             // English unless chosen: tests and scripted runs read the English labels. The app
             // starts with "auto" (main.rs), and older settings files without the field get it too.
             language: "en".into(),
+            playback_rate: 1.0,
             input_device: None,
             output_device: None,
             show_tracks_list: true,
@@ -933,6 +941,11 @@ impl SoundApp {
         let playing = self.is_playing();
         crate::i18n::set(&self.ui.language);
         self.watch_devices();
+        if let Some(p) = &self.player
+            && (p.rate() - self.ui.playback_rate).abs() > 0.001
+        {
+            p.set_rate(self.ui.playback_rate);
+        }
         self.loudness.update(&self.engine, playing, ctx);
         if let Some(job) = &self.audiogram {
             match job.done.try_recv() {
