@@ -346,6 +346,13 @@ const DE: &[(&str, &str)] = &[
     ("connecting …", "verbindet …"),
     ("muted themselves", "hat sich stummgeschaltet"),
     ("Browse…", "Durchsuchen …"),
+    ("Waveform", "Wellenform"),
+    ("Volume", "Lautstärke"),
+    ("Show the waveform", "Wellenform zeigen"),
+    (
+        "Show the volume line (draw it with the pencil; auto-ducking writes it)",
+        "Lautstärkelinie zeigen (mit dem Stift zeichnen; die Musikabsenkung schreibt sie)",
+    ),
     ("Playback Speed", "Wiedergabegeschwindigkeit"),
     ("Playback speed (the pitch stays the same)", "Wiedergabegeschwindigkeit (die Tonhöhe bleibt gleich)"),
     ("File:", "Datei"),

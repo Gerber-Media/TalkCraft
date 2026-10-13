@@ -1,7 +1,7 @@
 //! The Edit window: toolbar, rulers, track headers and playlists.
 
 use crate::theme::{Tokens, bold, clip_colors, regular, rgb};
-use crate::widgets::{selector_box, text_toggle};
+use crate::widgets::text_toggle;
 use crate::{Gesture, SoundApp, icons, toolbar};
 use egui::{Align2, Color32, CornerRadius, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, pos2, vec2};
 use serde_json::json;
@@ -1021,30 +1021,23 @@ fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, sele
     if h < 60.0 {
         return;
     }
-    // View selector.
+    // Second header row: the inserts summary (the automation mode is not offered).
+    let am_r = Rect::from_min_size(pos2(x0, head.min.y + 68.0), vec2(0.0, 16.0));
+    // TalkCraft: what the lane shows, Waveform or the Volume line (auto-ducking draws there).
+    // The automation mode stays Read and is not offered; other views remain reachable by command.
     let view_r = Rect::from_min_size(pos2(x0, head.min.y + 49.0), vec2(118.0, 16.0));
-    let mut c2 = ui.new_child(egui::UiBuilder::new().max_rect(view_r));
-    let vresp = selector_box(&mut c2, view_r.width(), view_r.height(), &view_label(&track.view), t.text);
-    egui::Popup::menu(&vresp).show(|ui| view_menu(app, ui, track));
-    // Automation mode.
-    let am_r = Rect::from_min_size(pos2(x0, head.min.y + 68.0), vec2(118.0, 16.0));
-    let mode = m.automation_mode;
-    let col = match mode {
-        soundcraft_model::AutomationMode::Read => t.auto_read,
-        soundcraft_model::AutomationMode::Write => t.auto_write,
-        soundcraft_model::AutomationMode::Touch | soundcraft_model::AutomationMode::TouchLatch => t.auto_touch,
-        soundcraft_model::AutomationMode::Latch => t.auto_latch,
-        _ => t.text_dim,
-    };
-    let mut c3 = ui.new_child(egui::UiBuilder::new().max_rect(am_r));
-    let aresp = selector_box(&mut c3, am_r.width(), am_r.height(), mode.label(), col);
-    egui::Popup::menu(&aresp).show(|ui| {
-        for m in soundcraft_model::AutomationMode::ALL {
-            if ui.selectable_label(m == mode, m.label()).clicked() {
-                let _ = app.run("mix.automation_mode", json!({"track": id.0, "mode": m.label()}));
-            }
+    let mut c2 = ui.new_child(egui::UiBuilder::new().max_rect(view_r).layout(egui::Layout::left_to_right(egui::Align::Center)));
+    c2.spacing_mut().item_spacing.x = 2.0;
+    c2.spacing_mut().button_padding = vec2(4.0, 0.0);
+    let views: &[(&str, &str)] =
+        if track.kind.has_playlist() && !track.kind.is_midi() { &[("waveform", "Waveform"), ("volume", "Volume")] } else { &[("volume", "Volume")] };
+    for (view, label) in views {
+        let on = track.view == *view;
+        let text = egui::RichText::new(crate::i18n::tr(label)).size(10.5).color(if on { t.text } else { t.text_dim });
+        if c2.add(egui::Button::selectable(on, text).min_size(vec2(56.0, 16.0))).on_hover_text(crate::i18n::tr(view_hint(view))).clicked() && !on {
+            let _ = app.run("track.view", json!({"track": id.0, "view": view}));
         }
-    });
+    }
     // Inline header meter.
     let md = app.meters.get(&id).copied().unwrap_or_default();
     let mr = Rect::from_min_max(pos2(head.max.x - 16.0, head.min.y + 4.0), pos2(head.max.x - 6.0, head.max.y - 4.0));
@@ -1136,39 +1129,8 @@ fn header_column(app: &mut SoundApp, ui: &mut Ui, track: &Track, col: &str, r: R
     }
 }
 
-fn view_label(v: &str) -> String {
-    match AutoParam::parse(v) {
-        Some(p) => p.label(),
-        None => v.to_string(),
-    }
-}
-
-fn view_menu(app: &mut SoundApp, ui: &mut Ui, track: &Track) {
-    let id = track.id.0;
-    let mut opts: Vec<&str> = Vec::new();
-    if track.kind.is_midi() {
-        opts.extend(["notes", "regions", "blocks"]);
-    } else if track.kind.has_playlist() {
-        opts.extend(["waveform", "blocks", "clip_gain", "playlists"]);
-    }
-    opts.extend(["volume", "pan", "mute"]);
-    for o in opts {
-        if ui.selectable_label(track.view == o, view_label(o)).clicked() {
-            let _ = app.run("track.view", json!({"track": id, "view": o}));
-        }
-    }
-    for (slot, ins) in track.mixer.inserts.iter().enumerate() {
-        let Some(ins) = ins else { continue };
-        let Some(info) = soundcraft_dsp::plugin_info(&ins.plugin) else { continue };
-        ui.menu_button(info.name, |ui| {
-            for p in info.params {
-                let v = format!("plugin:{}:{}", (b'a' + slot as u8) as char, p.id);
-                if ui.button(p.name).clicked() {
-                    let _ = app.run("track.view", json!({"track": id, "view": v}));
-                }
-            }
-        });
-    }
+fn view_hint(view: &str) -> &'static str {
+    if view == "volume" { "Show the volume line (draw it with the pencil; auto-ducking writes it)" } else { "Show the waveform" }
 }
 
 fn track_context_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
