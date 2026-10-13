@@ -15,17 +15,41 @@
 - **Podcast template.** New sessions start with a track per speaker (each on its own input, with
   a voice chain: high-pass EQ, gate, compressor, de-esser), a jingle track and a master limited to
   -1 dBTP.
+- **Audio interface.** Setup > Audio Interface picks the input and output device, finds each
+  speaker's microphone ("please speak now") and runs a soundcheck that says per microphone whether
+  to turn the gain up or down. Known podcast interfaces are recognised; unplugging one mid-session
+  is caught instead of crashing.
 - **Recording.** Record (Cmd+Space) records every speaker track except locked ones; a track's own
   record button records just that speaker. The take is drawn live while it records.
+- **Remote guests.** Window > Remote Guests: guests join from their browser with a link (nothing
+  to install). Each guest appears as a track "Ferngast – Name" with a live meter; M on the track
+  mutes them in the call. Record in TalkCraft starts and stops a lossless recording in every
+  guest's browser; after Stop their file arrives on their track, synced to a backup of the call.
+  The connection runs browser to browser (WebRTC); the guest page lives in
+  [Talkcraft-Gast](https://codefloe.com/GerberMedia/Talkcraft-Gast).
 - **Editing.** The blade splits a clip where you click (Alt: every track). Delete/Backspace removes
   the selected section after asking, closing the gap on all tracks so speakers stay in sync.
-  Edit > Shorten Pauses trims long silences on all tracks at once. Markers and subtitles move along.
-- **Subtitles.** Window > Subtitles: a cue list with speakers, a subtitle ruler, SRT and WebVTT
-  import/export, empty cues laid out along the speech, and automatic transcription with
+  Magnetic snapping, Close Gap, Z/Shift+Z zoom. Edit > Shorten Pauses trims long silences on all
+  tracks at once. Markers and subtitles move along.
+- **Clip tools.** Normalize or set a clip's loudness, clip volume, fades with handles, noise
+  reduction.
+- **Speakers and music.** Edit > Match Speaker Levels makes every speaker equally loud;
+  Edit > Auto-Duck Music lowers the music while anyone speaks; Sync Clip lines up a separately
+  recorded track by cross-correlation.
+- **Jingles.** Window > Jingles: eight pads for intro, outro and stingers, placed with one click.
+- **Subtitles and transcript.** Window > Subtitles: a cue list with speakers, a subtitle ruler, SRT
+  and WebVTT import/export, and automatic transcription with
   [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (speakers named after the loudest track).
-- **Delivery.** File > Export Episode: MP3 (LAME) with ID3 tags, cover and chapters from markers,
-  or WAV/FLAC/AIFF; loudness normalised to -16 LUFS (or another target). Shownotes (Markdown with a
-  chapter list) and Podcasting 2.0 `chapters.json` are written alongside.
+  File > Export > Transcript writes the text.
+- **Filler words.** Window > Filler Words shows the transcript as running text with "ähm", "uh"
+  and friends marked; select words and cut them out of every track at once.
+- **Loudness.** The toolbar shows the episode's loudness (LUFS) live.
+- **Delivery.** File > Export Episode: M4A (AAC, the default), M4B or MP3 (LAME) with tags, cover
+  and chapters from markers, or WAV/FLAC/AIFF; loudness normalised to -16 LUFS (or another target).
+  Shownotes (Markdown with a chapter list) and Podcasting 2.0 `chapters.json` are written alongside.
+- **Audiogram.** File > Export > Audiogram (MP4): a square or portrait video with cover, title,
+  waveform and subtitles for social media (needs ffmpeg).
+- **Languages.** English and German interface (Automatic follows the system).
 - **Settings.** Setup > Preferences holds the episode details and export defaults, saved with the
   session.
 
