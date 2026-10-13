@@ -51,7 +51,7 @@ impl Backend for Headless {
                 Ok(soundcraft_engine::inspect::session(&self.engine, params.get("detail").and_then(Value::as_str) == Some("full")))
             }
             m if m.starts_with("ui.") => {
-                Err(format!("`{m}` needs the desktop app: start `soundcraft --control 0` and use `soundcraft-cli mcp --connect PORT`"))
+                Err(format!("`{m}` needs the desktop app: start `talkcraft --control 0` and use `talkcraft-cli mcp --connect PORT`"))
             }
             other => Err(format!("unknown method `{other}`")),
         }

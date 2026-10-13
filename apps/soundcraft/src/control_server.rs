@@ -1,5 +1,5 @@
 //! Loopback JSON-lines control server: one request per line, one reply per line.
-//! This is the transport the MCP server (`soundcraft-cli mcp --connect PORT`) wraps.
+//! This is the transport the MCP server (`talkcraft-cli mcp --connect PORT`) wraps.
 
 use serde_json::{Value, json};
 use soundcraft_ui_egui::ControlRequest;

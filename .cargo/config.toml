@@ -1,2 +1,4 @@
 [alias]
 xtask = "run --package xtask --"
+# `cargo talkcraft` starts the app (release build); arguments go after `--`.
+talkcraft = "run --release --package talkcraft --"

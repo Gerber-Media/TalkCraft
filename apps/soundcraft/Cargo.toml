@@ -1,11 +1,11 @@
 [package]
-name = "soundcraft"
-description = "SoundCraft desktop app"
+name = "talkcraft"
+description = "TalkCraft desktop app (fork of SoundCraft)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish = false
-default-run = "soundcraft"
+default-run = "talkcraft"
 
 [lints]
 workspace = true

@@ -19,7 +19,7 @@ fn main() {
         .set("CompanyName", "Learning Machines LLC")
         .set("LegalCopyright", "Copyright (c) the SoundCraft authors. MIT OR Apache-2.0.")
         .set("OriginalFilename", "soundcraft.exe")
-        .set("InternalName", "soundcraft");
+        .set("InternalName", "talkcraft");
     if let Err(e) = res.compile() {
         if std::env::var_os("SOUNDCRAFT_REQUIRE_WINRES").is_some() {
             eprintln!("embedding Windows resources failed: {e}");

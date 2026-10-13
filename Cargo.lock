@@ -3469,24 +3469,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "soundcraft"
-version = "0.6.1"
-dependencies = [
- "eframe",
- "egui",
- "log",
- "muda",
- "objc2 0.6.5",
- "objc2-app-kit 0.3.2",
- "rfd",
- "serde_json",
- "soundcraft-engine",
- "soundcraft-playback",
- "soundcraft-ui-egui",
- "winresource",
-]
-
-[[package]]
 name = "soundcraft-au-host"
 version = "0.6.1"
 dependencies = [
@@ -3530,17 +3512,6 @@ dependencies = [
  "serde",
  "soundcraft-dsp",
  "thiserror 2.0.21",
-]
-
-[[package]]
-name = "soundcraft-cli"
-version = "0.6.1"
-dependencies = [
- "serde_json",
- "soundcraft-audio-io",
- "soundcraft-automation",
- "soundcraft-dsp",
- "soundcraft-engine",
 ]
 
 [[package]]
@@ -3962,6 +3933,35 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.6",
+]
+
+[[package]]
+name = "talkcraft"
+version = "0.6.1"
+dependencies = [
+ "eframe",
+ "egui",
+ "log",
+ "muda",
+ "objc2 0.6.5",
+ "objc2-app-kit 0.3.2",
+ "rfd",
+ "serde_json",
+ "soundcraft-engine",
+ "soundcraft-playback",
+ "soundcraft-ui-egui",
+ "winresource",
+]
+
+[[package]]
+name = "talkcraft-cli"
+version = "0.6.1"
+dependencies = [
+ "serde_json",
+ "soundcraft-audio-io",
+ "soundcraft-automation",
+ "soundcraft-dsp",
+ "soundcraft-engine",
 ]
 
 [[package]]
