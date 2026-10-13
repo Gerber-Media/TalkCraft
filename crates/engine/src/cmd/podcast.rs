@@ -66,6 +66,15 @@ pub fn specs() -> Vec<CommandSpec> {
             match_speakers
         ),
         cmd!(
+            "podcast.sync_clip",
+            "Sync Clip to Other Tracks",
+            [],
+            None,
+            "{clip, max_shift_s?: 20} — moves the clip so its audio lines up with the other tracks (cross-correlation; e.g. a guest's own recording against the call)",
+            has_tracks,
+            sync_clip
+        ),
+        cmd!(
             "podcast.auto_duck",
             "Auto-Duck Music",
             [],
@@ -132,6 +141,87 @@ fn match_speakers(e: &mut Engine, p: &Value) -> Result<Value> {
         }
     }
     Ok(json!({"tracks": out}))
+}
+
+/// Mean absolute level per block of `block` samples (a coarse envelope for correlation).
+fn envelope(x: &[f32], block: usize) -> Vec<f32> {
+    x.chunks(block.max(1)).map(|c| c.iter().map(|v| v.abs()).sum::<f32>() / c.len().max(1) as f32).collect()
+}
+
+/// The lag in `lags` where `b` matches `a` best (`a[i + lag] ≈ b[i]`), by normalised
+/// cross-correlation of the mean-removed signals, with its correlation (-1…1).
+fn best_lag(a: &[f32], b: &[f32], lags: std::ops::RangeInclusive<i64>) -> Option<(i64, f32)> {
+    let mean = |v: &[f32]| v.iter().sum::<f32>() / v.len().max(1) as f32;
+    let (ma, mb) = (mean(a), mean(b));
+    let mut best: Option<(i64, f32)> = None;
+    for lag in lags {
+        let (mut num, mut ea, mut eb) = (0.0f64, 0.0f64, 0.0f64);
+        for (i, y) in b.iter().enumerate() {
+            let Some(x) = usize::try_from(i as i64 + lag).ok().and_then(|j| a.get(j)) else { continue };
+            let (x, y) = (f64::from(x - ma), f64::from(y - mb));
+            num += x * y;
+            ea += x * x;
+            eb += y * y;
+        }
+        if ea > 0.0 && eb > 0.0 {
+            let r = (num / (ea * eb).sqrt()) as f32;
+            if best.is_none_or(|(_, br)| r > br) {
+                best = Some((lag, r));
+            }
+        }
+    }
+    best
+}
+
+fn sync_clip(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "podcast.sync_clip";
+    let id = soundcraft_model::ClipId(p.get("clip").and_then(Value::as_u64).ok_or_else(|| bad(ID, "`clip` required"))?);
+    let max_s = f64_or(p, "max_shift_s", 20.0).clamp(0.1, 120.0);
+    let s = e.session();
+    let (track, clip) = s.find_clip(id).map(|(t, c)| (t, c.clone())).ok_or_else(|| bad(ID, "no such clip"))?;
+    if !matches!(clip.content, soundcraft_model::ClipContent::Audio { .. }) {
+        return Err(bad(ID, "the clip holds no audio"));
+    }
+    let sr = s.sample_rate;
+    // Up to 60 s of the clip are plenty to find the offset. Both sides are compared as they sound
+    // (through their tracks' plugins), so filter delays do not bias the match.
+    let n = clip.length.min(sr.samples(60.0)).max(1);
+    let ch = crate::io::render_track(e, soundcraft_time::Range::new(clip.start, clip.start + n), track, ID)?;
+    let n = ch.iter().map(Vec::len).min().unwrap_or(0);
+    let mono: Vec<f32> = (0..n).map(|i| ch.iter().filter_map(|c| c.get(i)).sum::<f32>() / ch.len().max(1) as f32).collect();
+    let s = e.session();
+    // Everything else, over the clip's span plus the search range.
+    let shift = sr.samples(max_s);
+    let r = soundcraft_time::Range::new((clip.start - shift).max(0), clip.start + n as i64 + shift);
+    let mut others = s.clone();
+    if let Some(t) = others.track_mut(track) {
+        t.mixer.mute = true;
+    }
+    let refch = soundcraft_mix::render_range(&others, r, 1024);
+    let rn = refch.iter().map(Vec::len).min().unwrap_or(0);
+    let reference: Vec<f32> = (0..rn).map(|i| refch.iter().filter_map(|c| c.get(i)).sum::<f32>() / refch.len().max(1) as f32).collect();
+    // Coarse: 5 ms envelopes over the whole search range.
+    let block = (sr.samples(0.005).max(1)) as usize;
+    let (ea, eb) = (envelope(&reference, block), envelope(&mono, block));
+    let span = (ea.len() as i64 - eb.len() as i64).max(0);
+    let (coarse, score) = best_lag(&ea, &eb, 0..=span).ok_or_else(|| bad(ID, "the other tracks are silent there"))?;
+    if score < 0.3 {
+        return Err(bad(ID, format!("no clear match with the other tracks (correlation {score:.2})")));
+    }
+    // Fine: sample-accurate within two blocks of the coarse match, on 5 s of audio.
+    let fine_len = mono.len().min(sr.samples(5.0).max(0) as usize);
+    let around = coarse * block as i64;
+    let lo = (around - 2 * block as i64).max(0) as usize;
+    let hi = lo + fine_len + 4 * block;
+    let window = reference.get(lo.min(reference.len())..hi.min(reference.len())).unwrap_or(&[]);
+    let lag = best_lag(window, mono.get(..fine_len).unwrap_or(&[]), 0..=(4 * block) as i64).map_or(around - lo as i64, |(l, _)| l);
+    let new_start = r.start + lo as i64 + lag;
+    let delta = new_start - clip.start;
+    if delta != 0 {
+        let s = e.session_mut();
+        crate::edit::move_clips(s, &[id], delta, None);
+    }
+    Ok(json!({"moved": delta, "moved_s": sr.seconds(delta), "correlation": score}))
 }
 
 fn auto_duck(e: &mut Engine, p: &Value) -> Result<Value> {
@@ -526,6 +616,35 @@ mod tests {
         let s = e.session();
         let gain = |name: &str| s.track_by_name(name).unwrap().clips()[0].gain_db;
         assert!((gain("Gast 1") - gain("Moderation") - 20.0).abs() < 0.5, "a 20 dB quieter guest gets 20 dB more: {v}");
+        assert!(std::fs::remove_dir_all(&dir).is_ok());
+    }
+
+    #[test]
+    fn a_late_clip_is_synced_onto_the_other_tracks() {
+        let dir = std::env::temp_dir().join(format!("sc-podcast-sync-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // Speech-like: noise in irregular bursts (deterministic).
+        let mut seed = 7u32;
+        let mut rnd = move || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (seed >> 8) as f32 / (1u32 << 24) as f32 - 0.5
+        };
+        let talk: Vec<f32> =
+            (0..48_000 * 6).map(|i| if (i / 7_000) % 3 == 1 || (i / 11_000) % 4 == 2 { rnd() * 0.6 } else { rnd() * 0.01 }).collect();
+        let mut e = Engine::default();
+        e.execute("session.new", &json!({"name": "S", "template": "podcast", "speakers": 2})).unwrap();
+        for (i, (track, at)) in [("Moderation", 2.0), ("Gast 1", 2.7)].iter().enumerate() {
+            let buf = AudioBuffer { sample_rate: 48_000, channels: vec![talk.clone()] };
+            let wav = dir.join(format!("s{i}.wav"));
+            std::fs::write(&wav, soundcraft_audio_io::encode(&buf, &EncodeOptions::default()).unwrap()).unwrap();
+            e.execute("file.import_audio", &json!({"path": wav.to_string_lossy(), "track": track, "new_tracks": false, "at": {"seconds": at}}))
+                .unwrap();
+        }
+        let guest = e.session().track_by_name("Gast 1").unwrap().clips()[0].id;
+        let v = e.execute("podcast.sync_clip", &json!({"clip": guest.0, "max_shift_s": 2.0})).unwrap();
+        let start = e.session().find_clip(guest).unwrap().1.start;
+        assert_eq!(start, 96_000, "moved onto the moderation track exactly: {v}");
         assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 

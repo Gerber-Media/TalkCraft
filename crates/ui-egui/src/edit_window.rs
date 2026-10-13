@@ -2044,6 +2044,22 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
     if ui.button("Match Loudness (−16 LUFS)").on_hover_text("Sets the clip gain so the clip sounds as loud as the episode target").clicked() {
         run_report(app, "clip.normalize", json!({"clips": [c.0], "lufs": -16.0}));
     }
+    if ui
+        .button("Sync to Other Tracks")
+        .on_hover_text("Moves this clip so its audio lines up with the rest (e.g. a guest's own recording against the call)")
+        .clicked()
+    {
+        match app.run("podcast.sync_clip", json!({"clip": c.0})) {
+            Ok(v) => {
+                app.ui.status = format!(
+                    "Synced: moved {:+.3} s (match {:.0} %)",
+                    v["moved_s"].as_f64().unwrap_or(0.0),
+                    v["correlation"].as_f64().unwrap_or(0.0) * 100.0
+                )
+            }
+            Err(e) => app.ui.status = e,
+        }
+    }
     ui.menu_button("Fades", |ui| {
         for secs in [0.5, 1.0, 2.0] {
             if ui.button(format!("Fade In {secs} s")).clicked() {
