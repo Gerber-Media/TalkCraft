@@ -24,6 +24,10 @@ thiserror.workspace = true
 log.workspace = true
 zip.workspace = true
 
+[features]
+# MP3 export through LAME (LGPL); the desktop app and CLI turn it on.
+mp3 = ["soundcraft-audio-io/mp3"]
+
 [dev-dependencies]
 proptest.workspace = true
 

@@ -19,3 +19,7 @@ soundcraft-automation.workspace = true
 soundcraft-audio-io.workspace = true
 soundcraft-dsp.workspace = true
 serde_json.workspace = true
+
+# MP3 export builds LAME with autotools, which needs a Unix toolchain (not MSVC).
+[target.'cfg(all(unix, not(target_arch = "wasm32")))'.dependencies]
+soundcraft-engine = { workspace = true, features = ["mp3"] }

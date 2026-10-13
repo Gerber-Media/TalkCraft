@@ -19,6 +19,10 @@ egui.workspace = true
 serde_json.workspace = true
 log.workspace = true
 
+# MP3 export builds LAME with autotools, which needs a Unix toolchain (not MSVC).
+[target.'cfg(all(unix, not(target_arch = "wasm32")))'.dependencies]
+soundcraft-engine = { workspace = true, features = ["mp3"] }
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rfd.workspace = true
 

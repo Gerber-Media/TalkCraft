@@ -12,6 +12,12 @@ serde.workspace = true
 thiserror.workspace = true
 log.workspace = true
 symphonia.workspace = true
+# MP3 export (LAME, LGPL): opt-in so the default build stays MIT/Apache and builds for wasm.
+mp3lame-encoder = { version = "0.2.5", optional = true }
+id3 = { version = "1.17", optional = true, default-features = false }
+
+[features]
+mp3 = ["dep:mp3lame-encoder", "dep:id3"]
 
 [dev-dependencies]
 proptest.workspace = true

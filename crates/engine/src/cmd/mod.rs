@@ -24,6 +24,7 @@ mod mix;
 mod more_util;
 mod options;
 mod plugin_state;
+pub mod podcast;
 mod query;
 mod sampler;
 mod setup_more;
@@ -101,6 +102,7 @@ pub fn command_specs() -> &'static [CommandSpec] {
     SPECS.get_or_init(|| {
         let mut v = Vec::new();
         v.extend(file::specs());
+        v.extend(podcast::specs());
         v.extend(edit::specs());
         v.extend(edit_more::specs());
         v.extend(view::specs());

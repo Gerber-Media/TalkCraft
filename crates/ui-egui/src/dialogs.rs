@@ -25,6 +25,7 @@ pub enum Dialog {
     Session { frame_rate: String, bit_depth: String },
     ScoreSetup { title: String, composer: String, bars_per_system: u32, show_track_names: bool },
     SaveChanges { then: (String, Value) },
+    ExportEpisode { path: String, settings: Box<soundcraft_model::PodcastSettings> },
 }
 
 #[derive(Default)]
@@ -52,6 +53,7 @@ impl Dialogs {
             Dialog::Session { .. } => "session",
             Dialog::ScoreSetup { .. } => "score_setup",
             Dialog::SaveChanges { .. } => "save_changes",
+            Dialog::ExportEpisode { .. } => "export_episode",
         })
     }
 
@@ -82,6 +84,11 @@ impl Dialogs {
             }
             "track.new" => {
                 Dialog::NewTracks { count: 1, format: "Mono".into(), kind: "audio".into(), timebase: "samples".into(), name: "Audio".into() }
+            }
+            "file.export_podcast" => {
+                let settings = e.session().podcast.clone();
+                let ext = if settings.export.format == "aiff" { "aif".to_string() } else { settings.export.format.clone() };
+                Dialog::ExportEpisode { path: format!("{home}/{name}.{ext}"), settings: Box::new(settings) }
             }
             "session.new" => Dialog::NewSession { name: "Episode".into(), sample_rate: 48_000, template: "podcast".into(), speakers: 2 },
             "file.bounce_mix" => Dialog::Bounce {
@@ -258,6 +265,8 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     let mut keep = true;
     let mut action: Option<(String, Value)> = None;
     let mut save_first: Option<(String, Value)> = None;
+    // Runs before `action` (the export dialog saves its settings into the session first).
+    let mut before: Option<(String, Value)> = None;
     let confirmed = matches!(d, Dialog::SaveChanges { .. });
     let title = match &d {
         Dialog::NewTracks { .. } => "New Tracks",
@@ -275,6 +284,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
         Dialog::ScoreSetup { .. } => "Score Setup",
         Dialog::SaveChanges { then } if then.0 == "session.revert" => "Revert to Saved",
         Dialog::SaveChanges { .. } => "Unsaved Changes",
+        Dialog::ExportEpisode { .. } => "Export Episode",
     }
     .to_string();
     let enter = ctx.input(|i| i.key_pressed(egui::Key::Enter));
@@ -519,6 +529,13 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         action = Some(("setup.session".into(), json!({"frame_rate": frame_rate, "bit_depth": bit_depth})));
                     }
                 }
+                Dialog::ExportEpisode { path, settings } => {
+                    if export_episode_ui(ui, path, settings, enter) {
+                        let s = serde_json::to_value(settings.as_ref()).unwrap_or_default();
+                        before = Some(("podcast.set".into(), s));
+                        action = Some(("file.export_podcast".into(), json!({"path": path})));
+                    }
+                }
                 Dialog::ScoreSetup { title, composer, bars_per_system, show_track_names } => {
                     egui::Grid::new("score_setup").num_columns(2).spacing(vec2(10.0, 8.0)).show(ui, |ui| {
                         ui.label("Title");
@@ -586,10 +603,26 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
         keep = false;
         action = None;
     }
+    if let Some((cmd, params)) = before
+        && action.is_some()
+        && let Err(e) = app.run(&cmd, params)
+    {
+        app.ui.status = e;
+        action = None;
+    }
     let saving = action.as_ref().is_some_and(|(cmd, _)| cmd.starts_with("session.save"));
     if let Some((cmd, params)) = action {
         keep = false;
         match app.run(&cmd, params) {
+            Ok(v) if cmd == "file.export_podcast" => {
+                app.ui.status = format!(
+                    "Exported {} ({:.1} LUFS, {:.1} dBTP, {} chapter(s))",
+                    v["path"].as_str().unwrap_or_default(),
+                    v["lufs"].as_f64().unwrap_or(0.0),
+                    v["true_peak_db"].as_f64().unwrap_or(0.0),
+                    v["chapters"]
+                );
+            }
             Ok(v) if cmd == "file.export_clips" => {
                 app.ui.status = format!("Exported {} clip(s) to {}", v["written"], v["dir"].as_str().unwrap_or_default());
             }
@@ -685,6 +718,127 @@ fn audiosuite_window(app: &mut SoundApp, ctx: &egui::Context) {
     if !open {
         app.ui.audiosuite = None;
     }
+}
+
+/// Loudness targets offered by the export dialog: (label, LUFS).
+const LOUDNESS_PRESETS: [(&str, Option<f32>); 5] = [
+    ("-16 LUFS (stereo standard: Apple, Spotify)", Some(-16.0)),
+    ("-19 LUFS (mono standard)", Some(-19.0)),
+    ("-14 LUFS (louder)", Some(-14.0)),
+    ("-23 LUFS (EBU R128 broadcast)", Some(-23.0)),
+    ("Off (keep the mix level)", None),
+];
+
+/// The Export Episode dialog: format, quality, loudness and ID3 metadata. True when Export is pressed.
+fn export_episode_ui(ui: &mut egui::Ui, path: &mut String, s: &mut soundcraft_model::PodcastSettings, enter: bool) -> bool {
+    let dim = Tokens::current().text_dim;
+    let x = &mut s.export;
+    ui.horizontal(|ui| {
+        ui.label("File");
+        ui.add(egui::TextEdit::singleline(path).desired_width(380.0));
+    });
+    ui.label(egui::RichText::new("Format").strong());
+    egui::Grid::new("ep_fmt").num_columns(2).spacing(vec2(12.0, 6.0)).show(ui, |ui| {
+        ui.label("Format");
+        let before = x.format.clone();
+        egui::ComboBox::from_id_salt("ep_format").selected_text(x.format.to_uppercase()).show_ui(ui, |ui| {
+            for f in soundcraft_engine::cmd::podcast::EXPORT_FORMATS {
+                let label =
+                    if f == "mp3" && !soundcraft_audio_io::mp3::mp3_supported() { "MP3 (not in this build)".to_string() } else { f.to_uppercase() };
+                ui.selectable_value(&mut x.format, f.to_string(), label);
+            }
+        });
+        if x.format != before {
+            let ext = if x.format == "aiff" { "aif" } else { x.format.as_str() };
+            *path = std::path::Path::new(path.as_str()).with_extension(ext).to_string_lossy().to_string();
+        }
+        ui.end_row();
+        if x.format == "mp3" {
+            ui.label("Bitrate");
+            egui::ComboBox::from_id_salt("ep_bitrate").selected_text(format!("{} kbit/s", x.bitrate_kbps)).show_ui(ui, |ui| {
+                for b in soundcraft_audio_io::mp3::MP3_BITRATES {
+                    let hint = match b {
+                        64 => "  speech, mono",
+                        96 => "  speech, good",
+                        128 => "  standard",
+                        192 => "  music",
+                        _ => "",
+                    };
+                    ui.selectable_value(&mut x.bitrate_kbps, b, format!("{b} kbit/s{hint}"));
+                }
+            });
+        } else {
+            ui.label("Bit depth");
+            egui::ComboBox::from_id_salt("ep_bits").selected_text(format!("{}-bit", x.bit_depth)).show_ui(ui, |ui| {
+                for b in ["16", "24", "32f"] {
+                    ui.selectable_value(&mut x.bit_depth, b.to_string(), format!("{b}-bit"));
+                }
+            });
+        }
+        ui.end_row();
+        ui.label("Sample rate");
+        egui::ComboBox::from_id_salt("ep_sr").selected_text(format!("{} Hz", x.sample_rate)).show_ui(ui, |ui| {
+            for r in soundcraft_audio_io::mp3::MP3_SAMPLE_RATES {
+                ui.selectable_value(&mut x.sample_rate, r, format!("{r} Hz"));
+            }
+        });
+        ui.end_row();
+        ui.label("Channels");
+        ui.horizontal(|ui| {
+            ui.radio_value(&mut x.mono, false, "Stereo");
+            ui.radio_value(&mut x.mono, true, "Mono");
+        });
+        ui.end_row();
+        ui.label("Loudness");
+        let current = LOUDNESS_PRESETS
+            .iter()
+            .find(|(_, v)| *v == x.loudness_lufs)
+            .map_or_else(|| x.loudness_lufs.map_or_else(|| "Off".to_string(), |l| format!("{l:.0} LUFS")), |(l, _)| (*l).to_string());
+        egui::ComboBox::from_id_salt("ep_lufs").width(300.0).selected_text(current).show_ui(ui, |ui| {
+            for (label, v) in LOUDNESS_PRESETS {
+                ui.selectable_value(&mut x.loudness_lufs, v, label);
+            }
+        });
+        ui.end_row();
+        if x.format == "mp3" {
+            ui.label("Chapters");
+            ui.checkbox(&mut x.chapters, "Write markers as chapters");
+            ui.end_row();
+        }
+    });
+    if x.format == "mp3" {
+        let e = &mut s.episode;
+        ui.separator();
+        ui.label(egui::RichText::new("Episode (ID3 tags)").strong());
+        egui::Grid::new("ep_meta").num_columns(2).spacing(vec2(12.0, 6.0)).show(ui, |ui| {
+            for (label, field) in [("Title", &mut e.title), ("Podcast", &mut e.show), ("Author", &mut e.author), ("Genre", &mut e.genre)] {
+                ui.label(label);
+                ui.add(egui::TextEdit::singleline(field).desired_width(300.0));
+                ui.end_row();
+            }
+            ui.label("Episode");
+            ui.horizontal(|ui| {
+                ui.add(egui::DragValue::new(&mut e.episode).range(0..=99_999));
+                ui.label("Year");
+                ui.add(egui::DragValue::new(&mut e.year).range(0..=2200));
+                ui.label("Language");
+                egui::ComboBox::from_id_salt("ep_lang").selected_text(e.language.as_str()).show_ui(ui, |ui| {
+                    for (code, name) in [("deu", "Deutsch"), ("eng", "English"), ("dan", "Dansk"), ("fra", "Français"), ("spa", "Español")] {
+                        ui.selectable_value(&mut e.language, code.to_string(), format!("{code}  {name}"));
+                    }
+                });
+            });
+            ui.end_row();
+            ui.label("Cover");
+            ui.add(egui::TextEdit::singleline(&mut e.cover).hint_text("path to a square JPEG or PNG").desired_width(300.0));
+            ui.end_row();
+            ui.label("Description");
+            ui.add(egui::TextEdit::multiline(&mut e.description).desired_rows(3).desired_width(300.0));
+            ui.end_row();
+        });
+    }
+    ui.label(egui::RichText::new("Exports the edit selection, or the whole session. Settings are saved with the session.").small().color(dim));
+    buttons(ui, "Export", enter && !ui.ctx().egui_wants_keyboard_input())
 }
 
 #[cfg(test)]

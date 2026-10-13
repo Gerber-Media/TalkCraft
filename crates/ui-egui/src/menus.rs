@@ -148,6 +148,7 @@ const DIALOG_COMMANDS: &[&str] = &[
     "clip.clear",
     "track.new",
     "file.bounce_mix",
+    "file.export_podcast",
     "session.new",
     "file.import_audio",
     "file.import_midi",
@@ -384,6 +385,7 @@ fn params_for(path: &str, id: &str) -> Value {
 
 /// Menu items that open a SoundCraft window when clicked (programmatic calls still run the command).
 const MENU_WINDOWS: &[(&str, &str)] = &[
+    ("File > Export Episode...", "file.export_podcast"),
     ("Setup > Appearance", "window.ui_customization"),
     ("Setup > Hardware...", "window.playback_engine"),
     ("Setup > Playback Engine...", "window.playback_engine"),

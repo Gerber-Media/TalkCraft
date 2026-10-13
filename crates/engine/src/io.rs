@@ -281,6 +281,15 @@ pub fn bounce_source(
     Ok((bytes, (peak, lufs, true_peak)))
 }
 
+/// The main mix over `r` as planar channels at the session rate, surround folded to stereo.
+pub fn render_mix(e: &Engine, r: Range, id: &str) -> Result<Vec<Vec<f32>>> {
+    let s = e.session();
+    if r.len() > s.sample_rate.samples(4.0 * 3600.0) {
+        return Err(EngineError::BadParams(id.into(), "bounces are limited to 4 hours".into()));
+    }
+    Ok(render_bounce(s, r, true, None).0)
+}
+
 /// The main mix over `r` and its format (folded to stereo on request).
 fn render_main(s: &Session, r: Range, fold_stereo: bool) -> (Vec<Vec<f32>>, ChannelFormat) {
     render_bounce(s, r, fold_stereo, None)

@@ -15,6 +15,7 @@
 mod aiff;
 mod buffer;
 mod flac;
+pub mod mp3;
 mod pcm;
 pub mod peaks;
 mod symph;

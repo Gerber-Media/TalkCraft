@@ -11,6 +11,7 @@ mod clip;
 mod ids;
 mod markers;
 mod mixer;
+mod podcast;
 mod session;
 mod source;
 mod track;
@@ -22,6 +23,7 @@ pub use markers::{Group, MarkerKind, MemoryLocation};
 pub use mixer::{
     Bus, ChannelFormat, INSERT_SLOTS, Insert, Mixer, OutputPath, Route, SEND_SLOTS, SendSlot, Speaker, SurroundPan, fader_db_to_pos, fader_pos_to_db,
 };
+pub use podcast::{EpisodeInfo, PodcastExport, PodcastSettings};
 pub use session::{BitDepthSetting, EditMode, EditState, SESSION_EXTENSION, Session, SessionError, Tool, TrackView, ZoomState};
 pub use source::{Source, SourceAudio, SourcePool, VideoSource};
 pub use track::{Playlist, TRACK_COLORS, Track, TrackHeight, TrackKind};
