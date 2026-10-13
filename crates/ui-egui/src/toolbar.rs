@@ -329,7 +329,7 @@ fn loudness(app: &mut SoundApp, ui: &mut Ui) {
     let target = app.engine.session().podcast.export.loudness_lufs;
     let (r, resp) = ui.allocate_exact_size(vec2(132.0, 64.0), Sense::hover());
     ui.painter().rect(r, CornerRadius::same(4), t.counter_bg, Stroke::new(1.0, t.counter_border), StrokeKind::Inside);
-    ui.painter().text(pos2(r.min.x + 8.0, r.min.y + 12.0), Align2::LEFT_CENTER, "EPISODE", bold(9.5), t.counter_label);
+    ui.painter().text(pos2(r.min.x + 8.0, r.min.y + 12.0), Align2::LEFT_CENTER, crate::i18n::tr("EPISODE"), bold(9.5), t.counter_label);
     let stale = app.loudness.stale();
     let (main, sub, col) = match app.loudness.value {
         Some((lufs, tp)) => {

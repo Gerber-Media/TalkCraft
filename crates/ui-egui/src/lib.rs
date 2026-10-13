@@ -12,6 +12,7 @@ pub mod docking;
 pub mod edit_window;
 pub mod extra_windows;
 pub mod fonts;
+pub mod i18n;
 pub mod icons;
 pub mod jingles_window;
 pub mod loudness;
@@ -66,6 +67,9 @@ pub struct UiState {
     pub show_undo_history: bool,
     pub show_session_info: bool,
     pub show_audio_health: bool,
+    /// Interface language: "auto" (the system's), "en" or "de".
+    #[serde(default = "default_language")]
+    pub language: String,
     pub show_about: bool,
     pub show_midi_editor: bool,
     pub show_universe: bool,
@@ -114,12 +118,19 @@ pub struct UiState {
     pub ui_scale: f32,
 }
 
+fn default_language() -> String {
+    "auto".into()
+}
+
 impl Default for UiState {
     fn default() -> Self {
         UiState {
             docking: docking::Workspace::default(),
             mix_docking: docking::mix_default(),
             window: MainWindow::Edit,
+            // English unless chosen: tests and scripted runs read the English labels. The app
+            // starts with "auto" (main.rs), and older settings files without the field get it too.
+            language: "en".into(),
             show_tracks_list: true,
             show_clip_list: true,
             show_transport: false,
@@ -824,6 +835,7 @@ impl SoundApp {
             return;
         }
         let playing = self.is_playing();
+        crate::i18n::set(&self.ui.language);
         self.loudness.update(&self.engine, playing, ctx);
         if let Some(job) = &self.audiogram {
             match job.done.try_recv() {

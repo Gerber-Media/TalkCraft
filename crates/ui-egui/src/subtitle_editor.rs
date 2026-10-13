@@ -190,7 +190,7 @@ fn transcription_ui(ui: &mut egui::Ui, ed: &mut SubtitleEditor, t: &Tokens, star
         None => {}
     }
     if let Some(task) = &mut ed.task {
-        if ui.button("Cancel").clicked() {
+        if ui.button(crate::i18n::tr("Cancel")).clicked() {
             match task {
                 Task::Transcribe { child, job, .. } => {
                     let _ = child.kill();
@@ -218,7 +218,7 @@ fn transcription_ui(ui: &mut egui::Ui, ed: &mut SubtitleEditor, t: &Tokens, star
         }
         ui.label(RichText::new("needed once for automatic transcription").color(t.text_dim));
     } else if ui
-        .button("Transcribe")
+        .button(crate::i18n::tr("Transcribe"))
         .on_hover_text("Fill in subtitles from the speech with whisper.cpp — the edit selection, or the whole episode. Replaces the cues there (undoable); speakers come from the tracks.")
         .clicked()
     {
@@ -242,7 +242,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let cues: Vec<SubtitleCue> = app.engine.session().subtitles.clone();
     let playing = app.engine.transport.playing;
     let screen = ctx.content_rect();
-    egui::Window::new("Subtitles")
+    egui::Window::new(crate::i18n::tr("Subtitles"))
         .open(&mut open)
         .default_size(vec2(760.0, 420.0))
         .default_pos(egui::pos2((screen.max.x - 800.0).max(16.0), (screen.max.y - 480.0).max(80.0)))
@@ -250,27 +250,35 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
         .show(ctx, |ui| {
             let ed = &mut app.extra.subtitles;
             ui.horizontal_wrapped(|ui| {
-                if ui.button("+ Add at playhead").on_hover_text("A 3 s cue at the playhead, or over the edit selection (Cmd+Ctrl+U)").clicked() {
+                if ui
+                    .button(crate::i18n::tr("+ Add at playhead"))
+                    .on_hover_text("A 3 s cue at the playhead, or over the edit selection (Cmd+Ctrl+U)")
+                    .clicked()
+                {
                     run.push(("subtitle.add".into(), json!({})));
                 }
-                if ui.button("Create cues from speech").on_hover_text("Empty cues along the speech in the mix, ready to type into").clicked() {
+                if ui
+                    .button(crate::i18n::tr("Create cues from speech"))
+                    .on_hover_text("Empty cues along the speech in the mix, ready to type into")
+                    .clicked()
+                {
                     run.push(("subtitle.segment".into(), json!({})));
                 }
-                if ui.button("Import…").clicked() {
+                if ui.button(crate::i18n::tr("Import…")).clicked() {
                     dialog = Some("subtitle.import");
                 }
-                if ui.add_enabled(!cues.is_empty(), egui::Button::new("Export…")).clicked() {
+                if ui.add_enabled(!cues.is_empty(), egui::Button::new(crate::i18n::tr("Export…"))).clicked() {
                     dialog = Some("subtitle.export");
                 }
                 if ui
-                    .add_enabled(!cues.is_empty(), egui::Button::new("Export Text…"))
+                    .add_enabled(!cues.is_empty(), egui::Button::new(crate::i18n::tr("Export Text…")))
                     .on_hover_text("The transcript as readable text (.txt) or Markdown (.md)")
                     .clicked()
                 {
                     dialog = Some("subtitle.export_text");
                 }
                 ui.separator();
-                ui.checkbox(&mut ed.follow, "Follow playhead");
+                ui.checkbox(&mut ed.follow, crate::i18n::tr("Follow playhead"));
                 ui.add(egui::TextEdit::singleline(&mut ed.filter).hint_text("Search").desired_width(140.0));
                 ui.label(RichText::new(format!("{} cue(s)", cues.len())).color(t.text_dim));
             });
@@ -279,7 +287,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             if cues.is_empty() {
                 ui.add_space(24.0);
                 ui.vertical_centered(|ui| {
-                    ui.label(RichText::new("No subtitles yet").strong());
+                    ui.label(RichText::new(crate::i18n::tr("No subtitles yet")).strong());
                     ui.label(
                         RichText::new("Add a cue at the playhead, create empty cues from the speech, or import an .srt / .vtt file.")
                             .color(t.text_dim),

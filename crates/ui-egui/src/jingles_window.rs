@@ -56,7 +56,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let dropped: Vec<(Option<egui::Pos2>, String)> = ctx.input(|i| {
         i.raw.dropped_files.iter().map(|f| (i.pointer.hover_pos(), f.path().to_string_lossy().to_string())).filter(|(_, p)| !p.is_empty()).collect()
     });
-    egui::Window::new("Jingles").open(&mut open).default_size(vec2(520.0, 230.0)).resizable(true).show(ctx, |ui| {
+    egui::Window::new(crate::i18n::tr("Jingles")).open(&mut open).default_size(vec2(520.0, 230.0)).resizable(true).show(ctx, |ui| {
         let w = &mut app.extra.jingles;
         egui::Grid::new("jingle_pads").num_columns(4).spacing(vec2(8.0, 8.0)).show(ui, |ui| {
             for i in 0..JINGLE_PADS {

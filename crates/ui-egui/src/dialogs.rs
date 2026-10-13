@@ -440,7 +440,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     .to_string();
     let enter = ctx.input(|i| i.key_pressed(egui::Key::Enter));
     let esc = ctx.input(|i| i.key_pressed(egui::Key::Escape));
-    egui::Window::new(egui::RichText::new(&title).font(bold(13.0)))
+    egui::Window::new(egui::RichText::new(crate::i18n::tr(&title)).font(bold(13.0)))
         .collapsible(false)
         .resizable(false)
         .anchor(Align2::CENTER_CENTER, vec2(0.0, -80.0))
@@ -485,7 +485,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                 }
                 Dialog::NewSession { name, sample_rate, template, speakers } => {
                     ui.horizontal(|ui| {
-                        ui.label("Name");
+                        ui.label(crate::i18n::tr("Name"));
                         ui.text_edit_singleline(name);
                     });
                     egui::ComboBox::from_label("Sample Rate").selected_text(format!("{sample_rate} Hz")).show_ui(ui, |ui| {
@@ -517,7 +517,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                 }
                 Dialog::Bounce { path, format, bit_depth, normalize, loudness } => {
                     ui.horizontal(|ui| {
-                        ui.label("File");
+                        ui.label(crate::i18n::tr("File"));
                         ui.add(egui::TextEdit::singleline(path).desired_width(360.0));
                     });
                     ui.horizontal(|ui| {
@@ -660,12 +660,12 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                 }
                 Dialog::Audiogram { path, portrait } => {
                     ui.horizontal(|ui| {
-                        ui.label("File");
+                        ui.label(crate::i18n::tr("File"));
                         ui.add(egui::TextEdit::singleline(path).desired_width(380.0));
                     });
                     ui.horizontal(|ui| {
-                        ui.radio_value(portrait, false, "Square 1080 × 1080 (feed)");
-                        ui.radio_value(portrait, true, "Portrait 1080 × 1920 (stories, reels)");
+                        ui.radio_value(portrait, false, crate::i18n::tr("Square 1080 × 1080 (feed)"));
+                        ui.radio_value(portrait, true, crate::i18n::tr("Portrait 1080 × 1920 (stories, reels)"));
                     });
                     let s = app.engine.session();
                     let r = crate::audiogram::range(s);
@@ -693,8 +693,8 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                     ui.label(summary.as_str());
                     if clips.is_empty() {
                         ui.add_space(4.0);
-                        ui.radio_value(close_gap, true, "Close the gap on all tracks (later audio, markers and subtitles move up)");
-                        ui.radio_value(close_gap, false, "Leave silence on the selected tracks");
+                        ui.radio_value(close_gap, true, crate::i18n::tr("Close the gap on all tracks (later audio, markers and subtitles move up)"));
+                        ui.radio_value(close_gap, false, crate::i18n::tr("Leave silence on the selected tracks"));
                     }
                     if buttons(ui, "Delete", enter) {
                         action = Some(if !clips.is_empty() {
@@ -721,7 +721,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                 }
                 Dialog::Group { name, edit, mix, members } => {
                     ui.horizontal(|ui| {
-                        ui.label("Name");
+                        ui.label(crate::i18n::tr("Name"));
                         ui.text_edit_singleline(name);
                     });
                     ui.horizontal(|ui| {
@@ -768,7 +768,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                 }
                 Dialog::ScoreSetup { title, composer, bars_per_system, show_track_names } => {
                     egui::Grid::new("score_setup").num_columns(2).spacing(vec2(10.0, 8.0)).show(ui, |ui| {
-                        ui.label("Title");
+                        ui.label(crate::i18n::tr("Title"));
                         ui.text_edit_singleline(title);
                         ui.end_row();
                         ui.label("Composer");
@@ -803,7 +803,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         ui.label(format!("Save changes to “{name}” before closing?"));
                         ui.separator();
                         ui.horizontal(|ui| {
-                            if ui.button("Don't Save").clicked() {
+                            if ui.button(crate::i18n::tr("Don't Save")).clicked() {
                                 action = Some(then.clone());
                             }
                             if buttons(ui, "Save", enter) {
@@ -922,10 +922,10 @@ fn buttons(ui: &mut egui::Ui, ok: &str, enter: bool) -> bool {
     let mut pressed = enter;
     ui.separator();
     ui.horizontal(|ui| {
-        if ui.button("Cancel").clicked() {
+        if ui.button(crate::i18n::tr("Cancel")).clicked() {
             ui.ctx().memory_mut(|m| m.data.insert_temp(egui::Id::new("dlg_cancel"), true));
         }
-        if ui.add(egui::Button::new(egui::RichText::new(ok).strong()).fill(Tokens::current().accent)).clicked() {
+        if ui.add(egui::Button::new(egui::RichText::new(crate::i18n::tr(ok)).strong()).fill(Tokens::current().accent)).clicked() {
             pressed = true;
         }
     });
@@ -985,7 +985,7 @@ fn audiosuite_window(app: &mut SoundApp, ctx: &egui::Context) {
         }
         ui.ctx().memory_mut(|m| m.data.insert_temp(key, params.clone()));
         ui.label(egui::RichText::new("Processes the selected clips and replaces them with rendered audio.").small());
-        if ui.button(egui::RichText::new("Render").strong()).clicked() {
+        if ui.button(egui::RichText::new(crate::i18n::tr("Render")).strong()).clicked() {
             let p: serde_json::Map<String, Value> = params.iter().map(|(k, v)| (k.clone(), json!(v))).collect();
             let _ = app.run("audiosuite.process", json!({"process": process, "params": p}));
         }
@@ -1022,18 +1022,33 @@ fn preferences_ui(app: &mut SoundApp, ui: &mut egui::Ui, s: &mut soundcraft_mode
         ui.separator();
         export_settings_ui(ui, None, s, true);
         ui.separator();
-        ui.label(egui::RichText::new("Recording").strong());
+        ui.label(egui::RichText::new(crate::i18n::tr("Recording")).strong());
         ui.label(
             egui::RichText::new(
                 "Record (Cmd+Space) records every speaker track except locked ones; a track's own record button records just that speaker.",
             )
             .color(dim),
         );
-        if ui.button("Audio devices and buffer…").clicked() {
+        if ui.button(crate::i18n::tr("Audio devices and buffer…")).clicked() {
             let _ = app.run("window.playback_engine", json!({"value": true}));
         }
         ui.separator();
-        ui.label(egui::RichText::new("Transcription").strong());
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new(crate::i18n::tr("Interface language")).strong());
+            let label = |v: &str| match v {
+                "de" => "Deutsch",
+                "en" => "English",
+                _ => "Automatisch / Automatic",
+            };
+            egui::ComboBox::from_id_salt("ui_language").selected_text(label(&app.ui.language)).show_ui(ui, |ui| {
+                for v in ["auto", "de", "en"] {
+                    ui.selectable_value(&mut app.ui.language, v.to_string(), label(v));
+                }
+            });
+        });
+        ui.label(egui::RichText::new("The macOS menu bar follows after a restart.").small().color(dim));
+        ui.separator();
+        ui.label(egui::RichText::new(crate::i18n::tr("Transcription")).strong());
         use soundcraft_engine::transcribe;
         match transcribe::find_cli() {
             Some(cli) => ui.label(format!("whisper.cpp: {}", cli.display())),
@@ -1045,7 +1060,7 @@ fn preferences_ui(app: &mut SoundApp, ui: &mut egui::Ui, s: &mut soundcraft_mode
         };
         ui.label(egui::RichText::new("Transcription listens for the episode's language.").small().color(dim));
     });
-    ui.label(egui::RichText::new("Saved with the session.").small().color(dim));
+    ui.label(egui::RichText::new(crate::i18n::tr("Saved with the session.")).small().color(dim));
     buttons(ui, "Save", enter && !ui.ctx().egui_wants_keyboard_input())
 }
 
@@ -1055,13 +1070,13 @@ fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut 
     let x = &mut s.export;
     if let Some(path) = path.as_mut() {
         ui.horizontal(|ui| {
-            ui.label("File");
+            ui.label(crate::i18n::tr("File"));
             ui.add(egui::TextEdit::singleline(&mut **path).desired_width(380.0));
         });
     }
-    ui.label(egui::RichText::new("Format").strong());
+    ui.label(egui::RichText::new(crate::i18n::tr("Format")).strong());
     egui::Grid::new("ep_fmt").num_columns(2).spacing(vec2(12.0, 6.0)).show(ui, |ui| {
-        ui.label("Format");
+        ui.label(crate::i18n::tr("Format"));
         let before = x.format.clone();
         egui::ComboBox::from_id_salt("ep_format").selected_text(x.format.to_uppercase()).show_ui(ui, |ui| {
             for f in soundcraft_engine::cmd::podcast::EXPORT_FORMATS {
@@ -1086,7 +1101,7 @@ fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut 
         }
         ui.end_row();
         if matches!(x.format.as_str(), "mp3" | "m4a" | "m4b") {
-            ui.label("Bitrate");
+            ui.label(crate::i18n::tr("Bitrate"));
             egui::ComboBox::from_id_salt("ep_bitrate").selected_text(format!("{} kbit/s", x.bitrate_kbps)).show_ui(ui, |ui| {
                 for b in soundcraft_audio_io::mp3::MP3_BITRATES {
                     let hint = match b {
@@ -1108,20 +1123,20 @@ fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut 
             });
         }
         ui.end_row();
-        ui.label("Sample rate");
+        ui.label(crate::i18n::tr("Sample rate"));
         egui::ComboBox::from_id_salt("ep_sr").selected_text(format!("{} Hz", x.sample_rate)).show_ui(ui, |ui| {
             for r in soundcraft_audio_io::mp3::MP3_SAMPLE_RATES {
                 ui.selectable_value(&mut x.sample_rate, r, format!("{r} Hz"));
             }
         });
         ui.end_row();
-        ui.label("Channels");
+        ui.label(crate::i18n::tr("Channels"));
         ui.horizontal(|ui| {
-            ui.radio_value(&mut x.mono, false, "Stereo");
-            ui.radio_value(&mut x.mono, true, "Mono");
+            ui.radio_value(&mut x.mono, false, crate::i18n::tr("Stereo"));
+            ui.radio_value(&mut x.mono, true, crate::i18n::tr("Mono"));
         });
         ui.end_row();
-        ui.label("Loudness");
+        ui.label(crate::i18n::tr("Loudness"));
         let current = LOUDNESS_PRESETS
             .iter()
             .find(|(_, v)| *v == x.loudness_lufs)
@@ -1133,14 +1148,14 @@ fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut 
         });
         ui.end_row();
         if matches!(x.format.as_str(), "mp3" | "m4a" | "m4b") {
-            ui.label("Chapters");
-            ui.checkbox(&mut x.chapters, "Write markers as chapters");
+            ui.label(crate::i18n::tr("Chapters"));
+            ui.checkbox(&mut x.chapters, crate::i18n::tr("Write markers as chapters"));
             ui.end_row();
         }
-        ui.label("Also write");
+        ui.label(crate::i18n::tr("Also write"));
         ui.vertical(|ui| {
-            ui.checkbox(&mut x.shownotes, "Shownotes (.md) and chapters (.chapters.json)");
-            ui.checkbox(&mut x.subtitles, "Subtitles (.srt and .vtt)");
+            ui.checkbox(&mut x.shownotes, crate::i18n::tr("Shownotes (.md) and chapters (.chapters.json)"));
+            ui.checkbox(&mut x.subtitles, crate::i18n::tr("Subtitles (.srt and .vtt)"));
         });
         ui.end_row();
     });
@@ -1153,19 +1168,19 @@ fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut 
 /// Episode details: ID3 tags in MP3s, shownotes, transcription language.
 fn episode_ui(ui: &mut egui::Ui, e: &mut soundcraft_model::EpisodeInfo) {
     {
-        ui.label(egui::RichText::new("Episode").strong());
+        ui.label(egui::RichText::new(crate::i18n::tr("Episode")).strong());
         egui::Grid::new("ep_meta").num_columns(2).spacing(vec2(12.0, 6.0)).show(ui, |ui| {
             for (label, field) in [("Title", &mut e.title), ("Podcast", &mut e.show), ("Author", &mut e.author), ("Genre", &mut e.genre)] {
-                ui.label(label);
+                ui.label(crate::i18n::tr(label));
                 ui.add(egui::TextEdit::singleline(field).desired_width(300.0));
                 ui.end_row();
             }
-            ui.label("Episode");
+            ui.label(crate::i18n::tr("Episode"));
             ui.horizontal(|ui| {
                 ui.add(egui::DragValue::new(&mut e.episode).range(0..=99_999));
-                ui.label("Year");
+                ui.label(crate::i18n::tr("Year"));
                 ui.add(egui::DragValue::new(&mut e.year).range(0..=2200));
-                ui.label("Language");
+                ui.label(crate::i18n::tr("Language"));
                 egui::ComboBox::from_id_salt("ep_lang").selected_text(e.language.as_str()).show_ui(ui, |ui| {
                     for (code, name) in [("deu", "Deutsch"), ("eng", "English"), ("dan", "Dansk"), ("fra", "Français"), ("spa", "Español")] {
                         ui.selectable_value(&mut e.language, code.to_string(), format!("{code}  {name}"));
@@ -1173,10 +1188,10 @@ fn episode_ui(ui: &mut egui::Ui, e: &mut soundcraft_model::EpisodeInfo) {
                 });
             });
             ui.end_row();
-            ui.label("Cover");
+            ui.label(crate::i18n::tr("Cover"));
             ui.add(egui::TextEdit::singleline(&mut e.cover).hint_text("path to a square JPEG or PNG").desired_width(300.0));
             ui.end_row();
-            ui.label("Description");
+            ui.label(crate::i18n::tr("Description"));
             ui.add(egui::TextEdit::multiline(&mut e.description).desired_rows(3).desired_width(300.0));
             ui.end_row();
         });

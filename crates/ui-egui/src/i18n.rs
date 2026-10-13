@@ -1,0 +1,446 @@
+//! Interface language: English (the strings in the code) or German. `tr` looks a string up in the
+//! German table when German is active; strings without a translation stay English.
+
+use std::collections::HashMap;
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+static GERMAN: AtomicBool = AtomicBool::new(false);
+
+/// `setting` is "de", "en" or "auto" (the system's language).
+pub fn set(setting: &str) {
+    let de = match setting {
+        "de" => true,
+        "en" => false,
+        _ => system_is_german(),
+    };
+    GERMAN.store(de, Ordering::Relaxed);
+}
+
+pub fn german() -> bool {
+    GERMAN.load(Ordering::Relaxed)
+}
+
+/// LANG / LC_ALL / LC_MESSAGES, and on macOS the first preferred language (asked once).
+fn system_is_german() -> bool {
+    static ANSWER: OnceLock<bool> = OnceLock::new();
+    *ANSWER.get_or_init(|| {
+        for k in ["LC_ALL", "LC_MESSAGES", "LANG"] {
+            if let Some(v) = std::env::var_os(k).and_then(|v| v.into_string().ok()).filter(|v| !v.is_empty() && v != "C" && v != "POSIX") {
+                return v.starts_with("de");
+            }
+        }
+        #[cfg(target_os = "macos")]
+        if let Ok(out) = std::process::Command::new("defaults").args(["read", "-g", "AppleLanguages"]).output() {
+            let text = String::from_utf8_lossy(&out.stdout);
+            let first =
+                text.split(['"', ',', '(', '\n', ' ']).find(|t| !t.trim().is_empty() && t.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
+            return first.is_some_and(|l| l.starts_with("de"));
+        }
+        false
+    })
+}
+
+/// `s` in the active language.
+pub fn tr(s: &str) -> &str {
+    if !german() {
+        return s;
+    }
+    table().get(s).copied().unwrap_or(s)
+}
+
+fn table() -> &'static HashMap<&'static str, &'static str> {
+    static T: OnceLock<HashMap<&'static str, &'static str>> = OnceLock::new();
+    T.get_or_init(|| DE.iter().copied().collect())
+}
+
+/// English → German. Menu labels first, then windows and dialogs.
+const DE: &[(&str, &str)] = &[
+    // Menu roots.
+    ("File", "Ablage"),
+    ("Edit", "Bearbeiten"),
+    ("View", "Darstellung"),
+    ("Track", "Spur"),
+    ("Clip", "Clip"),
+    ("AudioSuite", "AudioSuite"),
+    ("Options", "Optionen"),
+    ("Setup", "Einstellungen"),
+    ("Window", "Fenster"),
+    // File.
+    ("New...", "Neu …"),
+    ("Open", "Öffnen"),
+    ("Session...", "Session …"),
+    ("Close Session", "Session schließen"),
+    ("Save Session", "Session sichern"),
+    ("Save Session As...", "Session sichern unter …"),
+    ("Save Session Copy In...", "Kopie der Session sichern in …"),
+    ("Save As Template...", "Als Vorlage sichern …"),
+    ("Revert Session to Saved...", "Auf gesicherte Version zurücksetzen …"),
+    ("Bounce Mix...", "Mix bouncen …"),
+    ("Import", "Importieren"),
+    ("Session Data...", "Session-Daten …"),
+    ("Audio...", "Audio …"),
+    ("Subtitles...", "Untertitel …"),
+    ("Export", "Exportieren"),
+    ("Selected Tracks as New Session...", "Ausgewählte Spuren als neue Session …"),
+    ("Transcript...", "Transkript …"),
+    ("Audiogram (MP4)...", "Audiogramm (MP4) …"),
+    ("Export Episode...", "Folge exportieren …"),
+    ("Export Shownotes...", "Shownotes exportieren …"),
+    // Edit.
+    ("Can't Undo", "Kein Widerrufen möglich"),
+    ("Can't Redo", "Kein Wiederholen möglich"),
+    ("Restore Last Selection", "Letzte Auswahl wiederherstellen"),
+    ("Cut", "Ausschneiden"),
+    ("Copy", "Kopieren"),
+    ("Paste", "Einsetzen"),
+    ("Clear", "Löschen"),
+    ("Cut Special", "Spezial ausschneiden"),
+    ("Copy Special", "Spezial kopieren"),
+    ("Paste Special", "Spezial einsetzen"),
+    ("Clear Special", "Spezial löschen"),
+    ("Clip Gain", "Clip-Gain"),
+    ("Clip Effects", "Clip-Effekte"),
+    ("All Automation", "Gesamte Automation"),
+    ("Merge Markers", "Marker zusammenführen"),
+    ("Repeat to Fill Selection", "Wiederholen bis Auswahl gefüllt"),
+    ("To Current Automation Type", "In aktuellen Automationstyp"),
+    ("Select All", "Alles auswählen"),
+    ("Selection", "Auswahl"),
+    ("Change Timeline to Match Edit", "Timeline an Bearbeitungsauswahl anpassen"),
+    ("Change Edit to Match Timeline", "Bearbeitungsauswahl an Timeline anpassen"),
+    ("Play Edit", "Bearbeitungsauswahl abspielen"),
+    ("Play Timeline", "Timeline-Auswahl abspielen"),
+    ("Move Edit Left", "Auswahl nach links"),
+    ("Move Edit Right", "Auswahl nach rechts"),
+    ("Extend Edit Up", "Auswahl nach oben erweitern"),
+    ("Extend Edit Down", "Auswahl nach unten erweitern"),
+    ("Extend Edit Up to Members", "Auswahl nach oben auf Gruppe erweitern"),
+    ("Extend Edit Down to Members", "Auswahl nach unten auf Gruppe erweitern"),
+    ("Remove Edit from Top", "Oberste Spur aus Auswahl entfernen"),
+    ("Remove Edit from Bottom", "Unterste Spur aus Auswahl entfernen"),
+    ("Duplicate", "Duplizieren"),
+    ("Repeat...", "Wiederholen …"),
+    ("Shift...", "Verschieben …"),
+    ("Space Clips…", "Clips verteilen …"),
+    ("Insert Silence", "Stille einfügen"),
+    ("Snap to", "Einrasten an"),
+    ("Next", "Nächstem"),
+    ("Previous", "Vorherigem"),
+    ("Trim", "Trimmen"),
+    ("To Selection", "Auf Auswahl"),
+    ("Start to Insertion", "Anfang bis Einfügemarke"),
+    ("End to Insertion", "Ende bis Einfügemarke"),
+    ("Start to Fill Selection", "Anfang füllt Auswahl"),
+    ("End to Fill Selection", "Ende füllt Auswahl"),
+    ("To Fill Selection", "Füllt Auswahl"),
+    ("To File Start", "Bis Dateianfang"),
+    ("To File End", "Bis Dateiende"),
+    ("To File Boundaries", "Bis Dateigrenzen"),
+    ("Separate", "Trennen"),
+    ("At Selection", "An Auswahl"),
+    ("Heal Separation", "Trennung aufheben"),
+    ("Consolidate", "Zusammenfügen"),
+    ("Mute", "Stummschalten"),
+    ("Copy Selection to...", "Auswahl kopieren nach …"),
+    ("Move Selection to...", "Auswahl verschieben nach …"),
+    ("New Playlist", "Neue Playlist"),
+    ("Duplicate of Main Playlist", "Duplikat der Haupt-Playlist"),
+    ("Strip Silence", "Stille entfernen"),
+    ("Automation", "Automation"),
+    ("Copy to Send...", "Auf Send kopieren …"),
+    ("Thin", "Ausdünnen"),
+    ("Thin All", "Alles ausdünnen"),
+    ("Convert Volume Automation to Clip Gain", "Lautstärke-Automation in Clip-Gain umwandeln"),
+    ("Convert Clip Gain to Volume Automation", "Clip-Gain in Lautstärke-Automation umwandeln"),
+    ("Coalesce Volume Automation to Clip Gain", "Lautstärke-Automation in Clip-Gain übernehmen"),
+    ("Coalesce Clip Gain to Volume Automation", "Clip-Gain in Lautstärke-Automation übernehmen"),
+    ("Write to Current", "In aktuellen Parameter schreiben"),
+    ("Write to All Enabled", "In alle aktiven schreiben"),
+    ("Trim to Current", "Aktuellen trimmen"),
+    ("Trim to All Enabled", "Alle aktiven trimmen"),
+    ("Fades", "Fades"),
+    ("Create...", "Erstellen …"),
+    ("Delete", "Löschen"),
+    ("Fade to Start", "Fade bis Anfang"),
+    ("Fade to End", "Fade bis Ende"),
+    ("Shorten Pauses...", "Pausen kürzen …"),
+    ("Match Speaker Levels", "Sprecher angleichen"),
+    ("Auto-Duck Music", "Musik automatisch absenken"),
+    ("Cut Filler Words...", "Füllwörter herausschneiden …"),
+    // View.
+    ("Mix Window Views", "Mix-Fenster-Ansichten"),
+    ("Edit Window Views", "Edit-Fenster-Ansichten"),
+    ("Inserts A-E", "Inserts A–E"),
+    ("Inserts F-J", "Inserts F–J"),
+    ("Sends A-E", "Sends A–E"),
+    ("Sends F-J", "Sends F–J"),
+    ("EQ Curve", "EQ-Kurve"),
+    ("I/O", "Ein-/Ausgänge"),
+    ("Meters and Faders", "Pegel und Fader"),
+    ("Delay Compensation", "Latenzausgleich"),
+    ("Track Color", "Spurfarbe"),
+    ("Comments", "Kommentare"),
+    ("All", "Alle"),
+    ("Minimal", "Minimal"),
+    ("Narrow Mix", "Schmaler Mix"),
+    ("Marker Controls", "Marker-Bedienelemente"),
+    ("Pinned Tracks", "Fixierte Spuren"),
+    ("Rulers", "Lineale"),
+    ("Min:Secs", "Min:Sek"),
+    ("Markers", "Marker"),
+    ("All Marker Rulers", "Alle Marker-Lineale"),
+    ("Subtitles", "Untertitel"),
+    ("Marker Displays", "Marker-Darstellung"),
+    ("Track Lane", "Spurbahn"),
+    ("Ruler Lines", "Lineal-Linien"),
+    ("Folder Lines", "Ordner-Linien"),
+    ("Ruler Lane Color", "Linealfarbe"),
+    ("Track Lane Color", "Spurbahnfarbe"),
+    ("Other Displays", "Weitere Anzeigen"),
+    ("Universe", "Übersicht"),
+    ("Track List", "Spurliste"),
+    ("Clip List", "Clip-Liste"),
+    ("Processing State", "Bearbeitungsstatus"),
+    ("Name", "Name"),
+    ("Channel Name", "Kanalname"),
+    ("Overlap Shadows", "Überlappungsschatten"),
+    ("Transparency", "Transparenz"),
+    ("Overwrite Indicator", "Überschreib-Anzeige"),
+    ("Copy/Move Indicators", "Kopier-/Verschiebe-Anzeigen"),
+    ("Clip Gain Line", "Clip-Gain-Linie"),
+    ("Clip Gain Info", "Clip-Gain-Info"),
+    ("Clip Effects Status", "Clip-Effekt-Status"),
+    ("Current Time", "Aktuelle Zeit"),
+    ("No Time", "Keine Zeit"),
+    ("Display on All Channels", "Auf allen Kanälen anzeigen"),
+    ("Waveforms", "Wellenformen"),
+    ("Peak", "Spitze"),
+    ("Power", "Leistung"),
+    ("Rectified", "Gleichgerichtet"),
+    ("Outlines", "Umrisse"),
+    ("Overlapped Crossfades", "Überlappende Crossfades"),
+    ("Trim Playlist", "Trim-Playlist"),
+    ("Composite Playlist", "Zusammengesetzte Playlist"),
+    ("Track Number", "Spurnummer"),
+    ("Track Transcription Lane", "Transkriptionsbahn"),
+    ("Transport", "Transport"),
+    ("Counters", "Zähler"),
+    ("Output Meters", "Ausgangspegel"),
+    ("Expanded", "Erweitert"),
+    ("Main Counter", "Hauptzähler"),
+    // Track.
+    ("Group...", "Gruppieren …"),
+    ("Duplicate...", "Duplizieren …"),
+    ("Make Inactive", "Inaktiv schalten"),
+    ("Move to New Folder...", "In neuen Ordner verschieben …"),
+    ("Change Track Width", "Spurbreite ändern"),
+    ("Bounce...", "Bouncen …"),
+    ("Save Track Preset...", "Spur-Preset sichern …"),
+    ("Bypass Inserts", "Inserts umgehen"),
+    ("Dynamics", "Dynamik"),
+    ("Reverb", "Hall"),
+    ("Delay", "Delay"),
+    ("Modulation", "Modulation"),
+    ("Mute Sends", "Sends stummschalten"),
+    ("Scroll to Track...", "Zu Spur scrollen …"),
+    ("Clear All Clip Indicators", "Alle Übersteuerungsanzeigen löschen"),
+    ("Coalesce Trim Automation", "Trim-Automation übernehmen"),
+    ("Clear Trim Automation", "Trim-Automation löschen"),
+    ("Toggle Recent Playlist", "Letzte Playlist umschalten"),
+    // Clip.
+    ("Edit Lock/Unlock", "Bearbeitungssperre an/aus"),
+    ("Send to Back", "Nach hinten"),
+    ("Bring to Front", "Nach vorne"),
+    ("Group", "Gruppieren"),
+    ("Ungroup", "Gruppierung aufheben"),
+    ("Ungroup All", "Alle Gruppierungen aufheben"),
+    ("Regroup", "Neu gruppieren"),
+    ("Rename...", "Umbenennen …"),
+    ("Bypass", "Umgehen"),
+    ("Render", "Berechnen"),
+    // AudioSuite.
+    ("EQ", "EQ"),
+    ("EQ 1-Band", "EQ 1-Band"),
+    ("EQ 7-Band", "EQ 7-Band"),
+    ("Rating", "Bewertung"),
+    ("Channel Strip", "Kanalzug"),
+    ("FET Compressor", "FET-Kompressor"),
+    ("Compressor/Limiter", "Kompressor/Limiter"),
+    ("De-Esser", "De-Esser"),
+    ("Expander/Gate", "Expander/Gate"),
+    ("Maximizer", "Maximizer"),
+    ("Pitch Shift", "Tonhöhe"),
+    ("Time Shift", "Zeitkorrektur"),
+    ("Other", "Weitere"),
+    ("DC Offset Removal", "Gleichspannung entfernen"),
+    ("Gain", "Verstärkung"),
+    ("Invert", "Invertieren"),
+    ("Normalize", "Normalisieren"),
+    ("Reverse", "Umkehren"),
+    ("Time Compression Expansion", "Zeitstauchung/-dehnung"),
+    // Options.
+    ("Loop Record", "Loop-Aufnahme"),
+    ("Pre/Post-Roll", "Pre-/Post-Roll"),
+    ("Loop Playback", "Loop-Wiedergabe"),
+    ("Edit Window Scrolling", "Scrollen im Edit-Fenster"),
+    ("No Scrolling", "Nicht scrollen"),
+    ("After Playback", "Nach der Wiedergabe"),
+    ("Page", "Seitenweise"),
+    ("Continuous", "Fortlaufend"),
+    ("Center Playhead", "Abspielmarke zentrieren"),
+    ("Link Timeline and Edit Selection", "Timeline- und Bearbeitungsauswahl koppeln"),
+    ("Link Track and Edit Selection", "Spur- und Bearbeitungsauswahl koppeln"),
+    ("Insertion Follows Playback", "Einfügemarke folgt Wiedergabe"),
+    ("Automation Follows Edit", "Automation folgt Bearbeitung"),
+    ("Markers Follow Edit", "Marker folgen Bearbeitung"),
+    ("Marker Target Follows First Selected Track", "Marker-Ziel folgt erster ausgewählter Spur"),
+    ("Auto-Spot Clips", "Clips automatisch platzieren"),
+    ("Pre-Fader Metering", "Pegel vor Fader"),
+    ("Solo Mode", "Solo-Modus"),
+    ("SIP (Solo In Place)", "SIP (Solo im Mix)"),
+    ("Latch", "Einrastend"),
+    ("Momentary", "Kurzzeitig"),
+    ("Low Latency Monitoring", "Abhören mit geringer Latenz"),
+    // Setup.
+    ("Hardware...", "Hardware …"),
+    ("Playback Engine...", "Wiedergabe-Engine …"),
+    ("I/O...", "Ein-/Ausgänge …"),
+    ("Session", "Session"),
+    ("Keyboard Shortcuts...", "Tastaturkurzbefehle …"),
+    ("Preferences...", "Einstellungen …"),
+    ("Appearance", "Erscheinungsbild"),
+    // Window.
+    ("Arrange", "Anordnen"),
+    ("Tile", "Kacheln"),
+    ("Tile Horizontal", "Horizontal kacheln"),
+    ("Tile Vertical", "Vertikal kacheln"),
+    ("Cascade", "Überlappend"),
+    ("Hide All Floating Windows", "Alle schwebenden Fenster ausblenden"),
+    ("Close Window", "Fenster schließen"),
+    ("Mix", "Mix"),
+    ("Big Counter", "Großer Zähler"),
+    ("Memory Locations", "Speicherpositionen"),
+    ("Color Palette", "Farbpalette"),
+    ("UI Customization", "Oberfläche anpassen"),
+    ("Metadata Inspector", "Metadaten-Inspektor"),
+    ("Undo History", "Verlauf"),
+    ("Search", "Suchen"),
+    ("Disk Usage", "Speicherbelegung"),
+    ("System Usage", "Systemauslastung"),
+    ("Filler Words", "Füllwörter"),
+    ("Jingles", "Jingles"),
+    ("Reset Panel Layout", "Fensteranordnung zurücksetzen"),
+    ("Mono", "Mono"),
+    ("Stereo", "Stereo"),
+    ("Pitch II", "Pitch II"),
+    // Windows and dialogs.
+    ("Preferences", "Einstellungen"),
+    ("Episode", "Folge"),
+    ("Title", "Titel"),
+    ("Podcast", "Podcast"),
+    ("Author", "Autor"),
+    ("Genre", "Genre"),
+    ("Year", "Jahr"),
+    ("Language", "Sprache"),
+    ("Cover", "Cover"),
+    ("Description", "Beschreibung"),
+    ("Format", "Format"),
+    ("Bitrate", "Bitrate"),
+    ("Sample rate", "Abtastrate"),
+    ("Channels", "Kanäle"),
+    ("Loudness", "Lautheit"),
+    ("Chapters", "Kapitel"),
+    ("Also write", "Zusätzlich schreiben"),
+    ("Recording", "Aufnahme"),
+    ("Transcription", "Transkription"),
+    ("Cancel", "Abbrechen"),
+    ("Save", "Sichern"),
+    ("Export Episode", "Folge exportieren"),
+    ("Delete Section", "Abschnitt löschen"),
+    ("Delete Clips", "Clips löschen"),
+    ("Audiogram Video", "Audiogramm-Video"),
+    ("Shorten Pauses", "Pausen kürzen"),
+    ("Interface language", "Sprache der Oberfläche"),
+    ("+ Add at playhead", "+ An Abspielmarke einfügen"),
+    ("Create cues from speech", "Untertitel aus Sprache anlegen"),
+    ("Import…", "Importieren …"),
+    ("Export…", "Exportieren …"),
+    ("Export Text…", "Als Text exportieren …"),
+    ("Follow playhead", "Abspielmarke folgen"),
+    ("Transcribe", "Transkribieren"),
+    ("Find Words", "Wörter finden"),
+    ("Select none", "Keine auswählen"),
+    ("No subtitles yet", "Noch keine Untertitel"),
+    ("No words yet", "Noch keine Wörter"),
+    ("Normalize (−1 dB peak)", "Normalisieren (−1 dB Spitze)"),
+    ("Match Loudness (−16 LUFS)", "Lautheit angleichen (−16 LUFS)"),
+    ("Reduce Noise", "Rauschen reduzieren"),
+    ("Sync to Other Tracks", "Mit anderen Spuren synchronisieren"),
+    ("Remove Fades", "Fades entfernen"),
+    ("Reset to 0 dB", "Auf 0 dB zurücksetzen"),
+    ("Close Gap on All Tracks", "Lücke auf allen Spuren schließen"),
+    ("Mute/Unmute", "Stumm an/aus"),
+    ("Time Lock/Unlock", "Zeitsperre an/aus"),
+    ("Render Clip Gain", "Clip-Gain berechnen"),
+    ("EPISODE", "FOLGE"),
+    ("OK", "OK"),
+    ("Export", "Exportieren"),
+    ("Shorten", "Kürzen"),
+    ("Strip", "Entfernen"),
+    ("Don't Save", "Nicht sichern"),
+    ("Revert", "Zurücksetzen"),
+    ("Write markers as chapters", "Marker als Kapitel schreiben"),
+    ("Shownotes (.md) and chapters (.chapters.json)", "Shownotes (.md) und Kapitel (.chapters.json)"),
+    ("Subtitles (.srt and .vtt)", "Untertitel (.srt und .vtt)"),
+    ("Audio devices and buffer…", "Audiogeräte und Puffer …"),
+    ("Saved with the session.", "Wird mit der Session gesichert."),
+    ("Square 1080 × 1080 (feed)", "Quadratisch 1080 × 1080 (Feed)"),
+    ("Portrait 1080 × 1920 (stories, reels)", "Hochformat 1080 × 1920 (Stories, Reels)"),
+    (
+        "Close the gap on all tracks (later audio, markers and subtitles move up)",
+        "Lücke auf allen Spuren schließen (Späteres, Marker und Untertitel rücken nach)",
+    ),
+    ("Leave silence on the selected tracks", "Stille auf den ausgewählten Spuren lassen"),
+    ("About TalkCraft", "Über TalkCraft"),
+    ("Session Info", "Session-Info"),
+    ("Session Audio Health", "Audio-Zustand der Session"),
+    ("Settings…", "Einstellungen …"),
+    ("Hide TalkCraft", "TalkCraft ausblenden"),
+    ("Hide Others", "Andere ausblenden"),
+    ("Quit TalkCraft", "TalkCraft beenden"),
+    ("Quit", "Beenden"),
+];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn german_menus_and_english_fallback() {
+        set("de");
+        assert_eq!(tr("File"), "Ablage");
+        assert_eq!(tr("Shorten Pauses..."), "Pausen kürzen …");
+        assert_eq!(tr("Something new"), "Something new");
+        set("en");
+        assert_eq!(tr("File"), "File");
+    }
+
+    #[test]
+    fn every_menu_label_has_a_german_name() {
+        let missing: Vec<String> = {
+            fn walk(n: &crate::menus::MenuNode, out: &mut Vec<String>) {
+                if !table().contains_key(n.label.as_str()) {
+                    out.push(n.label.clone());
+                }
+                n.children.iter().for_each(|c| walk(c, out));
+            }
+            let mut out = Vec::new();
+            crate::menus::tree().iter().for_each(|r| walk(r, &mut out));
+            out.sort();
+            out.dedup();
+            out
+        };
+        assert!(missing.is_empty(), "menu labels without German: {missing:?}");
+    }
+}

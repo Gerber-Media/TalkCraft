@@ -241,7 +241,8 @@ fn main() -> eframe::Result {
         e.mark_clean();
         e
     };
-    let prefs = load_prefs().unwrap_or_default();
+    // First start: follow the system's language (UiState::default() is English, for tests).
+    let prefs = load_prefs().unwrap_or_else(|| UiState { language: "auto".into(), ..UiState::default() });
     let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("TalkCraft")
@@ -275,6 +276,8 @@ fn main() -> eframe::Result {
             for f in &files {
                 open_path(&mut app, f);
             }
+            // The menu bar is built once: its labels need the interface language now.
+            soundcraft_ui_egui::i18n::set(&app.ui.language);
             // If the system menu bar cannot be built, keep the egui menu bar rather than fail to start.
             #[cfg(target_os = "macos")]
             let menu = match native_menu::NativeMenu::new(&app, &cc.egui_ctx) {

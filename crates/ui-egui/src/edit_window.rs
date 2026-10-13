@@ -946,10 +946,10 @@ fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, sele
     icons::draw(ui.painter(), pl_r.shrink(3.0), "triangle_down", t.text);
     let presp = ui.interact(pl_r, ui.id().with(("pl", id.0)), Sense::click());
     egui::Popup::menu(&presp).show(|ui| {
-        if ui.button("New...").clicked() {
+        if ui.button(crate::i18n::tr("New...")).clicked() {
             let _ = app.run("track.playlist_new", json!({"track": id.0}));
         }
-        if ui.button("Duplicate...").clicked() {
+        if ui.button(crate::i18n::tr("Duplicate...")).clicked() {
             let _ = app.run("track.playlist_duplicate", json!({"track": id.0}));
         }
         if ui.button("Delete Unused...").clicked() {
@@ -1203,7 +1203,7 @@ fn track_context_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
             }
         }
     });
-    ui.menu_button("Track Color", |ui| {
+    ui.menu_button(crate::i18n::tr("Track Color"), |ui| {
         for (i, c) in soundcraft_model::TRACK_COLORS.iter().enumerate() {
             let (r, resp) = ui.allocate_exact_size(vec2(120.0, 14.0), Sense::click());
             ui.painter().rect_filled(r, 2.0, rgb(*c));
@@ -2024,7 +2024,7 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
                 run_report(app, "edit.close_gap", json!({"track": track.0, "at": at}));
             }
             let all = ui
-                .add_enabled(!others_busy, egui::Button::new("Close Gap on All Tracks"))
+                .add_enabled(!others_busy, egui::Button::new(crate::i18n::tr("Close Gap on All Tracks")))
                 .on_hover_text("Cuts this time from every track, markers and subtitles (only where all tracks are empty)")
                 .on_disabled_hover_text("Other tracks have audio in this gap");
             if all.clicked() {
@@ -2032,19 +2032,23 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
             }
             ui.separator();
         }
-        if ui.button("Paste").clicked() {
+        if ui.button(crate::i18n::tr("Paste")).clicked() {
             let _ = app.run("edit.paste", json!({}));
         }
         return;
     };
     let gain = app.engine.session().find_clip(c).map_or(0.0, |(_, x)| x.gain_db);
-    if ui.button("Normalize (−1 dB peak)").clicked() {
+    if ui.button(crate::i18n::tr("Normalize (−1 dB peak)")).clicked() {
         run_report(app, "clip.normalize", json!({"clips": [c.0], "peak_db": -1.0}));
     }
-    if ui.button("Match Loudness (−16 LUFS)").on_hover_text("Sets the clip gain so the clip sounds as loud as the episode target").clicked() {
+    if ui
+        .button(crate::i18n::tr("Match Loudness (−16 LUFS)"))
+        .on_hover_text("Sets the clip gain so the clip sounds as loud as the episode target")
+        .clicked()
+    {
         run_report(app, "clip.normalize", json!({"clips": [c.0], "lufs": -16.0}));
     }
-    ui.menu_button("Reduce Noise", |ui| {
+    ui.menu_button(crate::i18n::tr("Reduce Noise"), |ui| {
         for (label, db) in [("Light (6 dB)", 6.0), ("Medium (12 dB)", 12.0), ("Strong (18 dB)", 18.0)] {
             if ui.button(label).on_hover_text("Learns the background from the quietest moments and lowers it; undoable").clicked() {
                 match app.run("clip.denoise", json!({"clips": [c.0], "reduction_db": db})) {
@@ -2055,7 +2059,7 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
         }
     });
     if ui
-        .button("Sync to Other Tracks")
+        .button(crate::i18n::tr("Sync to Other Tracks"))
         .on_hover_text("Moves this clip so its audio lines up with the rest (e.g. a guest's own recording against the call)")
         .clicked()
     {
@@ -2070,7 +2074,7 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
             Err(e) => app.ui.status = e,
         }
     }
-    ui.menu_button("Fades", |ui| {
+    ui.menu_button(crate::i18n::tr("Fades"), |ui| {
         for secs in [0.5, 1.0, 2.0] {
             if ui.button(format!("Fade In {secs} s")).clicked() {
                 run_report(app, "clip.set_fades", json!({"clip": c.0, "fade_in": {"seconds": secs}}));
@@ -2083,7 +2087,7 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
             }
         }
         ui.separator();
-        if ui.button("Remove Fades").clicked() {
+        if ui.button(crate::i18n::tr("Remove Fades")).clicked() {
             run_report(app, "clip.set_fades", json!({"clip": c.0, "fade_in": 0, "fade_out": 0}));
         }
         ui.label(egui::RichText::new("Or drag the small handles at the top of the clip").small().color(Tokens::current().text_dim));
@@ -2101,7 +2105,7 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
                 }
             }
         });
-        if ui.button("Reset to 0 dB").clicked() {
+        if ui.button(crate::i18n::tr("Reset to 0 dB")).clicked() {
             let _ = app.run("clip.gain", json!({"clips": [c.0], "db": 0.0}));
         }
     });
@@ -2121,11 +2125,11 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
         }
     }
     ui.separator();
-    if ui.button("Rename...").clicked() {
+    if ui.button(crate::i18n::tr("Rename...")).clicked() {
         let name = app.engine.session().find_clip(c).map(|(_, x)| x.name.clone()).unwrap_or_default();
         app.dialogs.open_rename_clip(c, &name);
     }
-    if ui.button("Delete").clicked() {
+    if ui.button(crate::i18n::tr("Delete")).clicked() {
         let _ = app.run("edit.select", json!({"clips": ids}));
         let _ = app.run("edit.clear", json!({}));
     }

@@ -18,7 +18,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("window.subtitles", "Subtitles", "Window > Subtitles", Some("Cmd+Ctrl+T")),
     ("window.words", "Filler Words", "Window > Filler Words", None),
     ("window.jingles", "Jingles", "Window > Jingles", None),
-    ("window.audiogram", "Audiogram Video...", "File > Export > Audiogram Video...", None),
+    ("window.audiogram", "Audiogram (MP4)...", "File > Export > Audiogram (MP4)...", None),
     ("window.undo_history", "Undo History", "Window > Undo History", None),
     ("window.clip_list", "Clip List", "Window > Clip List", None),
     ("window.track_list", "Track List", "View > Other Displays > Track List", None),
@@ -224,20 +224,20 @@ pub fn menu_bar(app: &mut SoundApp, ui: &mut egui::Ui) {
                     if ui.button(format!("About {}", crate::podcast::APP_NAME)).clicked() {
                         app.ui.show_about = true;
                     }
-                    if ui.button("Session Info").clicked() {
+                    if ui.button(crate::i18n::tr("Session Info")).clicked() {
                         app.ui.show_session_info = true;
                     }
-                    if ui.button("Session Audio Health").clicked() {
+                    if ui.button(crate::i18n::tr("Session Audio Health")).clicked() {
                         let _ = app.run("window.audio_health", json!({"value": true}));
                     }
                     ui.separator();
-                    if ui.button("Quit").clicked() {
+                    if ui.button(crate::i18n::tr("Quit")).clicked() {
                         let _ = crate::dialogs::run_or_ask(app, "app.quit", json!({}));
                     }
                 });
                 let extra = ui_aliases();
                 for root in tree() {
-                    ui.menu_button(&root.label, |ui| {
+                    ui.menu_button(crate::i18n::tr(&root.label), |ui| {
                         for c in &root.children {
                             menu_node(app, ui, c, &extra);
                         }
@@ -263,7 +263,7 @@ pub fn menu_bar(app: &mut SoundApp, ui: &mut egui::Ui) {
 
 fn menu_node(app: &mut SoundApp, ui: &mut egui::Ui, n: &MenuNode, extra: &[(&str, &str)]) {
     if !n.children.is_empty() {
-        ui.menu_button(&n.label, |ui| {
+        ui.menu_button(crate::i18n::tr(&n.label), |ui| {
             for c in &n.children {
                 menu_node(app, ui, c, extra);
             }
@@ -272,7 +272,7 @@ fn menu_node(app: &mut SoundApp, ui: &mut egui::Ui, n: &MenuNode, extra: &[(&str
     }
     let id = command_for_path(&n.path, extra);
     let (enabled, checked) = item_state(app, &n.path, id.as_deref());
-    let label = live_label(app, id.as_deref()).unwrap_or_else(|| n.label.clone());
+    let label = live_label(app, id.as_deref()).unwrap_or_else(|| crate::i18n::tr(&n.label).to_string());
     let label = if checked { format!("✔ {label}") } else { label };
     let shortcut = id.as_deref().and_then(shortcut_for).unwrap_or("");
     let btn = egui::Button::new(label).shortcut_text(crate::shortcuts::shortcut_label(shortcut, ui.ctx().os().is_mac()));
@@ -404,7 +404,7 @@ const MENU_WINDOWS: &[(&str, &str)] = &[
     ("Window > Subtitles", "window.subtitles"),
     ("Window > Filler Words", "window.words"),
     ("Window > Jingles", "window.jingles"),
-    ("File > Export > Audiogram Video...", "window.audiogram"),
+    ("File > Export > Audiogram (MP4)...", "window.audiogram"),
     ("Edit > Cut Filler Words...", "window.words"),
     ("View > Rulers > Subtitles", "view.ruler"),
     ("Setup > Appearance", "window.ui_customization"),
@@ -429,8 +429,14 @@ pub fn shortcut_for(id: &str) -> Option<&'static str> {
 pub fn live_label(app: &SoundApp, id: Option<&str>) -> Option<String> {
     let e = &app.engine;
     match id? {
-        "edit.undo" => Some(e.undo_label().map_or_else(|| "Can't Undo".into(), |l| format!("Undo {l}"))),
-        "edit.redo" => Some(e.redo_label().map_or_else(|| "Can't Redo".into(), |l| format!("Redo {l}"))),
+        "edit.undo" => Some(e.undo_label().map_or_else(
+            || crate::i18n::tr("Can't Undo").into(),
+            |l| if crate::i18n::german() { format!("Widerrufen: {l}") } else { format!("Undo {l}") },
+        )),
+        "edit.redo" => Some(e.redo_label().map_or_else(
+            || crate::i18n::tr("Can't Redo").into(),
+            |l| if crate::i18n::german() { format!("Wiederholen: {l}") } else { format!("Redo {l}") },
+        )),
         _ => None,
     }
 }

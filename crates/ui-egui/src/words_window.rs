@@ -155,7 +155,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let mut locate: Option<Samples> = None;
     let sr = app.engine.session().sample_rate;
     let screen = ctx.content_rect();
-    egui::Window::new("Filler Words")
+    egui::Window::new(crate::i18n::tr("Filler Words"))
         .open(&mut open)
         .default_size(vec2(640.0, 380.0))
         .default_pos(egui::pos2((screen.max.x - 680.0).max(16.0), 140.0))
@@ -166,7 +166,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 if let Some((job, child)) = &mut w.task {
                     let p = job.progress();
                     ui.add(egui::ProgressBar::new(p).desired_width(220.0).text(format!("Listening for every word… {:.0}%", p * 100.0)));
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(crate::i18n::tr("Cancel")).clicked() {
                         let _ = child.kill();
                         let _ = child.wait();
                         job.cleanup();
@@ -174,14 +174,14 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                     }
                 } else if transcribe::missing(None).is_some() {
                     ui.label(RichText::new(transcribe::missing(None).unwrap_or_default()).color(t.text_dim));
-                } else if ui.button("Find Words").on_hover_text("Transcribes the episode word by word, keeping the ähms and uhs").clicked() {
+                } else if ui.button(crate::i18n::tr("Find Words")).on_hover_text("Transcribes the episode word by word, keeping the ähms and uhs").clicked() {
                     find = true;
                 }
                 let fillers = w.words.iter().filter(|x| x.filler).count();
                 if ui.add_enabled(fillers > 0, egui::Button::new(format!("Select all fillers ({fillers})"))).clicked() {
                     w.words.iter_mut().for_each(|x| x.selected = x.filler);
                 }
-                if ui.add_enabled(w.words.iter().any(|x| x.selected), egui::Button::new("Select none")).clicked() {
+                if ui.add_enabled(w.words.iter().any(|x| x.selected), egui::Button::new(crate::i18n::tr("Select none"))).clicked() {
                     w.words.iter_mut().for_each(|x| x.selected = false);
                 }
                 let n = w.words.iter().filter(|x| x.selected).count();
@@ -195,7 +195,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             if w.words.is_empty() {
                 ui.add_space(20.0);
                 ui.vertical_centered(|ui| {
-                    ui.label(RichText::new("No words yet").strong());
+                    ui.label(RichText::new(crate::i18n::tr("No words yet")).strong());
                     ui.label(RichText::new("Find Words writes down every word with its time. Hesitations are marked and preselected; click a word to change that, right-click to hear it.").color(t.text_dim));
                 });
                 return;
