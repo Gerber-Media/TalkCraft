@@ -61,6 +61,15 @@ pub fn specs() -> Vec<CommandSpec> {
             transcribe
         ),
         cmd!(
+            noundo "transcript.words",
+            "Find Words",
+            [],
+            None,
+            "{language?, model?, start?, end?, srt?: whisper word output to read instead of running whisper} — every spoken word with its time; hesitations (ähm, uh …) are marked `filler`",
+            has_tracks,
+            words
+        ),
+        cmd!(
             "subtitle.assign_speakers",
             "Name Speakers from Tracks",
             [],
@@ -277,6 +286,38 @@ pub fn transcribe_language(e: &Engine, p: &Value) -> String {
     if w == "auto" && code.len() == 2 && code.bytes().all(|b| b.is_ascii_lowercase()) { code } else { w.to_string() }
 }
 
+/// Words from whisper's one-word-per-cue output, placed at `r.start`, fillers marked.
+pub fn words_json(e: &Engine, r: soundcraft_time::Range, cues: &[FileCue], language: &str) -> Value {
+    let sr = e.session().sample_rate;
+    let words: Vec<Value> = cues
+        .iter()
+        .filter(|c| !c.text.trim().is_empty())
+        .map(|c| {
+            let start = r.start + sr.samples(c.start_ms as f64 / 1000.0);
+            let end = (r.start + sr.samples(c.end_ms as f64 / 1000.0)).min(r.end);
+            json!({"start": start, "end": end, "text": c.text.trim(), "filler": crate::transcribe::is_filler(&c.text, language)})
+        })
+        .collect();
+    json!({"words": words})
+}
+
+fn words(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "transcript.words";
+    let r = full_range(e, range_param(e, ID, p)?);
+    let language = transcribe_language(e, p);
+    let cues = if let Some(srt) = str_param(p, "srt") {
+        let bytes = std::fs::read(srt).map_err(|err| bad(ID, format!("{srt}: {err}")))?;
+        subs::parse(&String::from_utf8_lossy(&bytes))
+    } else {
+        let mut job = crate::transcribe::prepare(e, r, &language, str_param(p, "model"), ID)?;
+        job.words = true;
+        let out = job.run_blocking();
+        job.cleanup();
+        out?
+    };
+    Ok(words_json(e, r, &cues, &language))
+}
+
 fn transcribe(e: &mut Engine, p: &Value) -> Result<Value> {
     const ID: &str = "subtitle.transcribe";
     let r = full_range(e, range_param(e, ID, p)?);
@@ -362,6 +403,28 @@ mod tests {
         assert!(e.session().subtitles.is_empty(), "one undo step");
         assert_eq!(transcribe_language(&e, &json!({})), "de");
         assert_eq!(transcribe_language(&e, &json!({"language": "en"})), "en");
+        assert!(std::fs::remove_dir_all(&dir).is_ok());
+    }
+
+    #[test]
+    fn words_mark_fillers_and_cut_ranges_removes_them_in_one_step() {
+        let dir = std::env::temp_dir().join(format!("sc-words-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut e = crate::demo::demo_engine();
+        let srt = dir.join("w.srt");
+        std::fs::write(&srt, "1\n00:00:00,040 --> 00:00:00,560\n Hallo,\n\n2\n00:00:00,560 --> 00:00:01,010\n ähm,\n\n3\n00:00:01,010 --> 00:00:01,110\n und\n\n4\n00:00:01,110 --> 00:00:01,500\n um\n\n").unwrap();
+        let v = e.execute("transcript.words", &json!({"srt": srt.to_string_lossy(), "language": "de"})).unwrap();
+        let w = v["words"].as_array().unwrap();
+        let fillers: Vec<&str> = w.iter().filter(|x| x["filler"] == true).map(|x| x["text"].as_str().unwrap()).collect();
+        assert_eq!(fillers, ["ähm,"], "German \"um\" is a word");
+        let end0 = e.session().content_end();
+        let r = [w[1]["start"].as_i64().unwrap(), w[1]["end"].as_i64().unwrap()];
+        let cut = e.execute("edit.cut_ranges", &json!({"ranges": [r, [r[0] + 10, r[1] - 10], [96_000, 120_000]]})).unwrap();
+        assert_eq!(cut["cut"], 2, "overlapping ranges merge: {cut}");
+        assert_eq!(e.session().content_end(), end0 - (r[1] - r[0]) - 24_000);
+        e.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(e.session().content_end(), end0, "one undo step");
         assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 }

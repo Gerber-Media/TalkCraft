@@ -14,6 +14,7 @@ const AUTO_UPDATE_SECS: f64 = 2.0;
 pub struct ExtraState {
     pub show_renderer: bool,
     pub subtitles: crate::subtitle_editor::SubtitleEditor,
+    pub words: crate::words_window::WordsWindow,
     pub show_ui_customization: bool,
     pub auto_update_config: bool,
     pub ui_scale: f32,
@@ -28,6 +29,7 @@ impl Default for ExtraState {
         Self {
             show_renderer: false,
             subtitles: Default::default(),
+            words: Default::default(),
             show_ui_customization: false,
             auto_update_config: false,
             ui_scale: 1.0,
@@ -50,6 +52,7 @@ pub fn run(app: &mut SoundApp, id: &str, p: &Value) -> Option<Value> {
         "window.ui_customization" => flag(&mut app.extra.show_ui_customization),
         "window.config_auto_update" => flag(&mut app.extra.auto_update_config),
         "window.subtitles" => crate::subtitle_editor::toggle(app, p),
+        "window.words" => crate::words_window::toggle(app, p),
         _ => return None,
     })
 }
@@ -58,6 +61,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     auto_update(app, ctx);
     renderer(app, ctx);
     crate::subtitle_editor::window(app, ctx);
+    crate::words_window::window(app, ctx);
     ui_customization(app, ctx);
     apply_customization(app, ctx);
 }

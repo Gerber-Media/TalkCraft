@@ -89,6 +89,15 @@ pub fn specs() -> Vec<CommandSpec> {
         cmd!("edit.repeat", "Repeat...", ["Edit"], Some("Alt+R"), "{count: n}", has_range, repeat),
         cmd!("edit.shift", "Shift...", ["Edit"], Some("Alt+H"), "{by: samples|{seconds}, later?: bool}", has_range, shift),
         cmd!(
+            "edit.cut_ranges",
+            "Cut Ranges",
+            [],
+            None,
+            "{ranges: [[start, end], …]} — removes each range from every track, markers and subtitles (later audio moves up), one undo step",
+            has_tracks,
+            cut_ranges
+        ),
+        cmd!(
             "edit.close_gap",
             "Close Gap",
             [],
@@ -504,6 +513,39 @@ fn shift(e: &mut Engine, p: &Value) -> Result<Value> {
     let s = e.session_mut();
     let n = ops::move_clips(s, &ids, if later { by } else { -by }, None);
     Ok(json!({"moved": n}))
+}
+
+fn cut_ranges(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "edit.cut_ranges";
+    let list = p.get("ranges").and_then(Value::as_array).ok_or_else(|| bad(ID, "`ranges` required"))?;
+    let mut ranges: Vec<Range> = list
+        .iter()
+        .filter_map(|r| {
+            let a = r.get(0).and_then(Value::as_i64)?;
+            let b = r.get(1).and_then(Value::as_i64)?;
+            (b > a && a >= 0).then(|| Range::new(a, b))
+        })
+        .collect();
+    if ranges.is_empty() {
+        return Err(bad(ID, "no valid range"));
+    }
+    ranges.sort_by_key(|r| r.start);
+    let mut merged: Vec<Range> = Vec::new();
+    for r in ranges {
+        match merged.last_mut() {
+            Some(m) if r.start <= m.end => m.end = m.end.max(r.end),
+            _ => merged.push(r),
+        }
+    }
+    let total: Samples = merged.iter().map(|r| r.len()).sum();
+    let first = merged.first().map_or(0, |r| r.start);
+    let s = e.session_mut();
+    // Back to front, so earlier ranges keep their positions.
+    for r in merged.iter().rev() {
+        ops::cut_time(s, *r, false);
+    }
+    s.edit.selection = Range::point(first);
+    Ok(json!({"cut": merged.len(), "removed": total}))
 }
 
 fn close_gap(e: &mut Engine, p: &Value) -> Result<Value> {

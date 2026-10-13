@@ -29,6 +29,7 @@ pub mod video_track;
 pub mod video_window;
 pub mod widgets;
 pub mod windows;
+pub mod words_window;
 
 use serde_json::{Value, json};
 use soundcraft_engine::{Engine, TransportRequest};

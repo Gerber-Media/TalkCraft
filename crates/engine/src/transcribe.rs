@@ -145,6 +145,9 @@ pub struct Job {
     pub range: Range,
     /// Length of the audio (seconds), for progress.
     pub seconds: f64,
+    /// One cue per word, with the hesitations kept (for cutting filler words), instead of
+    /// subtitle-sized cues.
+    pub words: bool,
 }
 
 impl Job {
@@ -172,7 +175,11 @@ impl Job {
             .arg(&self.model)
             .arg("-f")
             .arg(self.wav())
-            .args(["-l", &self.language, "-t", &threads.to_string(), "-ml", &MAX_CUE_CHARS.to_string(), "-sow", "-osrt", "-pp", "-of"])
+            .args(["-l", &self.language, "-t", &threads.to_string(), "-sow", "-osrt", "-pp", "-ml"])
+            .arg(if self.words { "1".to_string() } else { MAX_CUE_CHARS.to_string() })
+            // whisper leaves out "ähm" and "uh" unless its prompt shows them.
+            .args(if self.words { vec!["--prompt".to_string(), filler_prompt(&self.language).to_string()] } else { Vec::new() })
+            .arg("-of")
             .arg(self.dir.join("mix"))
             .stdin(Stdio::null())
             .stdout(log)
@@ -241,9 +248,34 @@ pub fn prepare(e: &Engine, r: Range, language: &str, model: Option<&str>, id: &s
     static SEQ: AtomicU64 = AtomicU64::new(0);
     let dir = std::env::temp_dir().join(format!("talkcraft-whisper-{}-{}", std::process::id(), SEQ.fetch_add(1, Ordering::Relaxed)));
     std::fs::create_dir_all(&dir).map_err(|err| EngineError::Io(format!("{}: {err}", dir.display())))?;
-    let job = Job { dir, cli, model, language: language.to_string(), range: r, seconds };
+    let job = Job { dir, cli, model, language: language.to_string(), range: r, seconds, words: false };
     std::fs::write(job.wav(), bytes).map_err(|err| EngineError::Io(format!("{}: {err}", job.wav().display())))?;
     Ok(job)
+}
+
+/// A prompt full of hesitations, so whisper writes them down instead of smoothing them away.
+pub fn filler_prompt(language: &str) -> &'static str {
+    match language {
+        "de" => "Ähm, also, äh, ja. Hm, ähm.",
+        "da" => "Øh, altså, øhm, ja. Hm.",
+        "fr" => "Euh, alors, bah, hein. Hm.",
+        "es" => "Eh, este, pues, o sea. Mm.",
+        _ => "Um, uh, so, like, you know. Hmm, uh.",
+    }
+}
+
+/// Whether `word` (punctuation and case ignored) is a hesitation sound in `language` (a whisper
+/// code). German "um" is a word, English "um" a hesitation.
+pub fn is_filler(word: &str, language: &str) -> bool {
+    let w: String = word.chars().filter(|c| c.is_alphabetic()).collect::<String>().to_lowercase();
+    let common = matches!(w.as_str(), "hm" | "hmm" | "mhm" | "mm" | "ähm" | "äh" | "öhm" | "ehm");
+    common
+        || match language {
+            "de" => matches!(w.as_str(), "ähh" | "ähhm" | "öh"),
+            "da" => matches!(w.as_str(), "øh" | "øhm"),
+            "fr" => matches!(w.as_str(), "euh" | "bah"),
+            _ => matches!(w.as_str(), "uh" | "uhm" | "um" | "umm" | "erm"),
+        }
 }
 
 /// Mean level (dBFS) of planar `ch` over frames `a..b`.
@@ -327,6 +359,17 @@ mod tests {
     use super::*;
 
     #[test]
+    fn fillers_are_recognised_with_punctuation_and_case() {
+        for w in [" ähm,", "Äh.", "hmm"] {
+            assert!(is_filler(w, "de"), "{w}");
+        }
+        for w in ["Hallo", "im", "Energie", "und", "um"] {
+            assert!(!is_filler(w, "de"), "German {w}");
+        }
+        assert!(is_filler("Um,", "en") && is_filler("uh", "en"));
+    }
+
+    #[test]
     fn language_codes_map_to_whisper() {
         assert_eq!(whisper_language("deu"), "de");
         assert_eq!(whisper_language(" ENG "), "en");
@@ -338,7 +381,15 @@ mod tests {
     fn progress_is_read_from_the_log() {
         let dir = std::env::temp_dir().join(format!("talkcraft-whisper-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let job = Job { dir: dir.clone(), cli: PathBuf::new(), model: PathBuf::new(), language: "de".into(), range: Range::new(0, 1), seconds: 1.0 };
+        let job = Job {
+            dir: dir.clone(),
+            cli: PathBuf::new(),
+            model: PathBuf::new(),
+            language: "de".into(),
+            range: Range::new(0, 1),
+            seconds: 1.0,
+            words: false,
+        };
         assert_eq!(job.progress(), 0.0);
         std::fs::write(job.log(), "whisper_print_progress_callback: progress =  10%\nwhisper_print_progress_callback: progress =  55%\n").unwrap();
         assert!((job.progress() - 0.55).abs() < 1e-6);
