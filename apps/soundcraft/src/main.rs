@@ -71,13 +71,13 @@ impl eframe::App for App {
         // title carries them; elsewhere the egui menu bar already does.
         let title = if self.0.native_menu_bar {
             format!(
-                "{}{} — Podcast Studio — {}",
+                "{}{} — PodCraft — {}",
                 self.0.engine.session().name,
                 if self.0.engine.is_dirty() { " *" } else { "" },
                 if self.0.ui.window == soundcraft_ui_egui::MainWindow::Edit { "Edit" } else { "Mix" }
             )
         } else {
-            format!("{} — Podcast Studio", self.0.engine.session().name)
+            format!("{} — PodCraft", self.0.engine.session().name)
         };
         set_title(ctx, title);
     }
@@ -158,7 +158,7 @@ fn services() -> Services {
         pick_open: Some(Box::new(|purpose: &str, _exts: &[&str]| {
             let d = rfd::FileDialog::new();
             let d = match purpose {
-                "session.open" => d.add_filter("Podcast Studio Session", &["scraft"]),
+                "session.open" => d.add_filter("PodCraft Session", &["scraft"]),
                 "file.import_midi" => d.add_filter("MIDI", &["mid", "midi", "smf"]),
                 _ => d.add_filter(
                     "Audio",
@@ -169,7 +169,7 @@ fn services() -> Services {
         })),
         pick_save: Some(Box::new(|_purpose: &str, default: &str| {
             let path = std::path::Path::new(default);
-            let mut d = rfd::FileDialog::new().add_filter("Podcast Studio Session", &["scraft"]);
+            let mut d = rfd::FileDialog::new().add_filter("PodCraft Session", &["scraft"]);
             if let Some(n) = path.file_name().and_then(|n| n.to_str()) {
                 d = d.set_file_name(n);
             }
@@ -244,12 +244,12 @@ fn main() -> eframe::Result {
     let prefs = load_prefs().unwrap_or_default();
     let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("Podcast Studio")
+            .with_title("PodCraft")
             .with_inner_size(sane_window_size(prefs.window_size))
             .with_maximized(prefs.window_maximized)
             .with_min_inner_size([960.0, 600.0])
             .with_drag_and_drop(true)
-            .with_app_id("media.gerber.podcaststudio"),
+            .with_app_id("media.gerber.podcraft"),
         ..Default::default()
     };
     if let Some(icon) = app_icon() {
@@ -259,7 +259,7 @@ fn main() -> eframe::Result {
     #[cfg(target_os = "windows")]
     graphics::configure(&mut options, eframe::wgpu::Backends::from_env(), eframe::wgpu::Dx12Compiler::from_env());
     eframe::run_native(
-        "Podcast Studio",
+        "PodCraft",
         options,
         Box::new(move |cc| {
             let player = if no_audio { None } else { Some(soundcraft_playback::Player::new(Arc::new(engine.session().clone()))) };
@@ -314,8 +314,8 @@ mod tests {
             out.textures_delta.clear();
             out.viewport_output.values().flat_map(|v| &v.commands).filter(|c| matches!(c, egui::ViewportCommand::Title(_))).count()
         };
-        assert_eq!(titles("Song — Podcast Studio"), 1);
-        assert_eq!(titles("Song — Podcast Studio"), 0);
-        assert_eq!(titles("Song * — Podcast Studio"), 1);
+        assert_eq!(titles("Song — PodCraft"), 1);
+        assert_eq!(titles("Song — PodCraft"), 0);
+        assert_eq!(titles("Song * — PodCraft"), 1);
     }
 }

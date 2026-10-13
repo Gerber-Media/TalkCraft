@@ -83,18 +83,18 @@ pub fn install_hint() -> String {
 fn settings_dir() -> Option<PathBuf> {
     let env = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
     if cfg!(target_os = "macos") {
-        env("HOME").map(|h| h.join("Library/Application Support/Podcast Studio"))
+        env("HOME").map(|h| h.join("Library/Application Support/PodCraft"))
     } else if cfg!(windows) {
-        env("APPDATA").map(|a| a.join("Podcast Studio"))
+        env("APPDATA").map(|a| a.join("PodCraft"))
     } else {
-        env("XDG_CONFIG_HOME").or_else(|| env("HOME").map(|h| h.join(".config"))).map(|c| c.join("podcast-studio"))
+        env("XDG_CONFIG_HOME").or_else(|| env("HOME").map(|h| h.join(".config"))).map(|c| c.join("podcraft"))
     }
 }
 
-/// Where speech models are looked for: `$PODCAST_STUDIO_MODELS`, then `models` in the app's
+/// Where speech models are looked for: `$PODCRAFT_MODELS`, then `models` in the app's
 /// settings folder.
 pub fn model_dirs() -> Vec<PathBuf> {
-    let mut out: Vec<PathBuf> = std::env::var_os("PODCAST_STUDIO_MODELS").filter(|v| !v.is_empty()).map(PathBuf::from).into_iter().collect();
+    let mut out: Vec<PathBuf> = std::env::var_os("PODCRAFT_MODELS").filter(|v| !v.is_empty()).map(PathBuf::from).into_iter().collect();
     out.extend(settings_dir().map(|s| s.join("models")));
     out
 }
@@ -239,7 +239,7 @@ pub fn prepare(e: &Engine, r: Range, language: &str, model: Option<&str>, id: &s
     let opts = EncodeOptions { format: FileFormat::Wav, bit_depth: BitDepth::Int16, dither: false, bwf: None };
     let bytes = soundcraft_audio_io::encode(&buf, &opts).map_err(|err| EngineError::Io(err.to_string()))?;
     static SEQ: AtomicU64 = AtomicU64::new(0);
-    let dir = std::env::temp_dir().join(format!("podcast-studio-whisper-{}-{}", std::process::id(), SEQ.fetch_add(1, Ordering::Relaxed)));
+    let dir = std::env::temp_dir().join(format!("podcraft-whisper-{}-{}", std::process::id(), SEQ.fetch_add(1, Ordering::Relaxed)));
     std::fs::create_dir_all(&dir).map_err(|err| EngineError::Io(format!("{}: {err}", dir.display())))?;
     let job = Job { dir, cli, model, language: language.to_string(), range: r, seconds };
     std::fs::write(job.wav(), bytes).map_err(|err| EngineError::Io(format!("{}: {err}", job.wav().display())))?;
@@ -336,7 +336,7 @@ mod tests {
 
     #[test]
     fn progress_is_read_from_the_log() {
-        let dir = std::env::temp_dir().join(format!("podcast-studio-whisper-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("podcraft-whisper-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let job = Job { dir: dir.clone(), cli: PathBuf::new(), model: PathBuf::new(), language: "de".into(), range: Range::new(0, 1), seconds: 1.0 };
         assert_eq!(job.progress(), 0.0);

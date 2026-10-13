@@ -504,7 +504,7 @@ pub struct Mixer {
     pub solo_safe: bool,
     #[serde(default)]
     pub record_arm: bool,
-    /// Locked tracks are never recorded (Podcast Studio: the jingle track, a guest who is absent).
+    /// Locked tracks are never recorded (PodCraft: the jingle track, a guest who is absent).
     #[serde(default)]
     pub record_lock: bool,
     #[serde(default)]

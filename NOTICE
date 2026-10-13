@@ -16,9 +16,9 @@ None: every bundled asset is original to SoundCraft. Icons are drawn in code; de
 synthesised in code. The egui default fonts (Ubuntu-Light, Hack, Noto Emoji, Emoji Icon Font) ship
 inside the egui crate under their own open licenses (see ATTRIBUTION.md).
 
-Podcast Studio (GERBER.MEDIA fork)
+PodCraft (GERBER.MEDIA fork)
 
-Podcast Studio is a fork of SoundCraft (https://github.com/storytold/soundcraft) under the same
+PodCraft is a fork of SoundCraft (https://github.com/storytold/soundcraft) under the same
 MIT OR Apache-2.0 terms. Desktop and CLI builds for macOS and Linux statically link the LAME MP3
 encoder (https://lame.sourceforge.io, via the mp3lame-sys and mp3lame-encoder crates), which is
 licensed under the GNU Lesser General Public License (LGPL). LAME is only included when the `mp3`

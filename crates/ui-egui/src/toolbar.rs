@@ -148,7 +148,7 @@ fn tools(app: &mut SoundApp, ui: &mut Ui) {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 2.0;
                 let e = app.engine.session().edit.clone();
-                // Podcast Studio leaves out the music toggles (Tab to Transient, Mirrored MIDI).
+                // PodCraft leaves out the music toggles (Tab to Transient, Mirrored MIDI).
                 let toggles: [(&str, &str, bool, &str); 3] = [
                     ("options.link_timeline_edit", "link", e.link_timeline_edit, "Link Timeline and Edit Selection"),
                     ("options.link_track_edit", "link", e.link_track_edit, "Link Track and Edit Selection"),

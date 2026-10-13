@@ -7,7 +7,7 @@ use serde_json::json;
 use soundcraft_model::{Track, TrackKind};
 
 /// The product name shown in menus, titles and the About window.
-pub const APP_NAME: &str = "Podcast Studio";
+pub const APP_NAME: &str = "PodCraft";
 
 /// Menu roots a podcast never needs: MIDI/tempo events.
 const HIDDEN_ROOTS: &[&str] = &["Event"];

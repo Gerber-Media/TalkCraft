@@ -435,7 +435,7 @@ impl SoundApp {
     }
 
     /// Record-enables exactly `tracks` for the take. Not an undo step: the arm state only says
-    /// which tracks are recording right now (Podcast Studio has no separate record-enable).
+    /// which tracks are recording right now (PodCraft has no separate record-enable).
     fn set_record_arms(&mut self, tracks: &[TrackId]) {
         let differs = self.engine.session().tracks.iter().any(|t| t.mixer.record_arm != tracks.contains(&t.id));
         if differs {
