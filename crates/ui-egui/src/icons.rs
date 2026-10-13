@@ -98,6 +98,13 @@ pub fn draw(painter: &Painter, r: Rect, name: &str, c: Color32) {
             painter.line_segment([p(r, 0.25, 0.75), p(r, 0.72, 0.28)], Stroke::new(s.width * 2.2, c));
             painter.add(Shape::convex_polygon(vec![p(r, 0.18, 0.82), p(r, 0.22, 0.66), p(r, 0.34, 0.78)], c, Stroke::NONE));
         }
+        "blade" => {
+            // Scissors: two finger rings and crossing blades.
+            painter.circle_stroke(p(r, 0.28, 0.76), r.width() * 0.13, s);
+            painter.circle_stroke(p(r, 0.72, 0.76), r.width() * 0.13, s);
+            painter.line_segment([p(r, 0.36, 0.66), p(r, 0.68, 0.12)], Stroke::new(s.width * 1.2, c));
+            painter.line_segment([p(r, 0.64, 0.66), p(r, 0.32, 0.12)], Stroke::new(s.width * 1.2, c));
+        }
         "lock" => {
             painter.rect_filled(Rect::from_min_max(p(r, 0.24, 0.46), p(r, 0.76, 0.84)), 1.5, c);
             let arc: Vec<Pos2> = (0..=12)

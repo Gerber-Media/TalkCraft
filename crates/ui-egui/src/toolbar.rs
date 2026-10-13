@@ -115,7 +115,7 @@ fn zoom_group(app: &mut SoundApp, ui: &mut Ui) {
 fn tools(app: &mut SoundApp, ui: &mut Ui) {
     let t = Tokens::current();
     let cur = app.engine.session().edit.tool;
-    group(ui, 268.0 + 38.0, 52.0, |ui, r| {
+    group(ui, 268.0 + 38.0 * 2.0, 52.0, |ui, r| {
         ui.vertical(|ui| {
             ui.spacing_mut().item_spacing = vec2(2.0, 3.0);
             let row = ui.horizontal(|ui| {
@@ -127,6 +127,7 @@ fn tools(app: &mut SoundApp, ui: &mut Ui) {
                     (Tool::Grabber, "grabber"),
                     (Tool::Scrubber, "scrubber"),
                     (Tool::Pencil, "pencil"),
+                    (Tool::Blade, "blade"),
                 ] {
                     let smart_member = cur == Tool::Smart && matches!(tool, Tool::Trim | Tool::Selector | Tool::Grabber);
                     let tip = format!("{}{}", tool.label(), tool.fkey().map(|k| format!(" ({k})")).unwrap_or_default());

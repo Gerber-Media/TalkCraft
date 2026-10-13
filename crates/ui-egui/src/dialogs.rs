@@ -102,6 +102,15 @@ pub enum Dialog {
         keep_ms: f64,
         preview: Option<String>,
     },
+    /// Delete/Backspace: remove the selected section (`clips` empty) or the selected clips.
+    DeleteSection {
+        start: Samples,
+        end: Samples,
+        tracks: Vec<u64>,
+        clips: Vec<u64>,
+        summary: String,
+        close_gap: bool,
+    },
 }
 
 #[derive(Default)]
@@ -132,7 +141,48 @@ impl Dialogs {
             Dialog::ExportEpisode { .. } => "export_episode",
             Dialog::Preferences { .. } => "preferences",
             Dialog::ShortenPauses { .. } => "shorten_pauses",
+            Dialog::DeleteSection { .. } => "delete_section",
         })
+    }
+
+    /// Delete/Backspace: asks before removing the edit selection's section, or the selected
+    /// clips. Err says what to select first.
+    pub fn open_delete(&mut self, e: &Engine) -> Result<(), String> {
+        let s = e.session();
+        let sel = s.edit.selection;
+        let secs = |n: Samples| s.sample_rate.seconds(n);
+        let names = |ids: &[TrackId]| ids.iter().filter_map(|t| s.track(*t)).map(|t| t.name.clone()).collect::<Vec<_>>().join(", ");
+        if !sel.is_empty() && !s.edit.selected_tracks.is_empty() {
+            let tracks = s.edit.selected_tracks.clone();
+            let summary = format!("Delete {:.1} s ({} – {}) on {}?", secs(sel.len()), clock(secs(sel.start)), clock(secs(sel.end)), names(&tracks));
+            self.open = Some(Dialog::DeleteSection {
+                start: sel.start,
+                end: sel.end,
+                tracks: tracks.iter().map(|t| t.0).collect(),
+                clips: Vec::new(),
+                summary,
+                close_gap: true,
+            });
+            return Ok(());
+        }
+        let clips = s.edit.selected_clips.clone();
+        if !clips.is_empty() {
+            let summary = if clips.len() == 1 {
+                "Delete the selected clip? Its place stays silent.".to_string()
+            } else {
+                format!("Delete {} selected clips? Their places stay silent.", clips.len())
+            };
+            self.open = Some(Dialog::DeleteSection {
+                start: 0,
+                end: 0,
+                tracks: Vec::new(),
+                clips: clips.iter().map(|c| c.0).collect(),
+                summary,
+                close_gap: false,
+            });
+            return Ok(());
+        }
+        Err("Nothing to delete: drag over the audio with the Selector, or click a clip with the Grabber".into())
     }
 
     pub fn open_rename_track(&mut self, id: TrackId, name: &str) {
@@ -369,6 +419,8 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
         Dialog::ExportEpisode { .. } => "Export Episode",
         Dialog::Preferences { .. } => "Preferences",
         Dialog::ShortenPauses { .. } => "Shorten Pauses",
+        Dialog::DeleteSection { clips, .. } if !clips.is_empty() => "Delete Clips",
+        Dialog::DeleteSection { .. } => "Delete Section",
     }
     .to_string();
     let enter = ctx.input(|i| i.key_pressed(egui::Key::Enter));
@@ -591,6 +643,24 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         action = Some(("edit.truncate_silence".into(), params));
                     }
                 }
+                Dialog::DeleteSection { start, end, tracks, clips, summary, close_gap } => {
+                    ui.label(summary.as_str());
+                    if clips.is_empty() {
+                        ui.add_space(4.0);
+                        ui.radio_value(close_gap, true, "Close the gap on all tracks (later audio, markers and subtitles move up)");
+                        ui.radio_value(close_gap, false, "Leave silence on the selected tracks");
+                    }
+                    if buttons(ui, "Delete", enter) {
+                        action = Some(if !clips.is_empty() {
+                            before = Some(("edit.select".into(), json!({"clips": clips})));
+                            ("edit.clear".into(), json!({}))
+                        } else if *close_gap {
+                            ("event.cut_time".into(), json!({"start": start, "end": end}))
+                        } else {
+                            ("edit.clear".into(), json!({"tracks": tracks, "start": start, "end": end}))
+                        });
+                    }
+                }
                 Dialog::StripSilence { threshold, min_ms, pre_ms, post_ms } => {
                     ui.add(egui::Slider::new(threshold, -96.0..=0.0).text("Threshold dB"));
                     ui.add(egui::Slider::new(min_ms, 0.0..=2000.0).text("Min strip duration ms"));
@@ -768,6 +838,13 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
 }
 
 /// Cancel/OK row; returns true when OK was pressed (or Enter).
+/// `m:ss.s` for dialog texts.
+fn clock(secs: f64) -> String {
+    let secs = secs.max(0.0);
+    let m = (secs / 60.0).floor();
+    format!("{}:{:04.1}", m as u64, secs - m * 60.0)
+}
+
 fn buttons(ui: &mut egui::Ui, ok: &str, enter: bool) -> bool {
     let mut pressed = enter;
     ui.separator();

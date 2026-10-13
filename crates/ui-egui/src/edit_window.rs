@@ -1621,10 +1621,16 @@ fn lane_interaction(app: &mut SoundApp, ui: &mut Ui, track: &Track, lane: Rect, 
             Tool::Grabber => egui::CursorIcon::Grab,
             Tool::Selector => egui::CursorIcon::Text,
             Tool::Zoom => egui::CursorIcon::ZoomIn,
-            Tool::Pencil => egui::CursorIcon::Crosshair,
+            Tool::Pencil | Tool::Blade => egui::CursorIcon::Crosshair,
             _ => egui::CursorIcon::Default,
         };
         ui.ctx().set_cursor_icon(icon);
+    }
+    // The blade shows where it will cut: on this clip, or (Alt) through every track.
+    if eff == Tool::Blade && resp.hovered() && (mods.alt || clip_at(track, at).is_some()) {
+        let x = x_of(&s, tl, snap(&s, at));
+        let t = Tokens::current();
+        ui.painter().line_segment([pos2(x, lane.min.y), pos2(x, lane.max.y)], Stroke::new(2.0, t.rec));
     }
     let auto_view = AutoParam::parse(&track.view);
     let fade_corner = if tool == Tool::Smart {
@@ -1690,6 +1696,7 @@ fn lane_interaction(app: &mut SoundApp, ui: &mut Ui, track: &Track, lane: Rect, 
             Tool::Scrubber => Some(Gesture::Scrub { last: at }),
             Tool::Pencil => Some(Gesture::Pencil { track: track.id, points: Vec::new() }),
             Tool::Zoom => Some(Gesture::ZoomBox { start: origin.x }),
+            Tool::Blade => None,
         };
     }
     if let Some(Gesture::ClipGain { clip, track: t, pos, anchor, fine, fader_bottom }) = &mut app.gesture
@@ -1722,6 +1729,7 @@ fn lane_interaction(app: &mut SoundApp, ui: &mut Ui, track: &Track, lane: Rect, 
             Tool::Zoom => {
                 let _ = app.run(if mods.alt { "view.zoom_out" } else { "view.zoom_in" }, json!({}));
             }
+            Tool::Blade => blade_cut(app, &s, track, snap(&s, at), mods.alt),
             Tool::Pencil => {
                 if let Some(param) = &auto_view {
                     let (lo, hi, _) = param.range();
@@ -1742,6 +1750,26 @@ fn lane_interaction(app: &mut SoundApp, ui: &mut Ui, track: &Track, lane: Rect, 
         && let Some(c) = &hit
     {
         let _ = app.run("edit.select", json!({"clips": [c.id.0]}));
+    }
+}
+
+/// Splits the clip on `track` at `at`, or with `all` the clips of every track there, into two
+/// clips whose edges can then be trimmed.
+fn blade_cut(app: &mut SoundApp, s: &Session, track: &Track, at: Samples, all: bool) {
+    let tracks: Vec<u64> = if all {
+        s.tracks.iter().filter(|t| t.kind.has_playlist() && clip_at(t, at).is_some()).map(|t| t.id.0).collect()
+    } else if clip_at(track, at).is_some() {
+        vec![track.id.0]
+    } else {
+        Vec::new()
+    };
+    if tracks.is_empty() {
+        app.ui.status = "The blade cuts clips: click on audio (Alt-click cuts every track)".into();
+        return;
+    }
+    match app.run("edit.separate", json!({"tracks": tracks, "at": at})) {
+        Ok(_) => app.ui.status = format!("Split {} clip(s)", tracks.len()),
+        Err(e) => app.ui.status = e,
     }
 }
 
@@ -2548,5 +2576,56 @@ mod tests {
         drag(&mut h, grab, release);
         let want: Vec<TrackId> = [1, 0, 2, 3].iter().map(|&i| before[i]).collect();
         assert_eq!(order(&h), want);
+    }
+
+    #[test]
+    fn the_blade_splits_the_clip_it_clicks_into_two() {
+        let mut h = harness_with(soundcraft_engine::demo::demo_engine());
+        h.state_mut().run("edit.mode", json!({"mode": "slip"})).unwrap();
+        h.state_mut().run("edit.tool", json!({"tool": "blade"})).unwrap();
+        h.run_steps(3);
+        let tl = timeline(&h);
+        let (c, lane) = clip_on_screen(&h, |a, b| b - a > 80.0 && a > tl.min.x + 10.0 && b < tl.max.x - 10.0);
+        let track = h.state().engine.session().find_clip(c.id).map(|(t, _)| t).unwrap();
+        let count = |h: &Harness<SoundApp>| h.state().engine.session().track(track).unwrap().clips().len();
+        let before = count(&h);
+        let s = h.state().engine.session();
+        let x = (x_of(s, tl, c.start) + x_of(s, tl, c.end())) / 2.0;
+        click(&mut h, pos2(x, lane.center().y));
+        h.run_steps(2);
+        assert_eq!(count(&h), before + 1, "{}", h.state().ui.status);
+        let s = h.state().engine.session();
+        let cut = sample_at(s, tl, x);
+        let t = s.track(track).unwrap();
+        assert!(t.clips().iter().any(|k| k.end() == cut || (k.end() - cut).abs() < 2_000), "a clip ends at the cut");
+        assert!(t.clips().iter().any(|k| k.start == cut || (k.start - cut).abs() < 2_000), "a clip starts at the cut");
+        h.state_mut().run("edit.undo", json!({})).unwrap();
+        assert_eq!(count(&h), before, "one undo step");
+    }
+
+    #[test]
+    fn delete_asks_and_then_closes_the_gap_on_every_track() {
+        let mut h = harness_with(soundcraft_engine::demo::demo_engine());
+        let s = h.state().engine.session();
+        let (end0, sr) = (s.content_end(), s.sample_rate);
+        let first = s.tracks[0].id.0;
+        let (a, b) = (sr.samples(2.0), sr.samples(3.0));
+        h.state_mut().run("edit.select", json!({"tracks": [first], "start": a, "end": b})).unwrap();
+        h.run_steps(2);
+        h.key_press(egui::Key::Delete);
+        h.run_steps(2);
+        assert_eq!(h.state().dialogs.open_name(), Some("delete_section"));
+        assert_eq!(h.state().engine.session().content_end(), end0, "nothing happens before the answer");
+        h.key_press(egui::Key::Enter);
+        h.run_steps(3);
+        assert_eq!(h.state().dialogs.open_name(), None);
+        assert_eq!(h.state().engine.session().content_end(), end0 - (b - a), "{}", h.state().ui.status);
+        // Nothing selected: the key only explains.
+        h.state_mut().run("edit.select", json!({"tracks": [], "clips": []})).unwrap();
+        h.state_mut().engine.session_mut().edit.selection = Range::point(0);
+        h.run_steps(2);
+        h.key_press(egui::Key::Backspace);
+        h.run_steps(2);
+        assert_eq!(h.state().dialogs.open_name(), None);
     }
 }

@@ -76,10 +76,12 @@ pub enum Tool {
     Scrubber,
     Pencil,
     Smart,
+    /// Splits the clip under the pointer at the click (TalkCraft); Alt splits every track there.
+    Blade,
 }
 
 impl Tool {
-    pub const ALL: [Tool; 7] = [Tool::Zoom, Tool::Trim, Tool::Selector, Tool::Grabber, Tool::Scrubber, Tool::Pencil, Tool::Smart];
+    pub const ALL: [Tool; 8] = [Tool::Zoom, Tool::Trim, Tool::Selector, Tool::Grabber, Tool::Scrubber, Tool::Pencil, Tool::Smart, Tool::Blade];
     pub fn id(self) -> &'static str {
         match self {
             Tool::Zoom => "zoom",
@@ -88,6 +90,7 @@ impl Tool {
             Tool::Grabber => "grabber",
             Tool::Scrubber => "scrubber",
             Tool::Pencil => "pencil",
+            Tool::Blade => "blade",
             Tool::Smart => "smart",
         }
     }
@@ -99,6 +102,7 @@ impl Tool {
             Tool::Grabber => "Grabber",
             Tool::Scrubber => "Scrubber",
             Tool::Pencil => "Pencil",
+            Tool::Blade => "Blade",
             Tool::Smart => "Smart Tool",
         }
     }
@@ -114,6 +118,7 @@ impl Tool {
             Tool::Grabber => Some("F8"),
             Tool::Scrubber => Some("F9"),
             Tool::Pencil => Some("F10"),
+            Tool::Blade => None,
             Tool::Smart => None,
         }
     }

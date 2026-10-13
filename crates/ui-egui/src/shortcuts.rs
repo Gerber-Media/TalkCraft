@@ -116,6 +116,12 @@ fn fixed(app: &mut SoundApp, key: Key, m: Modifiers, mac: bool) -> bool {
             let _ = app.run("window.toggle_mix_edit", json!({}));
             true
         }
+        Key::Delete | Key::Backspace if plain && app.ui.window == MainWindow::Edit => {
+            if let Err(e) = app.dialogs.open_delete(&app.engine) {
+                app.ui.status = e;
+            }
+            true
+        }
         Key::Enter if plain => {
             let _ = app.run("markers.add", json!({}));
             true
