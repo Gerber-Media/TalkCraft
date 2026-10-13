@@ -69,6 +69,15 @@ pub fn specs() -> Vec<CommandSpec> {
         cmd!("clip.rename", "Rename...", ["Clip"], Some("Cmd+Alt+Shift+R"), "{clip?, name}", has_selection, rename),
         cmd!("clip.gain", "Clip Gain", [], None, "{clips?, db | delta_db}", has_selection, gain),
         cmd!(
+            "clip.denoise",
+            "Reduce Noise",
+            [],
+            None,
+            "{clips?, reduction_db?: 12} — lowers steady background noise (hiss, hum, fans) by up to `reduction_db`; renders the clip to a new file (undoable)",
+            has_selection,
+            denoise
+        ),
+        cmd!(
             "clip.set_fades",
             "Set Clip Fades",
             [],
@@ -346,6 +355,36 @@ pub(crate) fn clip_audio(s: &soundcraft_model::Session, c: &soundcraft_model::Cl
     Some((ch, rate as f32))
 }
 
+fn denoise(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "clip.denoise";
+    let ids = clip_ids_param(e, p);
+    if ids.is_empty() {
+        return Err(bad(ID, "select a clip"));
+    }
+    let db = f64_or(p, "reduction_db", 12.0).clamp(1.0, 40.0) as f32;
+    let mut done = 0;
+    for id in ids {
+        let s = e.session();
+        let Some((_, c)) = s.find_clip(id).map(|(t, c)| (t, c.clone())) else { continue };
+        let Some((ch, rate)) = clip_audio(s, &c) else { continue };
+        if ch.iter().all(Vec::is_empty) {
+            continue;
+        }
+        let clean = soundcraft_dsp::denoise::denoise(&ch, db);
+        let buf = soundcraft_audio_io::AudioBuffer { sample_rate: rate as u32, channels: clean };
+        let s = e.session_mut();
+        let src = crate::io::add_source(s, &format!("{}_denoised", c.name), buf, None, soundcraft_audio_io::FileFormat::Wav);
+        if let Some(cl) = s.find_clip_mut(id) {
+            cl.content = soundcraft_model::ClipContent::Audio { source: src, offset: 0 };
+        }
+        done += 1;
+    }
+    if done == 0 {
+        return Err(bad(ID, "the selected clips hold no audio"));
+    }
+    Ok(json!({"clips": done, "reduction_db": db}))
+}
+
 fn set_fades(e: &mut Engine, p: &Value) -> Result<Value> {
     const ID: &str = "clip.set_fades";
     let id = ClipId(p.get("clip").and_then(Value::as_u64).ok_or_else(|| bad(ID, "`clip` required"))?);
@@ -461,6 +500,19 @@ mod tests {
         assert!((lufs + 20.0).abs() < 0.05, "loudness after normalize {lufs}");
         e.execute("edit.undo", &json!({})).unwrap();
         assert_eq!(e.session().find_clip(ClipId(cid)).unwrap().1.gain_db, peak_gain, "one undo step per normalize");
+    }
+
+    #[test]
+    fn denoise_renders_a_new_source_and_undo_restores_the_old() {
+        let mut e = crate::demo::demo_engine();
+        let pad = e.session().track_by_name("Pad").map(|t| t.id).unwrap();
+        let c = e.session().track(pad).unwrap().clips()[0].clone();
+        e.execute("clip.denoise", &json!({"clips": [c.id.0], "reduction_db": 12})).unwrap();
+        let k = e.session().find_clip(c.id).unwrap().1.clone();
+        assert_ne!(k.source(), c.source());
+        assert_eq!((k.start, k.length), (c.start, c.length), "the clip stays where it was");
+        e.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(e.session().find_clip(c.id).unwrap().1.source(), c.source());
     }
 
     #[test]

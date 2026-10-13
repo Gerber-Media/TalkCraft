@@ -2044,6 +2044,16 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
     if ui.button("Match Loudness (−16 LUFS)").on_hover_text("Sets the clip gain so the clip sounds as loud as the episode target").clicked() {
         run_report(app, "clip.normalize", json!({"clips": [c.0], "lufs": -16.0}));
     }
+    ui.menu_button("Reduce Noise", |ui| {
+        for (label, db) in [("Light (6 dB)", 6.0), ("Medium (12 dB)", 12.0), ("Strong (18 dB)", 18.0)] {
+            if ui.button(label).on_hover_text("Learns the background from the quietest moments and lowers it; undoable").clicked() {
+                match app.run("clip.denoise", json!({"clips": [c.0], "reduction_db": db})) {
+                    Ok(_) => app.ui.status = format!("Noise reduced by up to {db} dB"),
+                    Err(e) => app.ui.status = e,
+                }
+            }
+        }
+    });
     if ui
         .button("Sync to Other Tracks")
         .on_hover_text("Moves this clip so its audio lines up with the rest (e.g. a guest's own recording against the call)")
