@@ -1799,7 +1799,11 @@ fn blade_cut(app: &mut SoundApp, s: &Session, track: &Track, at: Samples, all: b
         return;
     }
     match app.run("edit.separate", json!({"tracks": tracks, "at": at})) {
-        Ok(_) => app.ui.status = format!("Split {} clip(s)", tracks.len()),
+        Ok(_) => {
+            // The insertion point goes to the cut, so Play continues from there.
+            app.engine.session_mut().edit.selection = Range::point(at);
+            app.ui.status = format!("Split {} clip(s)", tracks.len());
+        }
         Err(e) => app.ui.status = e,
     }
 }
@@ -2687,6 +2691,8 @@ mod tests {
         let t = s.track(track).unwrap();
         assert!(t.clips().iter().any(|k| k.end() == cut || (k.end() - cut).abs() < 2_000), "a clip ends at the cut");
         assert!(t.clips().iter().any(|k| k.start == cut || (k.start - cut).abs() < 2_000), "a clip starts at the cut");
+        let sel = s.edit.selection;
+        assert!(sel.is_empty() && (sel.start - cut).abs() < 2_000, "Play continues from the cut: {sel:?}");
         h.state_mut().run("edit.undo", json!({})).unwrap();
         assert_eq!(count(&h), before, "one undo step");
     }
@@ -2708,6 +2714,7 @@ mod tests {
         h.run_steps(3);
         assert_eq!(h.state().dialogs.open_name(), None);
         assert_eq!(h.state().engine.session().content_end(), end0 - (b - a), "{}", h.state().ui.status);
+        assert_eq!(h.state().engine.session().edit.selection, Range::point(a), "Play runs on from the cut");
         // Nothing selected: the key only explains.
         h.state_mut().run("edit.select", json!({"tracks": [], "clips": []})).unwrap();
         h.state_mut().engine.session_mut().edit.selection = Range::point(0);

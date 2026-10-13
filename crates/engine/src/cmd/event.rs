@@ -149,7 +149,11 @@ fn cut_time(e: &mut Engine, p: &Value) -> Result<Value> {
     if r.is_empty() {
         return Err(bad("event.cut_time", "selection is empty"));
     }
-    crate::edit::cut_time(e.session_mut(), r, false);
+    let s = e.session_mut();
+    crate::edit::cut_time(s, r, false);
+    // The removed time is gone: leave the insertion point at the cut, so Play runs on from there
+    // instead of stopping where the old selection ended.
+    s.edit.selection = soundcraft_time::Range::point(r.start);
     Ok(json!({"removed": r.len()}))
 }
 

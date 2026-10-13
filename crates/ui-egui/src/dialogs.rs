@@ -813,6 +813,11 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
             Ok(v) if cmd == "file.export_clips" => {
                 app.ui.status = format!("Exported {} clip(s) to {}", v["written"], v["dir"].as_str().unwrap_or_default());
             }
+            Ok(_) if cmd == "edit.clear" && matches!(d, Dialog::DeleteSection { .. }) => {
+                // Silence left in place: play on from the start of it rather than stopping at its end.
+                let at = app.engine.session().edit.selection.start;
+                app.engine.session_mut().edit.selection = soundcraft_time::Range::point(at);
+            }
             Ok(_) => {}
             Err(e) => app.ui.status = e,
         }
