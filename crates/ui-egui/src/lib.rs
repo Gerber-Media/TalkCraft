@@ -75,6 +75,9 @@ pub struct UiState {
     pub language: String,
     /// Audio devices picked in Setup > Audio Interface (`None` = the system default).
     pub input_device: Option<String>,
+    /// The History panel has been docked under the Clips list (older settings get it once).
+    #[serde(default)]
+    pub history_under_clips: bool,
     /// Work mode: record, edit or all (the toolbar's switch).
     #[serde(default)]
     pub workspace: workspace::Workspace,
@@ -165,7 +168,8 @@ impl Default for UiState {
             show_transport: false,
             show_memory_locations: false,
             show_big_counter: false,
-            show_undo_history: false,
+            show_undo_history: true,
+            history_under_clips: true,
             show_session_info: false,
             show_audio_health: false,
             show_about: false,

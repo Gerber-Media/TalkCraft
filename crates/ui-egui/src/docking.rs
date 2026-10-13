@@ -36,7 +36,7 @@ impl Panel {
             Self::Clips => "Clips",
             Self::Midi => "MIDI Editor",
             Self::Memory => "Memory Locations",
-            Self::History => "Undo History",
+            Self::History => "History",
         }
     }
     fn default_side(self) -> Zone {
@@ -87,14 +87,17 @@ impl Default for Workspace {
                         SplitAxis::Horizontal,
                         SplitSize::FixedFirst(168.0),
                         tabs(Panel::Tracks),
-                        split(SplitAxis::Horizontal, SplitSize::FixedSecond(230.0), tabs(Panel::Canvas), tabs(Panel::Clips)),
+                        split(
+                            SplitAxis::Horizontal,
+                            SplitSize::FixedSecond(230.0),
+                            tabs(Panel::Canvas),
+                            // TalkCraft: the History sits under the Clips list.
+                            split(SplitAxis::Vertical, SplitSize::FixedSecond(260.0), tabs(Panel::Clips), tabs(Panel::History)),
+                        ),
                     ),
                     tabs(Panel::Midi),
                 )),
-                floating: vec![
-                    craft_ui::docking::Floating { panels: vec![Panel::Memory], active: 0, rect: [160.0, 120.0, 480.0, 280.0] },
-                    craft_ui::docking::Floating { panels: vec![Panel::History], active: 0, rect: [680.0, 120.0, 260.0, 300.0] },
-                ],
+                floating: vec![craft_ui::docking::Floating { panels: vec![Panel::Memory], active: 0, rect: [160.0, 120.0, 480.0, 280.0] }],
             },
             hidden: Vec::new(),
         }
@@ -280,6 +283,23 @@ impl Workspace {
 }
 
 /// Mix retains its own arrangement; the timeline-only Clips and MIDI panels stay in Edit.
+/// Settings from before the History moved under the Clips list: dock it there once.
+pub fn move_history_under_clips(app: &mut crate::SoundApp) {
+    if app.ui.history_under_clips {
+        return;
+    }
+    app.ui.history_under_clips = true;
+    let w = &mut app.ui.docking;
+    if !w.layout.contains(&Panel::Clips) || w.set_visible(Panel::History, true).is_err() {
+        return;
+    }
+    let moved = w.apply(Action::Move { panel: Panel::History, anchor: Panel::Clips, placement: Placement::Split(Zone::Bottom) });
+    if let Err(e) = moved {
+        log::warn!("History panel could not be docked under Clips: {e}");
+    }
+    app.ui.show_undo_history = true;
+}
+
 pub fn mix_default() -> Workspace {
     let mut workspace = Workspace::default();
     let _ = workspace.set_visible(Panel::Clips, false);
@@ -290,7 +310,8 @@ pub fn mix_default() -> Workspace {
 fn sync(workspace: &mut Workspace, app: &crate::SoundApp, edit: bool) -> Result<(), String> {
     workspace.set_visible(Panel::Tracks, app.ui.show_tracks_list)?;
     workspace.set_visible(Panel::Memory, app.ui.show_memory_locations)?;
-    workspace.set_visible(Panel::History, app.ui.show_undo_history)?;
+    // Recording has no History: it shows while editing (and in All).
+    workspace.set_visible(Panel::History, app.ui.show_undo_history && app.ui.workspace.edits())?;
     if edit {
         workspace.set_visible(Panel::Clips, app.ui.show_clip_list)?;
         workspace.set_visible(Panel::Midi, app.ui.show_midi_editor)?;
@@ -301,7 +322,9 @@ fn sync(workspace: &mut Workspace, app: &crate::SoundApp, edit: bool) -> Result<
 fn publish_visibility(app: &mut crate::SoundApp, workspace: &Workspace, edit: bool) {
     app.ui.show_tracks_list = workspace.layout.contains(&Panel::Tracks);
     app.ui.show_memory_locations = workspace.layout.contains(&Panel::Memory);
-    app.ui.show_undo_history = workspace.layout.contains(&Panel::History);
+    if app.ui.workspace.edits() {
+        app.ui.show_undo_history = workspace.layout.contains(&Panel::History);
+    }
     if edit {
         app.ui.show_clip_list = workspace.layout.contains(&Panel::Clips);
         app.ui.show_midi_editor = workspace.layout.contains(&Panel::Midi);
@@ -411,7 +434,7 @@ pub fn show(app: &mut crate::SoundApp, ui: &mut egui::Ui, window: crate::MainWin
         ui,
         &workspace.layout,
         &style,
-        |panel| panel.label().into(),
+        |panel| crate::i18n::tr(panel.label()).into(),
         permissions,
         panel_limits,
         |ui, panel| match panel {

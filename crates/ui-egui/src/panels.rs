@@ -337,21 +337,42 @@ pub(crate) fn memory_locations(app: &mut SoundApp, ui: &mut Ui) {
     });
 }
 
+/// The History (like Photoshop's): every step since the session was opened. Clicking a row
+/// brings the session back to just after that step; the later rows stay (greyed) and can be
+/// clicked again until a new edit replaces them.
 pub(crate) fn undo_history(app: &mut SoundApp, ui: &mut Ui) {
-    let hist = app.engine.undo_history();
-    let n = hist.len();
-    egui::ScrollArea::vertical().show(ui, |ui| {
-        for (i, h) in hist.iter().enumerate() {
-            if ui.selectable_label(i + 1 == n, format!("{}  {h}", i + 1)).clicked() {
-                for _ in 0..(n - i - 1) {
-                    let _ = app.run("edit.undo", json!({}));
+    let t = Tokens::current();
+    let done = app.engine.undo_history();
+    let ahead = app.engine.redo_history();
+    let now = done.len();
+    let mut go: Option<usize> = None;
+    egui::ScrollArea::vertical().id_salt("history_scroll").auto_shrink([false, false]).stick_to_bottom(true).show(ui, |ui| {
+        ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
+            let rows = std::iter::once(crate::i18n::tr("Opened").to_string()).chain(done.iter().chain(&ahead).map(|l| history_label(l)));
+            for (step, label) in rows.enumerate() {
+                let future = step > now;
+                let text = egui::RichText::new(if step == 0 { label } else { format!("{step}  {label}") }).size(11.5).color(if future {
+                    t.text_dim
+                } else {
+                    t.text
+                });
+                let r = ui.add(egui::Button::selectable(step == now, text).wrap_mode(egui::TextWrapMode::Truncate));
+                if r.clicked() && step != now {
+                    go = Some(step);
                 }
             }
-        }
-        if let Some(r) = app.engine.redo_label() {
-            ui.label(egui::RichText::new(format!("(redo) {r}")).italics().color(Tokens::current().text_dim));
-        }
+        });
     });
+    if let Some(step) = go {
+        let _ = app.run("edit.history_go", json!({"step": step}));
+    }
+}
+
+/// A history row's text: the menu label of the command, translated, else its id.
+fn history_label(label: &str) -> String {
+    let named = soundcraft_engine::command_specs().iter().find(|c| c.id == label).map(|c| c.label.trim_end_matches("...").to_string());
+    let text = named.unwrap_or_else(|| label.to_string());
+    crate::i18n::tr(&text).to_string()
 }
 
 fn plugin_windows(app: &mut SoundApp, ctx: &egui::Context) {
@@ -507,17 +528,65 @@ fn about(app: &mut SoundApp, ctx: &egui::Context) {
             match tab {
                 1 => crate::credits::contributors_ui(ui),
                 2 => crate::credits::models_ui(ui),
-                _ => {
-                    ui.label(egui::RichText::new(crate::podcast::APP_NAME).font(bold(22.0)));
-                    ui.label(format!("Version {}", env!("CARGO_PKG_VERSION")));
-                    ui.label("Record, edit and deliver podcasts. A GERBER.MEDIA fork of SoundCraft.");
-                    ui.label("Based on SoundCraft by the ArtCraft team, dual-licensed MIT OR Apache-2.0. Made with Rust and egui.");
-                    ui.hyperlink_to("SoundCraft on GitHub", "https://github.com/storytold/soundcraft");
-                }
+                _ => about_page(ui),
             }
         },
     );
     app.ui.show_about = open;
+}
+
+/// The app icon, decoded once and kept as a texture.
+fn logo(ctx: &egui::Context) -> Option<egui::TextureHandle> {
+    const PNG: &[u8] = include_bytes!("../../../assets/app-icon/hicolor/256x256/apps/media.gerber.talkcraft.png");
+    let id = egui::Id::new("talkcraft_logo");
+    if let Some(t) = ctx.data(|d| d.get_temp::<egui::TextureHandle>(id)) {
+        return Some(t);
+    }
+    let img = image::load_from_memory_with_format(PNG, image::ImageFormat::Png).ok()?.to_rgba8();
+    let (w, h) = (img.width() as usize, img.height() as usize);
+    let tex = ctx.load_texture("talkcraft_logo", egui::ColorImage::from_rgba_unmultiplied([w, h], img.as_raw()), egui::TextureOptions::LINEAR);
+    ctx.data_mut(|d| d.insert_temp(id, tex.clone()));
+    Some(tex)
+}
+
+fn about_page(ui: &mut Ui) {
+    let t = Tokens::current();
+    let tr = crate::i18n::tr;
+    ui.horizontal(|ui| {
+        if let Some(tex) = logo(ui.ctx()) {
+            ui.add(egui::Image::new(&tex).fit_to_exact_size(vec2(112.0, 112.0)).corner_radius(18));
+        }
+        ui.add_space(12.0);
+        ui.vertical(|ui| {
+            ui.add_space(10.0);
+            ui.label(egui::RichText::new(crate::podcast::APP_NAME).font(bold(28.0)));
+            ui.label(egui::RichText::new(format!("{} {}", tr("Version"), crate::podcast::version::VERSION)).size(15.0));
+            ui.label(
+                egui::RichText::new(format!(
+                    "Build {} · {} SoundCraft {}",
+                    crate::podcast::version::BUILD,
+                    tr("based on"),
+                    env!("CARGO_PKG_VERSION")
+                ))
+                .small()
+                .color(t.text_dim),
+            );
+        });
+    });
+    ui.add_space(10.0);
+    ui.label(tr("Record, edit and deliver podcasts."));
+    ui.add_space(8.0);
+    ui.label(egui::RichText::new(tr("Idea, concept and design")).small().color(t.text_dim));
+    ui.label(egui::RichText::new("Dirk Gerber").font(bold(17.0)));
+    ui.hyperlink_to("GERBER.MEDIA", "https://gerber.media");
+    ui.add_space(10.0);
+    ui.separator();
+    ui.label(egui::RichText::new(tr("Based on SoundCraft by the ArtCraft team, dual-licensed MIT OR Apache-2.0. Made with Rust and egui.")).small());
+    ui.horizontal(|ui| {
+        ui.hyperlink_to(tr("TalkCraft source"), "https://codefloe.com/GerberMedia/TalkCraft");
+        ui.label("·");
+        ui.hyperlink_to("SoundCraft on GitHub", "https://github.com/storytold/soundcraft");
+    });
 }
 
 fn session_info(app: &mut SoundApp, ctx: &egui::Context) {

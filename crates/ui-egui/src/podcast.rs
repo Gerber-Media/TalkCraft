@@ -154,6 +154,11 @@ const HIDDEN_EXACT: &[&str] = &[
     "Window > Trim and Downmix",
 ];
 
+/// TalkCraft's running version, counted from its own commits at build time.
+pub mod version {
+    include!(concat!(env!("OUT_DIR"), "/talkcraft_version.rs"));
+}
+
 /// Commands a podcast leaves out entirely, shortcuts included. Track groups: Alt edits every
 /// track at once and deleting closes the gap on all tracks, so groups would only duplicate that.
 /// Sessions that already have groups keep them (the Groups list then shows them).

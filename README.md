@@ -56,6 +56,8 @@ podcast does not need.
   edge; in Shuffle the rest of the track makes room, with Alt every track). Magnetic snapping,
   Close Gap, Z/Shift+Z zoom. Edit > Shorten Pauses trims long silences on all
   tracks at once. Markers and subtitles move along.
+- **History.** Under the Clips list (while editing): every step since the session was opened;
+  click a row to go back to it and click later rows to go forward again, like Photoshop's History.
 - **Clip tools.** Normalize or set a clip's loudness, clip volume, fades with handles, noise
   reduction.
 - **Speakers and music.** Match Speaker Levels makes every speaker equally loud; Auto-Duck Music
@@ -200,6 +202,9 @@ braucht.
   zurückzuholen (der Zeiger wird an der Kante zu ↔; in Shuffle rückt der Rest der Spur nach, mit Alt auf allen Spuren). Magnetisches Einrasten, Lücke schließen, Zoom mit Z/Umschalt+Z.
   Bearbeiten > Pausen kürzen kürzt lange Pausen auf allen Spuren zugleich. Marker und Untertitel
   wandern mit.
+- **Verlauf.** Unter der Clip-Liste (beim Schneiden): jeder Schritt seit dem Öffnen; ein Klick auf
+  eine Zeile springt dorthin zurück, spätere Zeilen bleiben anklickbar, wie der Protokoll-Verlauf in
+  Photoshop.
 - **Clip-Werkzeuge.** Normalisieren oder Lautheit eines Clips setzen, Clip-Lautstärke, Blenden
   mit Anfassern, Rauschunterdrückung.
 - **Sprecher und Musik.** „Sprecher angleichen“ macht alle Sprecher gleich laut; „Musik

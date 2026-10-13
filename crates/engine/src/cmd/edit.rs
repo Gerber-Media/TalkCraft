@@ -10,6 +10,11 @@ pub fn specs() -> Vec<CommandSpec> {
     vec![
         cmd!(noundo "edit.undo", "Undo", ["Edit"], Some("Cmd+Z"), "{}", can_undo, |e, _| Ok(json!({"undone": e.undo()}))),
         cmd!(noundo "edit.redo", "Redo", ["Edit"], Some("Cmd+Shift+Z"), "{}", can_redo, |e, _| Ok(json!({"redone": e.redo()}))),
+        cmd!(noundo "edit.history_go", "Go to History Step", [], None, "{step: 0 = before the first edit … the number of steps} — undoes or redoes until that many steps are applied", always, |e, p| {
+            let step = p.get("step").and_then(Value::as_u64).ok_or_else(|| bad("edit.history_go", "`step` required"))?;
+            let at = e.history_go(usize::try_from(step).unwrap_or(usize::MAX));
+            Ok(json!({"step": at, "steps": e.undo_history().len() + e.redo_history().len()}))
+        }),
         cmd!("edit.restore_last_selection", "Restore Last Selection", ["Edit"], Some("Cmd+Alt+Z"), "{}", always, restore_selection),
         cmd!("edit.cut", "Cut", ["Edit"], Some("Cmd+X"), "{tracks?, start?, end?}", has_range, |e, p| cut_copy(e, p, true, "edit.cut")),
         cmd!(noundo "edit.copy", "Copy", ["Edit"], Some("Cmd+C"), "{tracks?, start?, end?}", has_range, |e, p| cut_copy(e, p, false, "edit.copy")),
@@ -839,6 +844,27 @@ fn consolidate(e: &mut Engine, p: &Value) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn history_steps_back_and_forward_like_a_history_panel() {
+        let mut e = Engine::default();
+        for _ in 0..3 {
+            e.execute("track.new", &json!({})).unwrap();
+        }
+        let tracks = |e: &Engine| e.session().tracks.len();
+        let full = tracks(&e);
+        e.execute("edit.history_go", &json!({"step": 1})).unwrap();
+        assert_eq!(tracks(&e), full - 2);
+        assert_eq!((e.undo_history().len(), e.redo_history().len()), (1, 2));
+        e.execute("edit.history_go", &json!({"step": 3})).unwrap();
+        assert_eq!(tracks(&e), full, "clicking a later row redoes up to it");
+        e.execute("edit.history_go", &json!({"step": 0})).unwrap();
+        assert_eq!(tracks(&e), full - 3);
+        e.execute("edit.history_go", &json!({"step": 2})).unwrap();
+        e.execute("track.new", &json!({})).unwrap();
+        assert!(e.redo_history().is_empty(), "a new edit drops the steps after it");
+        assert_eq!(e.undo_history().len(), 3);
+    }
+
     use super::*;
 
     #[test]

@@ -91,6 +91,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     crate::remote::window(app, ctx);
     if !app.extra.workspace_started {
         app.extra.workspace_started = true;
+        crate::docking::move_history_under_clips(app);
         if app.ui.ask_workspace {
             app.extra.ask_workspace = true;
         } else {

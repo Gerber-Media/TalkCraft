@@ -225,6 +225,19 @@ impl Engine {
     pub fn undo_history(&self) -> Vec<String> {
         self.undo.iter().map(|h| h.label.clone()).collect()
     }
+    /// Steps that can be redone, next one first.
+    pub fn redo_history(&self) -> Vec<String> {
+        self.redo.iter().rev().map(|h| h.label.clone()).collect()
+    }
+
+    /// Steps back or forward until `step` actions are applied (0 = before the first one), like
+    /// clicking a row of a History panel; the later steps stay redoable until a new edit.
+    pub fn history_go(&mut self, step: usize) -> usize {
+        let step = step.min(self.undo.len() + self.redo.len());
+        while self.undo.len() > step && self.undo() {}
+        while self.undo.len() < step && self.redo() {}
+        self.undo.len()
+    }
 
     pub fn undo(&mut self) -> bool {
         let Some(h) = self.undo.pop() else { return false };
