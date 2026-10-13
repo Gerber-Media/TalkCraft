@@ -50,6 +50,28 @@ pub fn specs() -> Vec<CommandSpec> {
             has_tracks,
             segment
         ),
+        cmd!(
+            "subtitle.transcribe",
+            "Transcribe Speech",
+            [],
+            None,
+            "{language?: from the episode (deu → de, auto), model?: path, start?, end?, replace?: true, speakers?: true, srt?: whisper output to place instead of running whisper} — subtitles with text from whisper.cpp",
+            has_tracks,
+            transcribe
+        ),
+        cmd!(
+            "subtitle.assign_speakers",
+            "Name Speakers from Tracks",
+            [],
+            None,
+            "{start?, end?, overwrite?: false} — each cue's speaker = the audio track loudest under it",
+            has_tracks,
+            |e, p| {
+                let r = full_range(e, range_param(e, "subtitle.assign_speakers", p)?);
+                let n = crate::transcribe::assign_speakers(e, r, bool_or(p, "overwrite", false), "subtitle.assign_speakers")?;
+                Ok(json!({"named": n}))
+            }
+        ),
     ]
 }
 
@@ -227,6 +249,36 @@ fn segment(e: &mut Engine, p: &Value) -> Result<Value> {
     Ok(json!({"created": n}))
 }
 
+/// `r`, or the whole session when it is empty.
+fn full_range(e: &Engine, r: soundcraft_time::Range) -> soundcraft_time::Range {
+    if r.is_empty() { soundcraft_time::Range::new(0, e.session().content_end().max(1)) } else { r }
+}
+
+/// The language whisper should listen for: `language`, else the episode's.
+pub fn transcribe_language(e: &Engine, p: &Value) -> String {
+    let code = str_param(p, "language").map(str::to_string).unwrap_or_else(|| e.session().podcast.episode.language.clone());
+    let w = crate::transcribe::whisper_language(&code);
+    // Already a whisper code like `de`.
+    if w == "auto" && code.len() == 2 && code.bytes().all(|b| b.is_ascii_lowercase()) { code } else { w.to_string() }
+}
+
+fn transcribe(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "subtitle.transcribe";
+    let r = full_range(e, range_param(e, ID, p)?);
+    let cues = if let Some(srt) = str_param(p, "srt") {
+        let bytes = std::fs::read(srt).map_err(|err| bad(ID, format!("{srt}: {err}")))?;
+        subs::parse(&String::from_utf8_lossy(&bytes))
+    } else {
+        let job = crate::transcribe::prepare(e, r, &transcribe_language(e, p), str_param(p, "model"), ID)?;
+        let out = job.run_blocking();
+        job.cleanup();
+        out?
+    };
+    let placed = crate::transcribe::place(e, r, cues, bool_or(p, "replace", true));
+    let named = if bool_or(p, "speakers", true) && placed > 0 { crate::transcribe::assign_speakers(e, r, false, ID)? } else { 0 };
+    Ok(json!({"created": placed, "named": named}))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266,6 +318,35 @@ mod tests {
         let c = &f.session().subtitles[0];
         assert_eq!((c.start, c.end, c.speaker.as_str(), c.text.as_str()), (480_000, 552_000, "Sven", "Hallo"));
         assert!(f.execute("subtitle.import", &json!({"path": dir.join("missing.srt").to_string_lossy()})).is_err());
+        assert!(std::fs::remove_dir_all(&dir).is_ok());
+    }
+
+    #[test]
+    fn whisper_output_is_placed_with_speakers_from_the_tracks() {
+        use soundcraft_audio_io::{AudioBuffer, EncodeOptions};
+        let dir = std::env::temp_dir().join(format!("sc-subs-whisper-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let tone =
+            |secs: usize| AudioBuffer { sample_rate: 48_000, channels: vec![(0..48_000 * secs).map(|i| (i as f32 * 0.02).sin() * 0.2).collect()] };
+        let mut e = Engine::default();
+        e.execute("session.new", &json!({"name": "Folge", "template": "podcast", "speakers": 2})).unwrap();
+        for (name, at) in [("Moderation", 0.0), ("Gast 1", 3.0)] {
+            let wav = dir.join(format!("{name}.wav"));
+            std::fs::write(&wav, soundcraft_audio_io::encode(&tone(2), &EncodeOptions::default()).unwrap()).unwrap();
+            e.execute("file.import_audio", &json!({"path": wav.to_string_lossy(), "track": name, "new_tracks": false, "at": {"seconds": at}}))
+                .unwrap();
+        }
+        let srt = dir.join("mix.srt");
+        std::fs::write(&srt, "1\n00:00:00,200 --> 00:00:01,800\n Hallo, willkommen.\n\n2\n00:00:03,100 --> 00:00:04,900\n Danke!\n\n3\n00:00:05,000 --> 00:00:05,400\n[Musik]\n\n").unwrap();
+        let v = e.execute("subtitle.transcribe", &json!({"srt": srt.to_string_lossy()})).unwrap();
+        assert_eq!((v["created"].as_u64(), v["named"].as_u64()), (Some(2), Some(2)), "{v}");
+        let got: Vec<(&str, &str)> = e.session().subtitles.iter().map(|c| (c.speaker.as_str(), c.text.as_str())).collect();
+        assert_eq!(got, [("Moderation", "Hallo, willkommen."), ("Gast 1", "Danke!")]);
+        e.execute("edit.undo", &json!({})).unwrap();
+        assert!(e.session().subtitles.is_empty(), "one undo step");
+        assert_eq!(transcribe_language(&e, &json!({})), "de");
+        assert_eq!(transcribe_language(&e, &json!({"language": "en"})), "en");
         assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 }

@@ -290,6 +290,19 @@ pub fn render_mix(e: &Engine, r: Range, id: &str) -> Result<Vec<Vec<f32>>> {
     Ok(render_bounce(s, r, true, None).0)
 }
 
+/// One track soloed (sends and auxes included) over `r` as planar channels, surround folded to stereo.
+pub fn render_track(e: &Engine, r: Range, track: TrackId, id: &str) -> Result<Vec<Vec<f32>>> {
+    let s = e.session();
+    if r.len() > s.sample_rate.samples(4.0 * 3600.0) {
+        return Err(EngineError::BadParams(id.into(), "bounces are limited to 4 hours".into()));
+    }
+    let mut solo = s.clone();
+    for t in &mut solo.tracks {
+        t.mixer.solo = t.id == track;
+    }
+    Ok(render_bounce(&solo, r, true, None).0)
+}
+
 /// The main mix over `r` and its format (folded to stereo on request).
 fn render_main(s: &Session, r: Range, fold_stereo: bool) -> (Vec<Vec<f32>>, ChannelFormat) {
     render_bounce(s, r, fold_stereo, None)

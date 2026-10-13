@@ -16,6 +16,7 @@ pub mod io;
 pub mod podcast;
 pub mod score;
 pub mod subtitles;
+pub mod transcribe;
 
 use serde_json::{Value, json};
 use soundcraft_model::{Clip, Session, TrackId, ZoomState};

@@ -1,15 +1,27 @@
 //! The Subtitles window: every cue as an editable row (times, speaker, text), the cue under the
 //! playhead highlighted and followed, and tools to add cues at the playhead, lay out empty cues
-//! along the speech, import and export SRT/WebVTT.
+//! along the speech, transcribe it with whisper.cpp, import and export SRT/WebVTT.
 
 use crate::SoundApp;
 use crate::theme::{Tokens, mono};
 use egui::{Color32, RichText, vec2};
 use serde_json::{Value, json};
+use soundcraft_engine::transcribe::{self, Job};
 use soundcraft_model::SubtitleCue;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::process::{Child, Command, Stdio};
 
-#[derive(Debug, Clone, Default)]
+/// A background program the window waits for.
+#[derive(Debug)]
+enum Task {
+    /// whisper-cli transcribing the mix.
+    Transcribe { job: Job, child: Child, start: Option<i64>, end: Option<i64> },
+    /// curl downloading the speech model to `part`, renamed to `to` when done.
+    Download { child: Child, part: PathBuf, to: PathBuf },
+}
+
+#[derive(Debug, Default)]
 pub struct SubtitleEditor {
     pub show: bool,
     /// Scroll the row under the playhead into view while playing.
@@ -21,6 +33,22 @@ pub struct SubtitleEditor {
     /// The cue clicked last (the ruler highlights it too).
     pub selected: Option<u64>,
     initialized: bool,
+    task: Option<Task>,
+}
+
+/// A copy never owns the running program.
+impl Clone for SubtitleEditor {
+    fn clone(&self) -> Self {
+        Self {
+            show: self.show,
+            follow: self.follow,
+            drafts: self.drafts.clone(),
+            filter: self.filter.clone(),
+            selected: self.selected,
+            initialized: self.initialized,
+            task: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -56,10 +84,155 @@ pub fn toggle(app: &mut SoundApp, p: &Value) -> Value {
     json!({"value": ed.show})
 }
 
+/// Starts transcribing the edit selection (or the whole session) in the background.
+fn start_transcription(app: &mut SoundApp) -> Result<(), String> {
+    let s = app.engine.session();
+    let sel = s.edit.selection;
+    let (start, end) = if sel.is_empty() { (None, None) } else { (Some(sel.start), Some(sel.end)) };
+    let r = if sel.is_empty() { soundcraft_time::Range::new(0, s.content_end().max(1)) } else { sel };
+    let language = soundcraft_engine::cmd::subtitles::transcribe_language(&app.engine, &json!({}));
+    let job = transcribe::prepare(&app.engine, r, &language, None, "subtitle.transcribe").map_err(|e| e.to_string())?;
+    match job.spawn() {
+        Ok(child) => {
+            app.extra.subtitles.task = Some(Task::Transcribe { job, child, start, end });
+            Ok(())
+        }
+        Err(e) => {
+            job.cleanup();
+            Err(e.to_string())
+        }
+    }
+}
+
+/// Starts downloading the default speech model with curl.
+fn start_download() -> Result<Task, String> {
+    let dir = transcribe::default_model_dir().ok_or("no settings folder for the model")?;
+    std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let to = dir.join(transcribe::DEFAULT_MODEL);
+    let part = dir.join(format!("{}.part", transcribe::DEFAULT_MODEL));
+    let child = Command::new("curl")
+        .args(["-fsSL", "-o"])
+        .arg(&part)
+        .arg(transcribe::DEFAULT_MODEL_URL)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| format!("curl: {e}"))?;
+    Ok(Task::Download { child, part, to })
+}
+
+/// Size of the default model, for download progress.
+const MODEL_BYTES: f32 = 574_041_195.0;
+
+/// Checks the background task; applies a finished transcription.
+fn poll(app: &mut SoundApp, ctx: &egui::Context) {
+    let Some(task) = app.extra.subtitles.task.as_mut() else { return };
+    let child = match task {
+        Task::Transcribe { child, .. } | Task::Download { child, .. } => child,
+    };
+    let done = match child.try_wait() {
+        Ok(Some(status)) => Some(status.success()),
+        Ok(None) => None,
+        Err(_) => Some(false),
+    };
+    let Some(ok) = done else {
+        ctx.request_repaint_after_secs(0.5);
+        return;
+    };
+    match app.extra.subtitles.task.take() {
+        Some(Task::Transcribe { job, start, end, .. }) => {
+            let result = job.result(ok).map_err(|e| e.to_string()).and_then(|_| {
+                let mut p = json!({"srt": job.srt().to_string_lossy(), "replace": true});
+                if let (Some(a), Some(b)) = (start, end) {
+                    p["start"] = json!(a);
+                    p["end"] = json!(b);
+                }
+                app.run("subtitle.transcribe", p)
+            });
+            job.cleanup();
+            app.ui.status = match result {
+                Ok(v) => format!("Transcribed {} cue(s), {} with a speaker", v["created"], v["named"]),
+                Err(e) => e,
+            };
+        }
+        Some(Task::Download { part, to, .. }) => {
+            app.ui.status = if ok && std::fs::rename(&part, &to).is_ok() {
+                "Speech model downloaded — ready to transcribe".into()
+            } else {
+                let _ = std::fs::remove_file(&part);
+                "The speech model could not be downloaded".into()
+            };
+        }
+        None => {}
+    }
+}
+
+/// The transcription row: start, progress and cancel, or what is missing.
+fn transcription_ui(ui: &mut egui::Ui, ed: &mut SubtitleEditor, t: &Tokens, start: &mut bool, error: &mut Option<String>) {
+    match &mut ed.task {
+        Some(Task::Transcribe { job, .. }) => {
+            let p = job.progress();
+            ui.add(egui::ProgressBar::new(p).desired_width(200.0).text(format!(
+                "Transcribing {:.0} min of audio… {:.0}%",
+                job.seconds / 60.0,
+                p * 100.0
+            )));
+        }
+        Some(Task::Download { part, .. }) => {
+            let got = std::fs::metadata(&*part).map_or(0, |m| m.len()) as f32;
+            ui.add(
+                egui::ProgressBar::new((got / MODEL_BYTES).clamp(0.0, 1.0))
+                    .desired_width(200.0)
+                    .text(format!("Downloading speech model… {:.0} MB", got / 1e6)),
+            );
+        }
+        None => {}
+    }
+    if let Some(task) = &mut ed.task {
+        if ui.button("Cancel").clicked() {
+            match task {
+                Task::Transcribe { child, job, .. } => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    job.cleanup();
+                }
+                Task::Download { child, part, .. } => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    let _ = std::fs::remove_file(&*part);
+                }
+            }
+            ed.task = None;
+        }
+        return;
+    }
+    if transcribe::find_cli().is_none() {
+        ui.label(RichText::new("Automatic transcription needs whisper.cpp: brew install whisper-cpp").color(t.text_dim));
+    } else if transcribe::find_model(None).is_none() {
+        if ui.button(format!("Download speech model (~{:.0} MB)", MODEL_BYTES / 1e6)).on_hover_text(transcribe::DEFAULT_MODEL_URL).clicked() {
+            match start_download() {
+                Ok(task) => ed.task = Some(task),
+                Err(e) => *error = Some(e),
+            }
+        }
+        ui.label(RichText::new("needed once for automatic transcription").color(t.text_dim));
+    } else if ui
+        .button("Transcribe")
+        .on_hover_text("Fill in subtitles from the speech with whisper.cpp — the edit selection, or the whole episode. Replaces the cues there (undoable); speakers come from the tracks.")
+        .clicked()
+    {
+        *start = true;
+    }
+}
+
 pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
+    poll(app, ctx);
     if !app.extra.subtitles.show {
         return;
     }
+    let mut transcribe_now = false;
+    let mut error = None;
     let mut open = true;
     let mut run: Vec<(String, Value)> = Vec::new();
     let mut dialog: Option<&'static str> = None;
@@ -94,6 +267,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 ui.add(egui::TextEdit::singleline(&mut ed.filter).hint_text("Search").desired_width(140.0));
                 ui.label(RichText::new(format!("{} cue(s)", cues.len())).color(t.text_dim));
             });
+            ui.horizontal(|ui| transcription_ui(ui, ed, &t, &mut transcribe_now, &mut error));
             ui.separator();
             if cues.is_empty() {
                 ui.add_space(24.0);
@@ -212,5 +386,11 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     }
     if let Some(id) = dialog {
         let _ = app.dialogs.open_for_command(&app.engine, id);
+    }
+    if let Some(e) = error {
+        app.ui.status = e;
+    }
+    if transcribe_now && let Err(e) = start_transcription(app) {
+        app.ui.status = e;
     }
 }
