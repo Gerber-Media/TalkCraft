@@ -41,7 +41,9 @@ podcast does not need.
   gets a track "Ferngast – Name" with a live meter; M on the track mutes them in the call. Record
   starts a lossless recording in every guest's browser; after Stop their file lands on their
   track, synced to a backup of the call. Browser to browser (WebRTC); the guest page lives in
-  [Talkcraft-Gast](https://codefloe.com/GerberMedia/Talkcraft-Gast).
+  [Talkcraft-Gast](https://codefloe.com/GerberMedia/Talkcraft-Gast). Works on phones too
+  (iPhone and Android): the screen stays on during the call and the page gives tips for recording
+  on the go.
 - **Editing.** The blade splits a clip where you click (Alt: every track). Delete/Backspace removes
   the selected section after asking, closing the gap on all tracks so speakers stay in sync.
   Magnetic snapping, Close Gap, Z/Shift+Z zoom. Edit > Shorten Pauses trims long silences on all
@@ -173,7 +175,9 @@ braucht.
   stumm. Record startet bei jedem Gast eine verlustfreie Aufnahme im Browser; nach Stop landet
   seine Datei auf seiner Spur, ausgerichtet an einem Mitschnitt des Gesprächs. Die Verbindung
   läuft direkt von Browser zu Browser (WebRTC); die Gast-Seite liegt in
-  [Talkcraft-Gast](https://codefloe.com/GerberMedia/Talkcraft-Gast).
+  [Talkcraft-Gast](https://codefloe.com/GerberMedia/Talkcraft-Gast). Klappt auch mit dem Handy
+  (iPhone und Android): Der Bildschirm bleibt während des Gesprächs an, und die Seite gibt Tipps
+  für die Aufnahme unterwegs.
 - **Schnitt.** Die Klinge teilt einen Clip, wo man klickt (Alt: alle Spuren). Entf/Rückschritt
   entfernt nach Rückfrage den markierten Abschnitt und schließt die Lücke auf allen Spuren, damit
   die Sprecher synchron bleiben. Magnetisches Einrasten, Lücke schließen, Zoom mit Z/Umschalt+Z.
