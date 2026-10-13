@@ -1,12 +1,9 @@
-# SoundCraft app icon (placeholder)
+# TalkCraft app icon
 
-**A nightingale singing**, as an engraving-style head-and-shoulders portrait in the Crafting Apps'
-owl-template framing (craftrules `standards/icon-design.md`): a full-bleed colour field, the bird
-in three-quarter view with its bill open and its eye on the viewer, its breast and wing running off
-the bottom and right edges, three song arcs leaving the bill.
-
-This is a **placeholder** until the owner draws SoundCraft's icon in ArtCraft like the other apps'
-icons. Replace `icon.svg` and run `packaging/icons.sh`; nothing else needs to change.
+**A talking parrot**, as an engraving-style head-and-shoulders portrait in the Crafting Apps'
+framing: a full-bleed colour field, the bird in profile facing left with its hooked bill open,
+feather scallops and cross-hatching, three sound arcs leaving the bill (the arcs come from the
+SoundCraft icon this app forked from).
 
 ## Palette
 
@@ -14,9 +11,9 @@ Exactly three colours:
 
 | Colour | Hex | Used for |
 |---|---|---|
-| Ink | `#0b0b0c` | Line work and contour |
-| Paper | `#efe9dc` | The bird and the song arcs |
-| SoundCraft teal (app colour) | `#14a9c4` | The full-bleed background field |
+| Ink | `#0b0b0c` | Line work, hatching and contour |
+| Paper | `#efe9dc` | The bird and the sound arcs |
+| TalkCraft green (app colour) | `#2f9e63` | The full-bleed background field |
 
 ## Geometry
 
@@ -26,8 +23,9 @@ tile. The macOS icons (`soundcraft.icns`, `soundcraft-macos-512.png`) sit on App
 
 ## Provenance and licence
 
-Drawn from scratch as hand-placed SVG paths by the SoundCraft contributors; no source image was
-traced or copied. MIT OR Apache-2.0, like the code (see `ATTRIBUTION.md`).
+Generated from scratch by `source/parrot.py` (hand-placed paths plus programmatic hatching and
+feather scallops, helpers in `source/lib.py`); no source image was traced or copied. Edit the
+script, run `python3 source/parrot.py` to rewrite `icon.svg`, then `packaging/icons.sh`. MIT OR Apache-2.0, like the code (see `ATTRIBUTION.md`).
 
 ## Files
 
