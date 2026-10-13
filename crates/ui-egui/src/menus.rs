@@ -150,6 +150,8 @@ const DIALOG_COMMANDS: &[&str] = &[
     "track.new",
     "file.bounce_mix",
     "file.export_podcast",
+    "setup.preferences",
+    "setup.transcription_settings",
     "edit.truncate_silence",
     "session.new",
     "file.import_audio",

@@ -40,6 +40,12 @@ const HIDDEN_PARTS: &[&str] = &[
     "Collaboration",
     "Synchronization",
     "Clip Groups",
+    // Setup entries without a window yet (or with nothing to set in a podcast).
+    "Disk Allocation",
+    "Peripherals",
+    "Timecode",
+    "Click/Countoff",
+    "Transcription Settings",
 ];
 
 /// Whether a menu catalog line (`Root > … > Leaf`) is left out of the podcast menus.

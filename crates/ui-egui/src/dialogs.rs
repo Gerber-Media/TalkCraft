@@ -10,23 +10,98 @@ use soundcraft_time::Samples;
 
 #[derive(Debug, Clone)]
 pub enum Dialog {
-    NewTracks { count: u32, format: String, kind: String, timebase: String, name: String },
-    NewSession { name: String, sample_rate: u32, template: String, speakers: u32 },
-    Bounce { path: String, format: String, bit_depth: String, normalize: bool, loudness: bool },
-    RenameTrack { id: TrackId, name: String },
-    RenameClip { id: ClipId, name: String },
-    ClearClips { clips: Vec<ClipId>, sources: Vec<SourceId>, message: String },
-    PathPrompt { cmd: String, title: String, path: String, key: String },
-    Number { cmd: String, title: String, key: String, value: f64, suffix: String },
-    TempoChange { at: Samples, bpm: f64 }, // from double-clicking the tempo ruler
-    Fades { shape: String },
-    StripSilence { threshold: f64, min_ms: f64, pre_ms: f64, post_ms: f64 },
-    Group { name: String, edit: bool, mix: bool, members: Vec<(u64, String, bool)> },
-    Session { frame_rate: String, bit_depth: String },
-    ScoreSetup { title: String, composer: String, bars_per_system: u32, show_track_names: bool },
-    SaveChanges { then: (String, Value) },
-    ExportEpisode { path: String, settings: Box<soundcraft_model::PodcastSettings> },
-    ShortenPauses { threshold: f64, longer_ms: f64, keep_ms: f64, preview: Option<String> },
+    NewTracks {
+        count: u32,
+        format: String,
+        kind: String,
+        timebase: String,
+        name: String,
+    },
+    NewSession {
+        name: String,
+        sample_rate: u32,
+        template: String,
+        speakers: u32,
+    },
+    Bounce {
+        path: String,
+        format: String,
+        bit_depth: String,
+        normalize: bool,
+        loudness: bool,
+    },
+    RenameTrack {
+        id: TrackId,
+        name: String,
+    },
+    RenameClip {
+        id: ClipId,
+        name: String,
+    },
+    ClearClips {
+        clips: Vec<ClipId>,
+        sources: Vec<SourceId>,
+        message: String,
+    },
+    PathPrompt {
+        cmd: String,
+        title: String,
+        path: String,
+        key: String,
+    },
+    Number {
+        cmd: String,
+        title: String,
+        key: String,
+        value: f64,
+        suffix: String,
+    },
+    TempoChange {
+        at: Samples,
+        bpm: f64,
+    }, // from double-clicking the tempo ruler
+    Fades {
+        shape: String,
+    },
+    StripSilence {
+        threshold: f64,
+        min_ms: f64,
+        pre_ms: f64,
+        post_ms: f64,
+    },
+    Group {
+        name: String,
+        edit: bool,
+        mix: bool,
+        members: Vec<(u64, String, bool)>,
+    },
+    Session {
+        frame_rate: String,
+        bit_depth: String,
+    },
+    ScoreSetup {
+        title: String,
+        composer: String,
+        bars_per_system: u32,
+        show_track_names: bool,
+    },
+    SaveChanges {
+        then: (String, Value),
+    },
+    ExportEpisode {
+        path: String,
+        settings: Box<soundcraft_model::PodcastSettings>,
+    },
+    /// Setup > Preferences: episode details, export defaults, audio and transcription.
+    Preferences {
+        settings: Box<soundcraft_model::PodcastSettings>,
+    },
+    ShortenPauses {
+        threshold: f64,
+        longer_ms: f64,
+        keep_ms: f64,
+        preview: Option<String>,
+    },
 }
 
 #[derive(Default)]
@@ -55,6 +130,7 @@ impl Dialogs {
             Dialog::ScoreSetup { .. } => "score_setup",
             Dialog::SaveChanges { .. } => "save_changes",
             Dialog::ExportEpisode { .. } => "export_episode",
+            Dialog::Preferences { .. } => "preferences",
             Dialog::ShortenPauses { .. } => "shorten_pauses",
         })
     }
@@ -92,6 +168,7 @@ impl Dialogs {
                 let ext = if settings.export.format == "aiff" { "aif".to_string() } else { settings.export.format.clone() };
                 Dialog::ExportEpisode { path: format!("{home}/{name}.{ext}"), settings: Box::new(settings) }
             }
+            "setup.preferences" | "setup.transcription_settings" => Dialog::Preferences { settings: Box::new(e.session().podcast.clone()) },
             "session.new" => Dialog::NewSession { name: "Episode".into(), sample_rate: 48_000, template: "podcast".into(), speakers: 2 },
             "file.bounce_mix" => Dialog::Bounce {
                 path: format!("{home}/{name} Bounce.wav"),
@@ -290,6 +367,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
         Dialog::SaveChanges { then } if then.0 == "session.revert" => "Revert to Saved",
         Dialog::SaveChanges { .. } => "Unsaved Changes",
         Dialog::ExportEpisode { .. } => "Export Episode",
+        Dialog::Preferences { .. } => "Preferences",
         Dialog::ShortenPauses { .. } => "Shorten Pauses",
     }
     .to_string();
@@ -560,8 +638,13 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         action = Some(("setup.session".into(), json!({"frame_rate": frame_rate, "bit_depth": bit_depth})));
                     }
                 }
+                Dialog::Preferences { settings } => {
+                    if preferences_ui(app, ui, settings, enter) {
+                        action = Some(("podcast.set".into(), serde_json::to_value(settings.as_ref()).unwrap_or_default()));
+                    }
+                }
                 Dialog::ExportEpisode { path, settings } => {
-                    if export_episode_ui(ui, path, settings, enter) {
+                    if export_episode_ui(ui, Some(path), settings, enter) {
                         let s = serde_json::to_value(settings.as_ref()).unwrap_or_default();
                         before = Some(("podcast.set".into(), s));
                         action = Some(("file.export_podcast".into(), json!({"path": path})));
@@ -772,13 +855,60 @@ const LOUDNESS_PRESETS: [(&str, Option<f32>); 5] = [
 ];
 
 /// The Export Episode dialog: format, quality, loudness and ID3 metadata. True when Export is pressed.
-fn export_episode_ui(ui: &mut egui::Ui, path: &mut String, s: &mut soundcraft_model::PodcastSettings, enter: bool) -> bool {
+/// The Export Episode dialog's body and its Export button.
+fn export_episode_ui(ui: &mut egui::Ui, path: Option<&mut String>, s: &mut soundcraft_model::PodcastSettings, enter: bool) -> bool {
     let dim = Tokens::current().text_dim;
-    let x = &mut s.export;
-    ui.horizontal(|ui| {
-        ui.label("File");
-        ui.add(egui::TextEdit::singleline(path).desired_width(380.0));
+    export_settings_ui(ui, path, s, false);
+    ui.label(egui::RichText::new("Exports the edit selection, or the whole session. Settings are saved with the session.").small().color(dim));
+    buttons(ui, "Export", enter && !ui.ctx().egui_wants_keyboard_input())
+}
+
+/// Setup > Preferences: everything a podcast session keeps, plus where audio and transcription
+/// stand. True when Save was pressed.
+fn preferences_ui(app: &mut SoundApp, ui: &mut egui::Ui, s: &mut soundcraft_model::PodcastSettings, enter: bool) -> bool {
+    let dim = Tokens::current().text_dim;
+    egui::ScrollArea::vertical().max_height(ui.ctx().content_rect().height() * 0.7).show(ui, |ui| {
+        episode_ui(ui, &mut s.episode);
+        ui.separator();
+        export_settings_ui(ui, None, s, true);
+        ui.separator();
+        ui.label(egui::RichText::new("Recording").strong());
+        ui.label(
+            egui::RichText::new(
+                "Record (Cmd+Space) records every speaker track except locked ones; a track's own record button records just that speaker.",
+            )
+            .color(dim),
+        );
+        if ui.button("Audio devices and buffer…").clicked() {
+            let _ = app.run("window.playback_engine", json!({"value": true}));
+        }
+        ui.separator();
+        ui.label(egui::RichText::new("Transcription").strong());
+        use soundcraft_engine::transcribe;
+        match transcribe::find_cli() {
+            Some(cli) => ui.label(format!("whisper.cpp: {}", cli.display())),
+            None => ui.label(egui::RichText::new(transcribe::install_hint()).color(dim)),
+        };
+        match transcribe::find_model(None) {
+            Some(m) => ui.label(format!("Speech model: {}", m.file_name().map(|n| n.to_string_lossy()).unwrap_or_default())),
+            None => ui.label(egui::RichText::new("No speech model yet: Window > Subtitles offers to download one.").color(dim)),
+        };
+        ui.label(egui::RichText::new("Transcription listens for the episode's language.").small().color(dim));
     });
+    ui.label(egui::RichText::new("Saved with the session.").small().color(dim));
+    buttons(ui, "Save", enter && !ui.ctx().egui_wants_keyboard_input())
+}
+
+/// Format, loudness and side files; with `path`, its extension follows the format. The episode
+/// tags follow for MP3 unless `episode_shown` (Preferences shows them on their own).
+fn export_settings_ui(ui: &mut egui::Ui, mut path: Option<&mut String>, s: &mut soundcraft_model::PodcastSettings, episode_shown: bool) {
+    let x = &mut s.export;
+    if let Some(path) = path.as_mut() {
+        ui.horizontal(|ui| {
+            ui.label("File");
+            ui.add(egui::TextEdit::singleline(&mut **path).desired_width(380.0));
+        });
+    }
     ui.label(egui::RichText::new("Format").strong());
     egui::Grid::new("ep_fmt").num_columns(2).spacing(vec2(12.0, 6.0)).show(ui, |ui| {
         ui.label("Format");
@@ -790,9 +920,11 @@ fn export_episode_ui(ui: &mut egui::Ui, path: &mut String, s: &mut soundcraft_mo
                 ui.selectable_value(&mut x.format, f.to_string(), label);
             }
         });
-        if x.format != before {
+        if x.format != before
+            && let Some(path) = path.as_mut()
+        {
             let ext = if x.format == "aiff" { "aif" } else { x.format.as_str() };
-            *path = std::path::Path::new(path.as_str()).with_extension(ext).to_string_lossy().to_string();
+            **path = std::path::Path::new(path.as_str()).with_extension(ext).to_string_lossy().to_string();
         }
         ui.end_row();
         if x.format == "mp3" {
@@ -854,10 +986,16 @@ fn export_episode_ui(ui: &mut egui::Ui, path: &mut String, s: &mut soundcraft_mo
         });
         ui.end_row();
     });
-    if x.format == "mp3" {
-        let e = &mut s.episode;
+    if x.format == "mp3" && !episode_shown {
         ui.separator();
-        ui.label(egui::RichText::new("Episode (ID3 tags)").strong());
+        episode_ui(ui, &mut s.episode);
+    }
+}
+
+/// Episode details: ID3 tags in MP3s, shownotes, transcription language.
+fn episode_ui(ui: &mut egui::Ui, e: &mut soundcraft_model::EpisodeInfo) {
+    {
+        ui.label(egui::RichText::new("Episode").strong());
         egui::Grid::new("ep_meta").num_columns(2).spacing(vec2(12.0, 6.0)).show(ui, |ui| {
             for (label, field) in [("Title", &mut e.title), ("Podcast", &mut e.show), ("Author", &mut e.author), ("Genre", &mut e.genre)] {
                 ui.label(label);
@@ -885,8 +1023,6 @@ fn export_episode_ui(ui: &mut egui::Ui, path: &mut String, s: &mut soundcraft_mo
             ui.end_row();
         });
     }
-    ui.label(egui::RichText::new("Exports the edit selection, or the whole session. Settings are saved with the session.").small().color(dim));
-    buttons(ui, "Export", enter && !ui.ctx().egui_wants_keyboard_input())
 }
 
 #[cfg(test)]
