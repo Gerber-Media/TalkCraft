@@ -3,7 +3,23 @@ use muda::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu
 use objc2::MainThreadMarker;
 use objc2_app_kit::NSApplication;
 use soundcraft_ui_egui::{SoundApp, menus};
-use std::sync::mpsc::{Receiver, channel};
+use std::sync::mpsc::{Receiver, Sender, channel};
+use std::sync::{Mutex, Once};
+
+/// muda keeps the first event handler for the life of the process (a `OnceCell`), so the
+/// handler is installed once and forwards to whichever menu bar is current: the bar is rebuilt
+/// when the work mode changes, and a handler bound to the old bar's channel would drop every click.
+static ROUTE: Mutex<Option<(Sender<MenuEvent>, egui::Context)>> = Mutex::new(None);
+static INSTALL: Once = Once::new();
+
+fn route(event: MenuEvent) {
+    if let Ok(r) = ROUTE.lock()
+        && let Some((tx, ctx)) = r.as_ref()
+        && tx.send(event).is_ok()
+    {
+        ctx.request_repaint();
+    }
+}
 
 struct Entry {
     item: CheckMenuItem,
@@ -57,12 +73,10 @@ impl NativeMenu {
             native.menu.append(&submenu)?;
         }
         native.menu.init_for_nsapp();
-        let ctx = ctx.clone();
-        MenuEvent::set_event_handler(Some(move |event| {
-            if tx.send(event).is_ok() {
-                ctx.request_repaint();
-            }
-        }));
+        if let Ok(mut r) = ROUTE.lock() {
+            *r = Some((tx, ctx.clone()));
+        }
+        INSTALL.call_once(|| MenuEvent::set_event_handler(Some(route)));
         Ok(native)
     }
 
@@ -140,6 +154,10 @@ impl NativeMenu {
 impl Drop for NativeMenu {
     fn drop(&mut self) {
         self.menu.remove_for_nsapp();
-        MenuEvent::set_event_handler(None::<fn(MenuEvent)>);
+        // The handler stays installed (muda cannot replace it); it now routes nowhere until the
+        // next bar is built.
+        if let Ok(mut r) = ROUTE.lock() {
+            *r = None;
+        }
     }
 }
