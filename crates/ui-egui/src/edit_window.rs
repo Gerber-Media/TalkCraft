@@ -1517,6 +1517,34 @@ fn plugin_range(track: &Track, p: &AutoParam) -> (f32, f32) {
 
 // ---- interaction -----------------------------------------------------------------------------
 
+/// Pixels within which a moved or trimmed edge clicks onto another clip's edge, a marker, the
+/// playhead or the session start.
+const MAGNET_PX: f64 = 10.0;
+
+/// `offset` adjusted so that one of `edges` (moved by `offset`) lands on the nearest other clip
+/// edge, marker, playhead or zero within [`MAGNET_PX`]; `offset` unchanged when none is that close.
+fn magnet(s: &Session, moving: &[ClipId], edges: &[Samples], offset: Samples) -> Samples {
+    let reach = (MAGNET_PX * s.edit.zoom.samples_per_px.max(0.01)) as Samples;
+    let targets = s
+        .tracks
+        .iter()
+        .flat_map(|t| t.clips().iter())
+        .filter(|c| !moving.contains(&c.id))
+        .flat_map(|c| [c.start, c.end()])
+        .chain(s.markers.iter().map(|m| m.start))
+        .chain([s.edit.playhead, 0]);
+    let mut best: Option<Samples> = None;
+    for t in targets {
+        for e in edges {
+            let d = t - (e + offset);
+            if d.abs() <= reach && best.is_none_or(|b| d.abs() < b.abs()) {
+                best = Some(d);
+            }
+        }
+    }
+    offset + best.unwrap_or(0)
+}
+
 fn snap(s: &Session, at: Samples) -> Samples {
     if s.edit.edit_mode.is_grid() { s.edit.grid.snap(at, s.sample_rate, &s.tempo, s.frame_rate) } else { at }
 }
@@ -1557,16 +1585,19 @@ fn lane_interaction(app: &mut SoundApp, ui: &mut Ui, track: &Track, lane: Rect, 
     // is over the popup, the lane has no hover position, and the rest of this function bails out.
     // The clip is remembered at the right-click so the menu keeps its target while it is used.
     let menu_clip_id = id.with("menu_clip");
+    let menu_at_id = id.with("menu_at");
     if resp.secondary_clicked() {
-        let clip = resp.interact_pointer_pos().and_then(|p| {
-            let s = app.engine.session();
-            clip_at(track, sample_at(s, tl, p.x).max(0)).map(|c| c.id)
+        let at = resp.interact_pointer_pos().map(|p| sample_at(app.engine.session(), tl, p.x).max(0));
+        let clip = at.and_then(|at| clip_at(track, at).map(|c| c.id));
+        ui.ctx().data_mut(|d| {
+            d.insert_temp(menu_clip_id, clip);
+            d.insert_temp(menu_at_id, at);
         });
-        ui.ctx().data_mut(|d| d.insert_temp(menu_clip_id, clip));
     }
     // The clip may have been removed or moved since the right-click; only use it if it still exists.
     let menu_clip = ui.ctx().data(|d| d.get_temp::<Option<ClipId>>(menu_clip_id)).flatten().filter(|c| track.clips().iter().any(|x| x.id == *c));
-    resp.context_menu(|ui| clip_context_menu(app, ui, menu_clip));
+    let menu_at = ui.ctx().data(|d| d.get_temp::<Option<Samples>>(menu_at_id)).flatten();
+    resp.context_menu(|ui| clip_context_menu(app, ui, menu_clip, track.id, menu_at));
     // Audio files dropped from the Clip List.
     if let Some(src) = resp.dnd_release_payload::<crate::DragSource>()
         && let Some(p) = ui.ctx().pointer_latest_pos()
@@ -1805,6 +1836,8 @@ fn drive_drag(app: &mut SoundApp, ctx: &egui::Context) {
     }
     let Some(p) = p else { return };
     let at = sample_at(&s, tl, p.x).max(0);
+    // Cmd/Ctrl held: move freely, without the magnet.
+    let free = ctx.input(|i| i.modifiers.command);
     let inside = pos2(p.x.max(tl.min.x).min(tl.max.x), p.y.max(tl.min.y).min(tl.max.y));
     let rows = &app.edit_layout.rows;
     let gap = |r: &[f32; 4]| (r[1] - inside.y).max(inside.y - r[3]).max(0.0);
@@ -1816,13 +1849,16 @@ fn drive_drag(app: &mut SoundApp, ctx: &egui::Context) {
                 *tracks = rows.get(a.min(b)..=a.max(b)).unwrap_or_default().iter().map(|(i, _)| TrackId(*i)).collect();
             }
         }
-        Some(Gesture::MoveClips { grab_at, delta, from_track, to_track: tt, .. }) => {
+        Some(Gesture::MoveClips { clips, grab_at, delta, from_track, to_track: tt }) => {
             let raw = at - *grab_at;
             *delta = if s.edit.edit_mode.is_grid() {
                 let base = s.track(*from_track).and_then(|t| clip_at(t, *grab_at)).map_or(*grab_at, |c| c.start);
                 snap(&s, base + raw) - base
-            } else {
+            } else if free {
                 raw
+            } else {
+                let edges: Vec<Samples> = clips.iter().filter_map(|c| s.find_clip(*c)).flat_map(|(_, c)| [c.start, c.end()]).collect();
+                magnet(&s, clips, &edges, raw)
             };
             if s.edit.edit_mode == soundcraft_model::EditMode::Spot {
                 *delta = 0;
@@ -1831,7 +1867,9 @@ fn drive_drag(app: &mut SoundApp, ctx: &egui::Context) {
                 *tt = t2;
             }
         }
-        Some(Gesture::TrimStart { to, .. } | Gesture::TrimEnd { to, .. }) => *to = snap(&s, at),
+        Some(Gesture::TrimStart { to, clip, .. } | Gesture::TrimEnd { to, clip, .. }) => {
+            *to = if s.edit.edit_mode.is_grid() || free { snap(&s, at) } else { at + magnet(&s, std::slice::from_ref(clip), &[at], 0) };
+        }
         Some(Gesture::Fade { to, .. }) => *to = at,
         Some(Gesture::Scrub { last }) => {
             *last = at;
@@ -1951,13 +1989,56 @@ fn trim_clip(app: &mut SoundApp, clip: ClipId, track: TrackId, to: Samples, star
     let _ = app.engine.execute("edit.select", &json!({"tracks": tracks_before, "start": sel_before.start, "end": sel_before.end}));
 }
 
-fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>) {
+fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, track: TrackId, at: Option<Samples>) {
     let Some(c) = clip else {
+        // An empty stretch between clips (e.g. where a clip was moved away): offer to close it.
+        let gap = at.and_then(|at| soundcraft_engine::edit::gap_at(app.engine.session(), track, at).map(|g| (at, g)));
+        if let Some((at, g)) = gap {
+            let s = app.engine.session();
+            let secs = s.sample_rate.seconds(g.len());
+            let others_busy = s.tracks.iter().any(|t| t.clips().iter().any(|c| c.start < g.end && c.end() > g.start));
+            if ui.button(format!("Close Gap on This Track ({secs:.1} s)")).on_hover_text("Moves the later clips on this track back").clicked() {
+                run_report(app, "edit.close_gap", json!({"track": track.0, "at": at}));
+            }
+            let all = ui
+                .add_enabled(!others_busy, egui::Button::new("Close Gap on All Tracks"))
+                .on_hover_text("Cuts this time from every track, markers and subtitles (only where all tracks are empty)")
+                .on_disabled_hover_text("Other tracks have audio in this gap");
+            if all.clicked() {
+                run_report(app, "edit.close_gap", json!({"track": track.0, "at": at, "all_tracks": true}));
+            }
+            ui.separator();
+        }
         if ui.button("Paste").clicked() {
             let _ = app.run("edit.paste", json!({}));
         }
         return;
     };
+    let gain = app.engine.session().find_clip(c).map_or(0.0, |(_, x)| x.gain_db);
+    if ui.button("Normalize (−1 dB peak)").clicked() {
+        run_report(app, "clip.normalize", json!({"clips": [c.0], "peak_db": -1.0}));
+    }
+    if ui.button("Match Loudness (−16 LUFS)").on_hover_text("Sets the clip gain so the clip sounds as loud as the episode target").clicked() {
+        run_report(app, "clip.normalize", json!({"clips": [c.0], "lufs": -16.0}));
+    }
+    ui.menu_button(format!("Volume ({gain:+.1} dB)"), |ui| {
+        let mut db = gain;
+        let r = ui.add(egui::Slider::new(&mut db, -24.0..=24.0).suffix(" dB").step_by(0.5));
+        if r.changed() {
+            let _ = app.engine.execute_merged("clip.gain", &json!({"clips": [c.0], "db": db}), &format!("clip_gain:{}", c.0));
+        }
+        ui.horizontal(|ui| {
+            for d in [-3.0, -1.0, 1.0, 3.0] {
+                if ui.button(format!("{d:+} dB")).clicked() {
+                    let _ = app.run("clip.gain", json!({"clips": [c.0], "delta_db": d}));
+                }
+            }
+        });
+        if ui.button("Reset to 0 dB").clicked() {
+            let _ = app.run("clip.gain", json!({"clips": [c.0], "db": 0.0}));
+        }
+    });
+    ui.separator();
     let ids = json!([c.0]);
     for (label, cmd) in [
         ("Mute/Unmute", "edit.mute_clips"),
@@ -1980,6 +2061,13 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>) {
     if ui.button("Delete").clicked() {
         let _ = app.run("edit.select", json!({"clips": ids}));
         let _ = app.run("edit.clear", json!({}));
+    }
+}
+
+/// Runs a command and puts its error, if any, in the status bar.
+fn run_report(app: &mut SoundApp, id: &str, params: serde_json::Value) {
+    if let Err(e) = app.run(id, params) {
+        app.ui.status = e;
     }
 }
 
@@ -2627,5 +2715,40 @@ mod tests {
         h.key_press(egui::Key::Backspace);
         h.run_steps(2);
         assert_eq!(h.state().dialogs.open_name(), None);
+    }
+
+    #[test]
+    fn moved_edges_click_onto_nearby_clip_edges_but_not_far_ones() {
+        let e = soundcraft_engine::demo::demo_engine();
+        let s = e.session();
+        let t = s.tracks.iter().find(|t| t.clips().len() >= 2).unwrap();
+        let (a, b) = (t.clips()[0].clone(), t.clips()[1].clone());
+        let spp = s.edit.zoom.samples_per_px;
+        // Move clip b so its start sits 4 px after clip a's end: it clicks onto it.
+        let near = a.end() + (4.0 * spp) as i64 - b.start;
+        assert_eq!(b.start + magnet(s, &[b.id], &[b.start, b.end()], near), a.end());
+        // 40 px away nothing pulls (unless something else happens to be there).
+        let far = a.end() + (40.0 * spp) as i64 - b.start;
+        let got = magnet(s, &[b.id], &[b.start, b.end()], far);
+        assert!(got == far || (got - far).abs() <= (MAGNET_PX * spp) as i64);
+    }
+
+    #[test]
+    fn z_zooms_in_for_cutting_and_shift_z_shows_the_whole_session() {
+        let mut h = harness_with(soundcraft_engine::demo::demo_engine());
+        let spp = |h: &Harness<SoundApp>| h.state().engine.session().edit.zoom.samples_per_px;
+        let before = spp(&h);
+        h.key_press(egui::Key::Z);
+        h.run_steps(2);
+        assert!(spp(&h) < before / 4.0, "Z zooms in: {before} -> {}", spp(&h));
+        h.state_mut().run("edit.select", json!({"start": 48_000, "end": 96_000})).unwrap();
+        h.key_press(egui::Key::Z);
+        h.run_steps(2);
+        let view = timeline(&h).width() as f64 * spp(&h);
+        assert!(view > 48_000.0 && view < 60_000.0, "the selection fills the view: {view}");
+        h.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::Z);
+        h.run_steps(2);
+        let end = h.state().engine.session().content_end() as f64;
+        assert!(timeline(&h).width() as f64 * spp(&h) >= end * 0.9, "Shift+Z shows the session");
     }
 }

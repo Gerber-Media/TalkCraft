@@ -122,6 +122,24 @@ fn fixed(app: &mut SoundApp, key: Key, m: Modifiers, mac: bool) -> bool {
             }
             true
         }
+        // Z: zoom in for precise cuts (onto the edit selection, else 8× around the insertion
+        // point); Shift+Z: back to the whole session.
+        Key::Z if !m.command && !m.alt && !m.ctrl && app.ui.window == MainWindow::Edit => {
+            let [x0, _, x1, _] = app.edit_layout.timeline;
+            let width = f64::from((x1 - x0).max(100.0));
+            if m.shift {
+                let _ = app.run("view.zoom_fit", json!({"width_px": width}));
+            } else if !app.engine.session().edit.selection.is_empty() {
+                // A little room on both sides of the selection.
+                let _ = app.run("view.zoom_to_selection", json!({"width_px": width * 0.9}));
+                let s = app.engine.session();
+                let to = (s.edit.selection.start - (s.edit.zoom.samples_per_px * width * 0.05) as i64).max(0);
+                let _ = app.run("view.scroll", json!({"to": to}));
+            } else {
+                let _ = app.run("view.zoom_by", json!({"factor": 8.0}));
+            }
+            true
+        }
         Key::Enter if plain => {
             let _ = app.run("markers.add", json!({}));
             true

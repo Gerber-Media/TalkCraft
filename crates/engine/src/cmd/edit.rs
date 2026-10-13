@@ -88,6 +88,15 @@ pub fn specs() -> Vec<CommandSpec> {
         cmd!("edit.duplicate", "Duplicate", ["Edit"], Some("Cmd+D"), "{tracks?, start?, end?}", has_range, duplicate),
         cmd!("edit.repeat", "Repeat...", ["Edit"], Some("Alt+R"), "{count: n}", has_range, repeat),
         cmd!("edit.shift", "Shift...", ["Edit"], Some("Alt+H"), "{by: samples|{seconds}, later?: bool}", has_range, shift),
+        cmd!(
+            "edit.close_gap",
+            "Close Gap",
+            [],
+            None,
+            "{track, at, all_tracks?: false} — moves the clips after the empty stretch around `at` back by its length; `all_tracks` cuts that time from every track (only where all are empty)",
+            has_tracks,
+            close_gap
+        ),
         cmd!("edit.insert_silence", "Insert Silence", ["Edit"], Some("Cmd+Shift+E"), "{tracks?, start?, end?}", has_range, insert_silence),
         cmd!("edit.separate", "At Selection", ["Edit", "Separate"], Some("Cmd+E"), "{tracks?, at?|start/end}", has_selection, separate),
         cmd!("edit.separate_on_grid", "On Grid", ["Edit", "Separate"], None, "{tracks?, start?, end?}", has_range, separate_on_grid),
@@ -495,6 +504,26 @@ fn shift(e: &mut Engine, p: &Value) -> Result<Value> {
     let s = e.session_mut();
     let n = ops::move_clips(s, &ids, if later { by } else { -by }, None);
     Ok(json!({"moved": n}))
+}
+
+fn close_gap(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "edit.close_gap";
+    let track = TrackId(p.get("track").and_then(Value::as_u64).ok_or_else(|| bad(ID, "`track` required"))?);
+    let at = position_param(e, ID, p, "at")?.ok_or_else(|| bad(ID, "`at` required"))?;
+    let gap = crate::edit::gap_at(e.session(), track, at).ok_or_else(|| bad(ID, "there is no gap here with audio after it"))?;
+    if bool_or(p, "all_tracks", false) {
+        let busy = e.session().tracks.iter().any(|t| t.clips().iter().any(|c| c.start < gap.end && c.end() > gap.start));
+        if busy {
+            return Err(bad(ID, "other tracks have audio in this gap: close it on this track only"));
+        }
+        crate::edit::cut_time(e.session_mut(), gap, false);
+        return Ok(json!({"closed": gap.len(), "all_tracks": true}));
+    }
+    let ids: Vec<ClipId> =
+        e.session().track(track).map(|t| t.clips().iter().filter(|c| c.start >= gap.end).map(|c| c.id).collect()).unwrap_or_default();
+    let s = e.session_mut();
+    ops::move_clips(s, &ids, -gap.len(), None);
+    Ok(json!({"closed": gap.len(), "moved": ids.len()}))
 }
 
 fn insert_silence(e: &mut Engine, p: &Value) -> Result<Value> {

@@ -436,6 +436,18 @@ pub fn cut_time(s: &mut Session, r: Range, keep_markers: bool) {
     crate::subtitles::cut_time(s, r);
 }
 
+/// The empty stretch around `at` on `track`: from the end of the clip before it to the start of
+/// the clip after it. `None` when a clip covers `at` or nothing follows.
+pub fn gap_at(s: &soundcraft_model::Session, track: soundcraft_model::TrackId, at: soundcraft_time::Samples) -> Option<soundcraft_time::Range> {
+    let t = s.track(track)?;
+    if t.clips().iter().any(|c| c.start <= at && at < c.end()) {
+        return None;
+    }
+    let start = t.clips().iter().map(|c| c.end()).filter(|e| *e <= at).max().unwrap_or(0);
+    let end = t.clips().iter().map(|c| c.start).filter(|x| *x > at).min()?;
+    (end > start).then(|| soundcraft_time::Range::new(start, end))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

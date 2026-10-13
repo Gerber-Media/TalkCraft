@@ -4,6 +4,7 @@
 
 use egui::{Event, Modifiers, PointerButton, pos2, vec2};
 use egui_kittest::Harness;
+use egui_kittest::kittest::Queryable;
 use soundcraft_ui_egui::{Services, SoundApp};
 
 /// One UI frame, with queued synthetic pointer input applied first (as the control channel does).
@@ -50,14 +51,16 @@ fn clip_menu_stays_open_while_moving_onto_delete() {
     for _ in 0..10 {
         step(&mut h);
     }
+    // Where the menu drew its Delete item (the menu's last entry).
+    let delete = h.get_all_by_label("Delete").last().map(|n| n.rect().center()).expect("the clip menu shows Delete");
     // Move (no click) into the menu, as a real pointer would, so the lane loses its hover.
-    for (x, y) in [(900.0, 300.0), (907.0, 442.0)] {
+    for (x, y) in [(900.0, 300.0), (delete.x, delete.y)] {
         h.state_mut().synthetic.push(Event::PointerMoved(pos2(x, y)));
         for _ in 0..10 {
             step(&mut h);
         }
     }
-    press(&mut h, 907.0, 442.0, PointerButton::Primary);
+    press(&mut h, delete.x, delete.y, PointerButton::Primary);
     for _ in 0..15 {
         step(&mut h);
     }

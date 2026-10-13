@@ -68,6 +68,15 @@ pub fn specs() -> Vec<CommandSpec> {
         cmd!("clip.loop", "Loop...", ["Clip"], Some("Cmd+Alt+L"), "{clips?, count?: n, length?: samples}", has_selection, loop_clips),
         cmd!("clip.rename", "Rename...", ["Clip"], Some("Cmd+Alt+Shift+R"), "{clip?, name}", has_selection, rename),
         cmd!("clip.gain", "Clip Gain", [], None, "{clips?, db | delta_db}", has_selection, gain),
+        cmd!(
+            "clip.normalize",
+            "Normalize Clip",
+            [],
+            None,
+            "{clips?, peak_db?: -1, lufs?} — sets the clip gain so the clip peaks at `peak_db`, or (with `lufs`) reaches that integrated loudness",
+            has_selection,
+            normalize
+        ),
         cmd!("clip.gain_nudge_up", "Nudge Clip Gain Up", [], Some("Ctrl+Shift+Up"), "{clips?}", has_selection, |e, p| nudge_gain(e, p, 1.0)),
         cmd!("clip.gain_nudge_down", "Nudge Clip Gain Down", [], Some("Ctrl+Shift+Down"), "{clips?}", has_selection, |e, p| nudge_gain(e, p, -1.0)),
         cmd!("clip.gain_render", "Render", ["Clip", "Clip Gain"], None, "{clips?}", has_selection, |e, p| {
@@ -316,6 +325,50 @@ fn rename(e: &mut Engine, p: &Value) -> Result<Value> {
     Ok(json!({"clips": ids.len()}))
 }
 
+/// The clip's audio as planar channels (its stretch applied to the source span), `None` for
+/// MIDI/video clips or audio not loaded.
+fn clip_audio(s: &soundcraft_model::Session, c: &soundcraft_model::Clip) -> Option<(Vec<Vec<f32>>, f32)> {
+    let soundcraft_model::ClipContent::Audio { source, offset } = &c.content else { return None };
+    let audio = s.pool.get(*source)?;
+    let rate = s.source(*source).map_or(s.sample_rate.hz(), |x| x.sample_rate).max(1);
+    let a = (*offset).max(0) as usize;
+    let b = a.saturating_add(((c.length as f64) * c.stretch.max(0.01)).round() as usize);
+    let ch = audio.buffer.channels.iter().map(|x| x.get(a.min(x.len())..b.min(x.len())).unwrap_or(&[]).to_vec()).collect();
+    Some((ch, rate as f32))
+}
+
+fn normalize(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "clip.normalize";
+    let ids = clip_ids_param(e, p);
+    if ids.is_empty() {
+        return Err(bad(ID, "select a clip"));
+    }
+    let lufs = p.get("lufs").and_then(Value::as_f64).map(|v| v.clamp(-40.0, -5.0) as f32);
+    let peak_db = f64_or(p, "peak_db", -1.0).clamp(-30.0, 0.0) as f32;
+    let mut gains = Vec::new();
+    for id in &ids {
+        let s = e.session();
+        let Some((_, c)) = s.find_clip(*id) else { continue };
+        let Some((ch, rate)) = clip_audio(s, c) else { continue };
+        let measured = match lufs {
+            Some(_) => soundcraft_dsp::offline::integrated_lufs(&ch, rate),
+            None => soundcraft_dsp::offline::peak_db(&ch),
+        };
+        if !measured.is_finite() || measured < -90.0 {
+            continue;
+        }
+        let gain = (lufs.unwrap_or(peak_db) - measured).clamp(-40.0, 36.0);
+        if let Some(c) = e.session_mut().find_clip_mut(*id) {
+            c.gain_db = gain;
+            gains.push(json!({"clip": id.0, "gain_db": gain}));
+        }
+    }
+    if gains.is_empty() {
+        return Err(bad(ID, "the selected clips hold no audio to normalize"));
+    }
+    Ok(json!({"clips": gains}))
+}
+
 fn gain(e: &mut Engine, p: &Value) -> Result<Value> {
     let ids = clip_ids_param(e, p);
     let abs = p.get("db").and_then(Value::as_f64);
@@ -357,6 +410,49 @@ fn quantize_to_grid(e: &mut Engine, p: &Value) -> Result<Value> {
 mod tests {
     use serde_json::json;
     use soundcraft_model::{ClipId, TrackId};
+
+    #[test]
+    fn normalize_sets_the_clip_gain_to_the_peak_or_loudness_target() {
+        let mut e = crate::demo::demo_engine();
+        let pad = e.session().track_by_name("Pad").map(|t| t.id).unwrap();
+        let cid = e.session().track(pad).unwrap().clips()[0].id.0;
+        e.execute("clip.normalize", &json!({"clips": [cid], "peak_db": -3.0})).unwrap();
+        let s = e.session();
+        let c = s.find_clip(ClipId(cid)).unwrap().1.clone();
+        let (ch, _) = super::clip_audio(s, &c).unwrap();
+        let peak = soundcraft_dsp::offline::peak_db(&ch) + c.gain_db;
+        assert!((peak + 3.0).abs() < 0.01, "peak after normalize {peak}");
+        let peak_gain = c.gain_db;
+        e.execute("clip.normalize", &json!({"clips": [cid], "lufs": -20.0})).unwrap();
+        let s = e.session();
+        let c = s.find_clip(ClipId(cid)).unwrap().1.clone();
+        let (ch, rate) = super::clip_audio(s, &c).unwrap();
+        let lufs = soundcraft_dsp::offline::integrated_lufs(&ch, rate) + c.gain_db;
+        assert!((lufs + 20.0).abs() < 0.05, "loudness after normalize {lufs}");
+        e.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(e.session().find_clip(ClipId(cid)).unwrap().1.gain_db, peak_gain, "one undo step per normalize");
+    }
+
+    #[test]
+    fn close_gap_moves_the_later_clips_back_on_one_track_or_cuts_time_everywhere() {
+        let mut e = crate::demo::demo_engine();
+        let pad = e.session().track_by_name("Pad").map(|t| t.id).unwrap();
+        let first = e.session().track(pad).unwrap().clips()[0].clone();
+        let sr = e.session().sample_rate;
+        // Cut a hole into the first clip: separate twice and remove the middle.
+        let (a, b) = (first.start + sr.samples(0.5), first.start + sr.samples(1.0));
+        e.execute("edit.separate", &json!({"tracks": [pad.0], "at": a})).unwrap();
+        e.execute("edit.separate", &json!({"tracks": [pad.0], "at": b})).unwrap();
+        e.execute("edit.clear", &json!({"tracks": [pad.0], "start": a, "end": b})).unwrap();
+        let after: Vec<i64> = e.session().track(pad).unwrap().clips().iter().filter(|c| c.start >= b).map(|c| c.start).collect();
+        let mid = (a + b) / 2;
+        assert_eq!(crate::edit::gap_at(e.session(), pad, mid), Some(soundcraft_time::Range::new(a, b)));
+        assert!(e.execute("edit.close_gap", &json!({"track": pad.0, "at": mid, "all_tracks": true})).is_err(), "other tracks play there");
+        e.execute("edit.close_gap", &json!({"track": pad.0, "at": mid})).unwrap();
+        let now: Vec<i64> = e.session().track(pad).unwrap().clips().iter().filter(|c| c.start >= a).map(|c| c.start).collect();
+        assert_eq!(now, after.iter().map(|x| x - (b - a)).collect::<Vec<_>>());
+        assert!(e.execute("edit.close_gap", &json!({"track": pad.0, "at": mid})).is_err(), "no gap left");
+    }
 
     #[test]
     fn elastic_warp_renders_and_remove_warp_restores() {
