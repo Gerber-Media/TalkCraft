@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -29,25 +29,62 @@
 <body>
 <main>
   <h1><img src="logo.png" alt="" width="56" height="56">TalkCraft Studio</h1>
-  <p class="muted">Dieses Fenster offen lassen, solange Gäste zugeschaltet sind. Aufgenommen wird mit dem Record-Knopf in TalkCraft – die Gäste starten und stoppen automatisch mit.</p>
+  <p class="muted" data-t="intro"></p>
 
   <div class="card">
-    <b>Einladungslink für Gäste</b>
+    <b data-t="link"></b>
     <div class="row" style="margin-top:8px">
       <input id="link" readonly>
-      <button id="copy">Kopieren</button>
+      <button id="copy" data-t="copy"></button>
     </div>
   </div>
 
   <div class="card">
-    <p id="state">Verbinde mit dem Vermittlungsdienst …</p>
-    <div id="guests"><p class="muted">Noch keine Gäste.</p></div>
+    <p id="state" data-t="connecting"></p>
+    <div id="guests"></div>
   </div>
-  <p class="muted">Gäste hören dich über das Mikrofon, das dieser Browser benutzt, und hören sich gegenseitig. Für die Aufnahme zählt nur dein Mikrofon in TalkCraft.</p>
+  <p class="muted" data-t="foot"></p>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 "use strict";
+// English unless the browser prefers German; ?lang=de|en forces one.
+const TEXT = {
+  en: {
+    intro: "Keep this window open while guests are on. Record with the Record button in TalkCraft – guests start and stop automatically.",
+    link: "Invitation link for guests", copy: "Copy", copied: "Copied ✓",
+    connecting: "Connecting to the connection service …", none: "No guests yet.",
+    foot: "Guests hear you through the microphone this browser uses, and they hear each other. For the recording only your microphone in TalkCraft counts.",
+    upload_failed: (g) => `The recording of ${g} could not be handed to TalkCraft.`,
+    receiving: (n, pct) => `receiving recording ${n} … ${pct} %`,
+    muted: "muted", self_muted: "muted themselves", connected: "connected", audio: "connecting audio …",
+    click: "Please click into this page once – there is no sound before that.",
+    recording: "Recording", ready: "Ready. Guests can connect now.",
+    offline: "TalkCraft cannot be reached – is the app still running?",
+    error: (t) => `Connection error: ${t}`, no_mic: "Without the microphone your guests cannot hear you: ",
+    guest: "Guest",
+  },
+  de: {
+    intro: "Dieses Fenster offen lassen, solange Gäste zugeschaltet sind. Aufgenommen wird mit dem Record-Knopf in TalkCraft – die Gäste starten und stoppen automatisch mit.",
+    link: "Einladungslink für Gäste", copy: "Kopieren", copied: "Kopiert ✓",
+    connecting: "Verbinde mit dem Vermittlungsdienst …", none: "Noch keine Gäste.",
+    foot: "Gäste hören dich über das Mikrofon, das dieser Browser benutzt, und hören sich gegenseitig. Für die Aufnahme zählt nur dein Mikrofon in TalkCraft.",
+    upload_failed: (g) => `Die Aufnahme von ${g} konnte nicht an TalkCraft übergeben werden.`,
+    receiving: (n, pct) => `überträgt Aufnahme ${n} … ${pct} %`,
+    muted: "stummgeschaltet", self_muted: "hat sich stummgeschaltet", connected: "verbunden", audio: "verbindet Ton …",
+    click: "Bitte einmal in diese Seite klicken – vorher läuft kein Ton.",
+    recording: "Aufnahme läuft", ready: "Bereit. Gäste können sich jetzt verbinden.",
+    offline: "TalkCraft ist nicht erreichbar – läuft die App noch?",
+    error: (t) => `Verbindungsfehler: ${t}`, no_mic: "Ohne Mikrofon-Freigabe können dich die Gäste nicht hören: ",
+    guest: "Gast",
+  },
+};
+const LANG = [new URLSearchParams(location.search).get("lang"), ...(navigator.languages || []), navigator.language]
+  .filter(Boolean).map((l) => l.slice(0, 2).toLowerCase()).find((l) => l in TEXT) || "en";
+const T = TEXT[LANG];
+document.documentElement.lang = LANG;
+for (const el of document.querySelectorAll("[data-t]")) el.textContent = T[el.dataset.t];
+
 const ROOM = "{{ROOM}}";
 const TOKEN = "{{TOKEN}}";
 const GUEST_URL = "{{GUEST_URL}}";
@@ -60,7 +97,7 @@ registerProcessor("tap", Tap);`;
 
 $("link").value = `${GUEST_URL}#${ROOM}`;
 $("copy").onclick = async () => {
-  try { await navigator.clipboard.writeText($("link").value); $("copy").textContent = "Kopiert ✓"; }
+  try { await navigator.clipboard.writeText($("link").value); $("copy").textContent = T.copied; }
   catch { $("link").select(); document.execCommand("copy"); }
 };
 
@@ -68,6 +105,15 @@ let ctx, micSource, peer;
 let recording = false, take = 0, takeStarted = 0;
 // peer id → { name, conn, src, dest, tap, live: [chunks] | null, level, file }
 const guests = new Map();
+
+// Guests are told apart by name (their track in TalkCraft): a second "Anna" becomes "Anna 2".
+function uniqueName(name, id) {
+  const base = String(name).trim().slice(0, 60) || T.guest;
+  const taken = new Set([...guests].filter(([k]) => k !== id).map(([, g]) => g.name));
+  let n = base;
+  for (let i = 2; taken.has(n); i++) n = `${base} ${i}`;
+  return n;
+}
 
 function wav(chunks, rate) {
   const n = chunks.reduce((a, c) => a + c.length, 0);
@@ -91,19 +137,19 @@ async function upload(guest, kind, takeNo, started, body) {
     } catch { /* TalkCraft busy or restarting: retry */ }
     await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
   }
-  alert(`Die Aufnahme von ${guest} konnte nicht an TalkCraft übergeben werden.`);
+  alert(T.upload_failed(guest));
 }
 
 function render() {
   const el = $("guests");
-  if (!guests.size) { el.innerHTML = '<p class="muted">Noch keine Gäste.</p>'; return; }
+  if (!guests.size) { el.innerHTML = '<p class="muted"></p>'; el.firstChild.textContent = T.none; return; }
   el.innerHTML = "";
   for (const [id, g] of guests) {
     const row = document.createElement("div");
     row.className = "guest";
     row.innerHTML = `<div><b></b><div class="muted"></div></div><div class="meter"><div id="m-${id}"></div></div>`;
     row.querySelector("b").textContent = g.name;
-    row.querySelector(".muted").textContent = g.file ? `überträgt Aufnahme ${g.file.take} … ${Math.round(100 * g.file.got / g.file.bytes)} %` : (g.src ? (g.muted ? "stummgeschaltet" : g.selfMuted ? "hat sich stummgeschaltet" : "verbunden") : "verbindet Ton …");
+    row.querySelector(".muted").textContent = g.file ? T.receiving(g.file.take, Math.round(100 * g.file.got / g.file.bytes)) : (g.src ? (g.muted ? T.muted : g.selfMuted ? T.self_muted : T.connected) : T.audio);
     el.appendChild(row);
   }
 }
@@ -151,7 +197,11 @@ function onData(id, d) {
     return;
   }
   if (!d || !d.t) return;
-  if (d.t === "hello") { g.name = d.name || g.name; render(); report(); }
+  if (d.t === "hello") {
+    g.name = uniqueName(d.name || g.name, id);
+    if (g.conn.open) g.conn.send({ t: "hello", host: "TalkCraft", name: g.name });
+    render(); report();
+  }
   else if (d.t === "level") g.level = d.db;
   else if (d.t === "self-mute") { g.selfMuted = !!d.on; if (g.out) g.out.gain.value = g.muted || g.selfMuted ? 0 : 1; render(); report(); }
   else if (d.t === "file-begin") { g.file = { take: d.take, bytes: d.bytes, got: 0, parts: [], started: g.starts[d.take] ?? Date.now() }; render(); }
@@ -164,7 +214,7 @@ function onData(id, d) {
 }
 
 function addGuest(conn) {
-  const g = { name: conn.metadata?.name || "Gast", conn, src: null, out: null, muted: false, dest: null, hears: new Set(), live: null, level: -60, file: null, starts: {} };
+  const g = { name: uniqueName(conn.metadata?.name || T.guest, conn.peer), conn, src: null, out: null, muted: false, dest: null, hears: new Set(), live: null, level: -60, file: null, starts: {} };
   guests.set(conn.peer, g);
   conn.on("open", () => {
     conn.send({ t: "hello", host: "TalkCraft" });
@@ -236,24 +286,25 @@ async function poll() {
       recording = false;
       for (const g of guests.values()) { if (g.conn.open) g.conn.send({ t: "stop", take }); stopLive(g, take); }
     }
-    if (ctx && ctx.state === "suspended") $("state").textContent = "Bitte einmal in diese Seite klicken – vorher läuft kein Ton.";
-    else $("state").innerHTML = recording ? '<span class="rec"></span>Aufnahme läuft' : (peer && peer.open ? "Bereit. Gäste können sich jetzt verbinden." : $("state").innerHTML);
+    if (ctx && ctx.state === "suspended") $("state").textContent = T.click;
+    else if (recording) { $("state").innerHTML = '<span class="rec"></span>'; $("state").append(T.recording); }
+    else if (peer && peer.open) $("state").textContent = T.ready;
   } catch {
-    $("state").textContent = "TalkCraft ist nicht erreichbar – läuft die App noch?";
+    $("state").textContent = T.offline;
   }
   setTimeout(poll, 150);
 }
 
 function connectPeer(attempt = 0) {
   peer = new Peer(ROOM);
-  peer.on("open", () => { $("state").textContent = "Bereit. Gäste können sich jetzt verbinden."; });
+  peer.on("open", () => { $("state").textContent = T.ready; });
   peer.on("connection", addGuest);
   peer.on("call", onCall);
   peer.on("disconnected", () => { if (!peer.destroyed) peer.reconnect(); });
   peer.on("error", (e) => {
     // After a reload the old session can hold the room a few seconds.
     if (e.type === "unavailable-id" && attempt < 10) { peer.destroy(); setTimeout(() => connectPeer(attempt + 1), 3000); return; }
-    $("state").textContent = "Verbindungsfehler: " + e.type;
+    $("state").textContent = T.error(e.type);
   });
 }
 
@@ -262,13 +313,15 @@ async function init() {
   ctx = new AudioContext({ sampleRate: 48000 });
   await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: "text/javascript" })));
   micSource = ctx.createMediaStreamSource(mic);
+  render();
   connectPeer();
   poll();
   meters();
   setInterval(report, 1000);
 }
+render();
 document.addEventListener("click", () => ctx && ctx.resume());
-init().catch((e) => { $("state").textContent = "Ohne Mikrofon-Freigabe können dich die Gäste nicht hören: " + e.message; });
+init().catch((e) => { $("state").textContent = T.no_mic + e.message; });
 </script>
 </body>
 </html>

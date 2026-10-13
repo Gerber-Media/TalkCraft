@@ -38,7 +38,8 @@ podcast does not need.
 - **Recording.** Record (Cmd+Space) records every speaker track except locked ones; a track's own
   record button records just that speaker. The take is drawn live while it records.
 - **Remote guests.** Guests join from their browser with a link, nothing to install. Each guest
-  gets a track "Ferngast – Name" with a live meter; M on the track mutes them in the call (guests can also mute themselves). Record
+  gets a track "Ferngast – Name" with a live meter; M on the track mutes them in the call (guests can also mute themselves). Two guests with the same name are told apart
+  ("Anna 2"). The guest and studio pages are in English, or German when the browser prefers it. Record
   starts a lossless recording in every guest's browser; after Stop their file lands on their
   track, synced to a backup of the call. Browser to browser (WebRTC); the guest page lives in
   [Talkcraft-Gast](https://codefloe.com/GerberMedia/Talkcraft-Gast). Works on phones too
@@ -173,7 +174,9 @@ braucht.
   Aufnahmeknopf einer Spur nimmt nur diesen Sprecher auf. Die Wellenform erscheint live.
 - **Ferngäste.** Gäste kommen per Link über ihren Browser dazu, ohne Installation. Jeder Gast
   bekommt eine Spur „Ferngast – Name“ mit Live-Pegel; M auf der Spur schaltet ihn im Gespräch
-  stumm; Gäste können sich auch selbst stummschalten. Record startet bei jedem Gast eine verlustfreie Aufnahme im Browser; nach Stop landet
+  stumm; Gäste können sich auch selbst stummschalten. Zwei Gäste mit gleichem Namen werden
+  unterschieden („Anna 2“). Gast- und Studio-Seite sind auf Englisch, oder auf Deutsch, wenn der Browser
+  Deutsch bevorzugt. Record startet bei jedem Gast eine verlustfreie Aufnahme im Browser; nach Stop landet
   seine Datei auf seiner Spur, ausgerichtet an einem Mitschnitt des Gesprächs. Die Verbindung
   läuft direkt von Browser zu Browser (WebRTC); die Gast-Seite liegt in
   [Talkcraft-Gast](https://codefloe.com/GerberMedia/Talkcraft-Gast). Klappt auch mit dem Handy

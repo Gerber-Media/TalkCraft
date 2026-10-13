@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TalkCraft – Gast</title>
+<title>TalkCraft</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -35,51 +35,112 @@
 <body>
 <main>
   <h1><img src="logo.png" alt="" width="56" height="56">TalkCraft</h1>
-  <p id="intro">Du bist zu einer Podcast-Aufnahme eingeladen. Deine Stimme wird hier im Browser in voller Qualität aufgenommen und am Ende automatisch an die Aufnahme geschickt.</p>
+  <p id="intro" data-t="intro"></p>
 
   <section id="setup">
-    <label for="name">Dein Name</label>
-    <input id="name" autocomplete="name" placeholder="z. B. Anna">
-    <label for="mic">Mikrofon</label>
-    <select id="mic"><option>Bitte Mikrofon erlauben …</option></select>
+    <label for="name" data-t="name"></label>
+    <input id="name" autocomplete="name" data-tp="name_hint">
+    <label for="mic" data-t="mic"></label>
+    <select id="mic"><option data-t="mic_allow"></option></select>
     <div class="meter"><div id="level"></div></div>
-    <p class="muted">Bitte <b>Kopfhörer</b> aufsetzen, sonst hört dein Mikrofon das Gespräch mit. Sprich zum Testen – der Balken sollte sich deutlich bewegen.</p>
+    <p class="muted" data-th="headphones"></p>
     <div class="card hidden" id="mobile">
-      <b>Aufnahme mit dem Handy</b>
+      <b data-t="phone_title"></b>
       <ul class="muted" style="margin:6px 0 0; padding-left:20px">
-        <li>Kopfhörer mit Kabel nehmen: Bei Bluetooth-Kopfhörern klingt das Mikrofon deutlich schlechter.</li>
-        <li>Diese Seite während der Aufnahme im Vordergrund lassen und nicht in andere Apps wechseln.</li>
-        <li>„Nicht stören“ einschalten, damit kein Anruf die Aufnahme unterbricht.</li>
-        <li>Am besten mit Ladekabel und im WLAN.</li>
+        <li data-t="phone_1"></li>
+        <li data-t="phone_2"></li>
+        <li data-t="phone_3"></li>
+        <li data-t="phone_4"></li>
       </ul>
     </div>
-    <button id="join" disabled>Verbinden</button>
+    <button id="join" disabled data-t="join"></button>
   </section>
 
   <section id="call" class="hidden">
     <div class="card">
-      <p id="state">Verbinde …</p>
+      <p id="state" data-t="connecting"></p>
       <p class="muted hidden" id="warn" style="color: var(--red)"></p>
       <div class="meter"><div id="level2"></div></div>
     </div>
     <div class="card hidden" id="upload">
-      <p id="uploadText">Aufnahme wird übertragen …</p>
+      <p id="uploadText"></p>
       <progress id="uploadBar" max="1" value="0"></progress>
     </div>
-    <button id="selfmute">Stummschalten</button>
-    <button class="secondary" id="save">Aufnahmen zusätzlich auf diesem Gerät speichern</button>
-    <button class="secondary" id="leave">Verlassen</button>
+    <button id="selfmute" data-t="mute"></button>
+    <button class="secondary" id="save" data-t="save"></button>
+    <button class="secondary" id="leave" data-t="leave"></button>
   </section>
-  <p class="muted" id="foot">Die Verbindung läuft direkt zwischen den Browsern. TalkCraft ist Open Source.</p>
+  <p class="muted" id="foot" data-t="foot"></p>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 "use strict";
+// English unless the browser prefers German; ?lang=de|en forces one.
+const TEXT = {
+  en: {
+    intro: "You are invited to a podcast recording. Your voice is recorded here in your browser in full quality and sent to the studio automatically at the end.",
+    name: "Your name", name_hint: "e.g. Anna", mic: "Microphone", mic_allow: "Please allow the microphone …", mic_default: "Microphone",
+    headphones: "Please put on <b>headphones</b>, otherwise your microphone picks up the conversation. Say something to test – the bar should clearly move.",
+    phone_title: "Recording on a phone",
+    phone_1: "Use wired headphones: with Bluetooth headphones the microphone sounds much worse.",
+    phone_2: "Keep this page in front while recording and do not switch to other apps.",
+    phone_3: "Turn on Do Not Disturb so no call interrupts the recording.",
+    phone_4: "Ideally plugged in and on Wi-Fi.",
+    join: "Connect", connecting: "Connecting …", mute: "Mute", unmute: "Unmute",
+    save: "Also save the recordings on this device", leave: "Leave",
+    foot: "The connection runs directly between the browsers. TalkCraft is open source.",
+    no_room: "This link is incomplete: the room after the # is missing. Please open the complete link from your invitation.",
+    no_mic: "This does not work without the microphone. Please allow it in your browser and reload the page.",
+    background: "The page was in the background while recording – the recording may have gaps. Please keep it in front.",
+    sending: (n) => `Sending recording ${n} …`, sent: (n) => `Recording ${n} sent ✓`,
+    recording: "Recording – just talk normally.", paused: "Connected. Recording paused.",
+    studio_muted: "The studio has muted you.", unmuted: "Connected. You can be heard again.",
+    self_muted: "You are muted – nobody hears you, your recording records silence.",
+    kicked: "The studio has ended the call for you. Thanks for taking part!",
+    hello: (host, name) => `Connected to ${host} as ${name}. Waiting for the recording to start …`,
+    tap: "Tap the page once to hear the studio.", ended: "Call ended. Thanks for taking part!",
+    error: (t) => `Connection error: ${t}. Please reload the page.`,
+    none_yet: "No finished recording yet.", guest: "Guest", file: "TalkCraft-Guest",
+  },
+  de: {
+    intro: "Du bist zu einer Podcast-Aufnahme eingeladen. Deine Stimme wird hier im Browser in voller Qualität aufgenommen und am Ende automatisch ans Studio geschickt.",
+    name: "Dein Name", name_hint: "z. B. Anna", mic: "Mikrofon", mic_allow: "Bitte Mikrofon erlauben …", mic_default: "Mikrofon",
+    headphones: "Bitte <b>Kopfhörer</b> aufsetzen, sonst hört dein Mikrofon das Gespräch mit. Sprich zum Testen – der Balken sollte sich deutlich bewegen.",
+    phone_title: "Aufnahme mit dem Handy",
+    phone_1: "Kopfhörer mit Kabel nehmen: Bei Bluetooth-Kopfhörern klingt das Mikrofon deutlich schlechter.",
+    phone_2: "Diese Seite während der Aufnahme im Vordergrund lassen und nicht in andere Apps wechseln.",
+    phone_3: "„Nicht stören“ einschalten, damit kein Anruf die Aufnahme unterbricht.",
+    phone_4: "Am besten mit Ladekabel und im WLAN.",
+    join: "Verbinden", connecting: "Verbinde …", mute: "Stummschalten", unmute: "Stummschaltung aufheben",
+    save: "Aufnahmen zusätzlich auf diesem Gerät speichern", leave: "Verlassen",
+    foot: "Die Verbindung läuft direkt zwischen den Browsern. TalkCraft ist Open Source.",
+    no_room: "Dieser Link ist unvollständig: Es fehlt die Raum-Kennung hinter dem #. Bitte den vollständigen Link aus der Einladung öffnen.",
+    no_mic: "Ohne Mikrofon-Freigabe geht es nicht. Bitte im Browser das Mikrofon erlauben und die Seite neu laden.",
+    background: "Die Seite war während der Aufnahme im Hintergrund – dabei kann die Aufnahme Lücken bekommen. Bitte im Vordergrund lassen.",
+    sending: (n) => `Aufnahme ${n} wird übertragen …`, sent: (n) => `Aufnahme ${n} übertragen ✓`,
+    recording: "Aufnahme läuft – sprich ganz normal.", paused: "Verbunden. Aufnahme pausiert.",
+    studio_muted: "Das Studio hat dich stummgeschaltet.", unmuted: "Verbunden. Du bist wieder zu hören.",
+    self_muted: "Du bist stummgeschaltet – niemand hört dich, deine Aufnahme zeichnet Stille auf.",
+    kicked: "Das Studio hat das Gespräch für dich beendet. Danke fürs Mitmachen!",
+    hello: (host, name) => `Verbunden mit ${host} als ${name}. Wartet auf den Start der Aufnahme …`,
+    tap: "Tippe einmal auf die Seite, um das Studio zu hören.", ended: "Verbindung beendet. Danke fürs Mitmachen!",
+    error: (t) => `Verbindungsfehler: ${t}. Bitte Seite neu laden.`,
+    none_yet: "Noch keine fertige Aufnahme.", guest: "Gast", file: "TalkCraft-Gast",
+  },
+};
+const LANG = [new URLSearchParams(location.search).get("lang"), ...(navigator.languages || []), navigator.language]
+  .filter(Boolean).map((l) => l.slice(0, 2).toLowerCase()).find((l) => l in TEXT) || "en";
+const T = TEXT[LANG];
+document.documentElement.lang = LANG;
+for (const el of document.querySelectorAll("[data-t]")) el.textContent = T[el.dataset.t];
+for (const el of document.querySelectorAll("[data-th]")) el.innerHTML = T[el.dataset.th];
+for (const el of document.querySelectorAll("[data-tp]")) el.placeholder = T[el.dataset.tp];
+
 const room = decodeURIComponent((location.hash || "").slice(1));
 const $ = (id) => document.getElementById(id);
 const CHUNK = 64 * 1024;
 let stream, ctx, analyser, peer, conn, call, recorder = null, takes = [], muted = false, kicked = false;
-let selfMuted = false, callStream = null;
+let selfMuted = false, callStream = null, myName = "";
 let wakeLock = null, sending = 0, wasHidden = false, player = null;
 const mobile = matchMedia("(pointer: coarse)").matches || /iPhone|iPad|Android/i.test(navigator.userAgent);
 if (mobile) $("mobile").classList.remove("hidden");
@@ -94,7 +155,7 @@ document.addEventListener("visibilitychange", () => {
   if (conn) keepAwake();
   if (ctx && ctx.state !== "running") ctx.resume();
   if (wasHidden) {
-    $("warn").textContent = "Die Seite war während der Aufnahme im Hintergrund – dabei kann die Aufnahme Lücken bekommen. Bitte im Vordergrund lassen.";
+    $("warn").textContent = T.background;
     $("warn").classList.remove("hidden");
     wasHidden = false;
   }
@@ -102,7 +163,7 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("beforeunload", (e) => { if (recorder || sending) { e.preventDefault(); e.returnValue = ""; } });
 
 if (!room) {
-  $("intro").textContent = "Dieser Link ist unvollständig: es fehlt die Raum-Kennung hinter dem #. Bitte den vollständigen Link aus der Einladung öffnen.";
+  $("intro").textContent = T.no_room;
   $("setup").classList.add("hidden");
 }
 
@@ -159,7 +220,7 @@ function meter() {
 
 async function listMics() {
   const devs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === "audioinput");
-  $("mic").innerHTML = devs.map((d) => `<option value="${d.deviceId}">${d.label || "Mikrofon"}</option>`).join("");
+  $("mic").innerHTML = devs.map((d) => `<option value="${d.deviceId}">${(d.label || T.mic_default).replace(/[<&]/g, "")}</option>`).join("");
 }
 
 async function init() {
@@ -169,7 +230,7 @@ async function init() {
     $("join").disabled = false;
     meter();
   } catch (e) {
-    $("intro").textContent = "Ohne Mikrofon-Freigabe geht es nicht. Bitte im Browser das Mikrofon erlauben und die Seite neu laden. (" + e.message + ")";
+    $("intro").textContent = T.no_mic + " (" + e.message + ")";
   }
 }
 $("mic").onchange = () => openMic($("mic").value);
@@ -196,7 +257,7 @@ async function sendFile(take, buf) {
 
 async function sendChunks(take, buf) {
   $("upload").classList.remove("hidden");
-  $("uploadText").textContent = `Aufnahme ${take} wird übertragen …`;
+  $("uploadText").textContent = T.sending(take);
   conn.send({ t: "file-begin", take, bytes: buf.byteLength, rate: ctx.sampleRate });
   const dc = conn.dataChannel;
   for (let o = 0; o < buf.byteLength; o += CHUNK) {
@@ -206,33 +267,36 @@ async function sendChunks(take, buf) {
   }
   conn.send({ t: "file-end", take });
   $("uploadBar").value = 1;
-  $("uploadText").textContent = `Aufnahme ${take} übertragen ✓`;
+  $("uploadText").textContent = T.sent(take);
 }
 
 function onMessage(m) {
   if (m.t === "start") {
     recorder = [];
-    $("state").innerHTML = '<span class="rec"></span>Aufnahme läuft – sprich ganz normal.';
+    $("state").innerHTML = '<span class="rec"></span>';
+    $("state").append(T.recording);
   } else if (m.t === "stop") {
     const chunks = recorder || [];
     recorder = null;
-    $("state").textContent = "Verbunden. Aufnahme pausiert.";
+    $("state").textContent = T.paused;
     const buf = wav(chunks, ctx.sampleRate);
     takes.push({ take: m.take, buf });
     sendFile(m.take, buf);
   } else if (m.t === "muted") {
     muted = m.on; // The call is muted in the studio; the own recording keeps running.
-    $("state").textContent = m.on ? "Das Studio hat dich stummgeschaltet." : (recorder ? "Aufnahme läuft – sprich ganz normal." : "Verbunden. Du bist wieder zu hören.");
+    $("state").textContent = m.on ? T.studio_muted : (recorder ? T.recording : T.unmuted);
   } else if (m.t === "kick") {
     kicked = true;
-    $("state").textContent = "Das Studio hat das Gespräch für dich beendet. Danke fürs Mitmachen!";
+    $("state").textContent = T.kicked;
   } else if (m.t === "hello") {
-    $("state").textContent = `Verbunden mit ${m.host || "dem Studio"}. Wartet auf den Start der Aufnahme …`;
+    // The studio may add a number when two guests share a name.
+    $("state").textContent = T.hello(m.host || "TalkCraft", m.name || myName);
   }
 }
 
 $("join").onclick = () => {
-  const name = $("name").value.trim() || "Gast";
+  const name = $("name").value.trim().slice(0, 60) || T.guest;
+  myName = name;
   localStorage.setItem("tc-name", name);
   $("setup").classList.add("hidden");
   $("call").classList.remove("hidden");
@@ -253,13 +317,13 @@ $("join").onclick = () => {
       call = peer.call(room, callStream, { metadata: { name } });
       call.on("stream", (remote) => {
         player.srcObject = remote;
-        player.play().catch(() => { $("state").textContent = "Tippe einmal auf die Seite, um das Studio zu hören."; });
+        player.play().catch(() => { $("state").textContent = T.tap; });
       });
     });
     conn.on("data", (d) => { if (d && d.t) onMessage(d); });
-    conn.on("close", () => { if (!kicked) $("state").textContent = "Verbindung beendet. Danke fürs Mitmachen!"; });
+    conn.on("close", () => { if (!kicked) $("state").textContent = T.ended; });
   });
-  peer.on("error", (e) => { $("state").textContent = "Verbindungsfehler: " + e.type + ". Bitte Seite neu laden."; });
+  peer.on("error", (e) => { $("state").textContent = T.error(e.type); });
 };
 
 function setSelfMute(on) {
@@ -271,10 +335,10 @@ function setSelfMute(on) {
   if (pc && track) for (const sender of pc.getSenders()) {
     if (!sender.track || sender.track.kind === "audio") sender.replaceTrack(on ? null : track).catch(() => {});
   }
-  $("selfmute").textContent = on ? "Stummschaltung aufheben" : "Stummschalten";
+  $("selfmute").textContent = on ? T.unmute : T.mute;
   $("selfmute").classList.toggle("muted-on", on);
   $("level2").parentElement.style.opacity = on ? 0.3 : 1;
-  $("state").textContent = on ? "Du bist stummgeschaltet – niemand hört dich, deine Aufnahme zeichnet Stille auf." : (recorder ? "Aufnahme läuft – sprich ganz normal." : "Verbunden. Du bist wieder zu hören.");
+  $("state").textContent = on ? T.self_muted : (recorder ? T.recording : T.unmuted);
   if (conn && conn.open) conn.send({ t: "self-mute", on });
 }
 $("selfmute").onclick = () => setSelfMute(!selfMuted);
@@ -283,10 +347,10 @@ $("save").onclick = () => {
   for (const { take, buf } of takes) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
-    a.download = `TalkCraft-Gast-${take}.wav`;
+    a.download = `${T.file}-${take}.wav`;
     a.click();
   }
-  if (!takes.length) alert("Noch keine fertige Aufnahme.");
+  if (!takes.length) alert(T.none_yet);
 };
 document.addEventListener("click", () => { if (player && player.paused && player.srcObject) player.play().catch(() => {}); });
 $("leave").onclick = () => { if (peer) peer.destroy(); location.reload(); };
