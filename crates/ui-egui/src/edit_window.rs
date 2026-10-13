@@ -1653,6 +1653,8 @@ fn lane_interaction(app: &mut SoundApp, ui: &mut Ui, track: &Track, lane: Rect, 
                 Tool::Selector
             }
         }
+        // The hand only over a clip: elsewhere a Grabber click places the insertion point.
+        Tool::Grabber if hit.is_none() => Tool::Selector,
         other => other,
     };
     if resp.hovered() {
@@ -1762,13 +1764,16 @@ fn lane_interaction(app: &mut SoundApp, ui: &mut Ui, track: &Track, lane: Rect, 
     }
     if resp.clicked() {
         match eff {
-            Tool::Grabber => {
-                if let Some(c) = &hit {
+            // TalkCraft: a click puts the insertion point where it lands (dragging moves the clip);
+            // Shift/Cmd-click or a double-click selects the clip.
+            Tool::Grabber => match &hit {
+                Some(c) if mods.shift || mods.command => {
                     let mut ids = if mods.shift { s.edit.selected_clips.iter().map(|x| x.0).collect::<Vec<_>>() } else { Vec::new() };
                     ids.push(c.id.0);
                     let _ = app.run("edit.select", json!({"clips": ids}));
                 }
-            }
+                _ => place_insertion(app, ui, &s, track.id, at, false),
+            },
             Tool::Zoom => {
                 let _ = app.run(if mods.alt { "view.zoom_out" } else { "view.zoom_in" }, json!({}));
             }

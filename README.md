@@ -38,7 +38,7 @@ podcast does not need.
 - **Recording.** Record (Cmd+Space) records every speaker track except locked ones; a track's own
   record button records just that speaker. The take is drawn live while it records.
 - **Remote guests.** Guests join from their browser with a link, nothing to install. Each guest
-  gets a track "Ferngast – Name" with a live meter; M on the track mutes them in the call. Record
+  gets a track "Ferngast – Name" with a live meter; M on the track mutes them in the call (guests can also mute themselves). Record
   starts a lossless recording in every guest's browser; after Stop their file lands on their
   track, synced to a backup of the call. Browser to browser (WebRTC); the guest page lives in
   [Talkcraft-Gast](https://codefloe.com/GerberMedia/Talkcraft-Gast). Works on phones too
@@ -46,7 +46,8 @@ podcast does not need.
   on the go.
 - **Editing.** The blade splits a clip where you click (Alt: every track). Delete/Backspace removes
   the selected section after asking, closing the gap on all tracks so speakers stay in sync.
-  Magnetic snapping, Close Gap, Z/Shift+Z zoom. Edit > Shorten Pauses trims long silences on all
+  A click places the cursor with every tool, the hand too (dragging moves clips, Shift-click
+  selects one). Magnetic snapping, Close Gap, Z/Shift+Z zoom. Edit > Shorten Pauses trims long silences on all
   tracks at once. Markers and subtitles move along.
 - **Clip tools.** Normalize or set a clip's loudness, clip volume, fades with handles, noise
   reduction.
@@ -172,7 +173,7 @@ braucht.
   Aufnahmeknopf einer Spur nimmt nur diesen Sprecher auf. Die Wellenform erscheint live.
 - **Ferngäste.** Gäste kommen per Link über ihren Browser dazu, ohne Installation. Jeder Gast
   bekommt eine Spur „Ferngast – Name“ mit Live-Pegel; M auf der Spur schaltet ihn im Gespräch
-  stumm. Record startet bei jedem Gast eine verlustfreie Aufnahme im Browser; nach Stop landet
+  stumm; Gäste können sich auch selbst stummschalten. Record startet bei jedem Gast eine verlustfreie Aufnahme im Browser; nach Stop landet
   seine Datei auf seiner Spur, ausgerichtet an einem Mitschnitt des Gesprächs. Die Verbindung
   läuft direkt von Browser zu Browser (WebRTC); die Gast-Seite liegt in
   [Talkcraft-Gast](https://codefloe.com/GerberMedia/Talkcraft-Gast). Klappt auch mit dem Handy
@@ -180,7 +181,8 @@ braucht.
   für die Aufnahme unterwegs.
 - **Schnitt.** Die Klinge teilt einen Clip, wo man klickt (Alt: alle Spuren). Entf/Rückschritt
   entfernt nach Rückfrage den markierten Abschnitt und schließt die Lücke auf allen Spuren, damit
-  die Sprecher synchron bleiben. Magnetisches Einrasten, Lücke schließen, Zoom mit Z/Umschalt+Z.
+  die Sprecher synchron bleiben. Ein Klick setzt mit jedem Werkzeug die Einfügemarke, auch mit der Hand (Ziehen verschiebt
+  Clips, Umschalt-Klick wählt einen aus). Magnetisches Einrasten, Lücke schließen, Zoom mit Z/Umschalt+Z.
   Bearbeiten > Pausen kürzen kürzt lange Pausen auf allen Spuren zugleich. Marker und Untertitel
   wandern mit.
 - **Clip-Werkzeuge.** Normalisieren oder Lautheit eines Clips setzen, Clip-Lautstärke, Blenden

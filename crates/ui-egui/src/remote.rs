@@ -47,6 +47,8 @@ pub struct Guest {
     pub name: String,
     pub level_db: f32,
     pub connected: bool,
+    /// The guest muted themselves.
+    pub self_muted: bool,
 }
 
 #[derive(Debug, Default)]
@@ -179,6 +181,7 @@ fn route(method: &str, path: &str, body: &[u8], srv: &Server, tx: &Sender<Upload
                     name: g["name"].as_str().unwrap_or("Gast").chars().take(60).collect(),
                     level_db: g["level"].as_f64().unwrap_or(-60.0) as f32,
                     connected: g["connected"].as_bool().unwrap_or(false),
+                    self_muted: g["self_muted"].as_bool().unwrap_or(false),
                 })
                 .collect();
             sh.guests_seen = Some(Instant::now());
@@ -465,6 +468,8 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                         ui.add(egui::ProgressBar::new(level).desired_width(120.0).desired_height(8.0));
                         if !g.connected {
                             ui.label(RichText::new(tr("connecting …")).color(t.text_dim));
+                        } else if g.self_muted {
+                            ui.label(RichText::new(tr("muted themselves")).color(t.text_dim));
                         }
                         let on = muted(&g.name);
                         if ui.selectable_label(on, tr("Mute")).on_hover_text(tr("Mutes the guest in the call (same as M on their track)")).clicked() {

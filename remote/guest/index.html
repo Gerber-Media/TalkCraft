@@ -21,6 +21,7 @@
   input, select, button { font: inherit; width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid #c9c3b6; background: #fff; }
   button { background: var(--green); color: #fff; border: 0; font-weight: 600; cursor: pointer; margin-top: 16px; }
   button:disabled { opacity: .5; cursor: default; }
+  button.muted-on { background: var(--red); }
   button.secondary { background: #fff; color: var(--ink); border: 1px solid #c9c3b6; }
   .meter { height: 12px; background: #ddd6c8; border-radius: 6px; overflow: hidden; margin-top: 8px; }
   .meter > div { height: 100%; width: 0; background: var(--green); transition: width .08s; }
@@ -65,6 +66,7 @@
       <p id="uploadText">Aufnahme wird übertragen …</p>
       <progress id="uploadBar" max="1" value="0"></progress>
     </div>
+    <button id="selfmute">Stummschalten</button>
     <button class="secondary" id="save">Aufnahmen zusätzlich auf diesem Gerät speichern</button>
     <button class="secondary" id="leave">Verlassen</button>
   </section>
@@ -77,6 +79,7 @@ const room = decodeURIComponent((location.hash || "").slice(1));
 const $ = (id) => document.getElementById(id);
 const CHUNK = 64 * 1024;
 let stream, ctx, analyser, peer, conn, call, recorder = null, takes = [], muted = false, kicked = false;
+let selfMuted = false, callStream = null;
 let wakeLock = null, sending = 0, wasHidden = false, player = null;
 const mobile = matchMedia("(pointer: coarse)").matches || /iPhone|iPad|Android/i.test(navigator.userAgent);
 if (mobile) $("mobile").classList.remove("hidden");
@@ -132,7 +135,8 @@ async function openMic(deviceId) {
   analyser.fftSize = 1024;
   src.connect(analyser);
   const tap = new AudioWorkletNode(ctx, "tap");
-  tap.port.onmessage = (e) => { if (recorder) recorder.push(e.data); };
+  // Muted by the guest: silence of the same length, so the take stays in time.
+  tap.port.onmessage = (e) => { if (recorder) recorder.push(selfMuted ? new Int16Array(e.data.length) : e.data); };
   src.connect(tap);
   const sink = ctx.createGain();
   sink.gain.value = 0;
@@ -242,7 +246,10 @@ $("join").onclick = () => {
     conn = peer.connect(room, { reliable: true, serialization: "binary", metadata: { name } });
     conn.on("open", () => {
       conn.send({ t: "hello", name });
-      call = peer.call(room, stream, { metadata: { name } });
+      // The call gets its own copy of the microphone, so muting it never touches the meter.
+      callStream = stream.clone();
+      callStream.getAudioTracks().forEach((t) => { t.enabled = !selfMuted; });
+      call = peer.call(room, callStream, { metadata: { name } });
       call.on("stream", (remote) => {
         player.srcObject = remote;
         player.play().catch(() => { $("state").textContent = "Tippe einmal auf die Seite, um das Studio zu hören."; });
@@ -253,6 +260,15 @@ $("join").onclick = () => {
   });
   peer.on("error", (e) => { $("state").textContent = "Verbindungsfehler: " + e.type + ". Bitte Seite neu laden."; });
 };
+
+function setSelfMute(on) {
+  selfMuted = on;
+  if (callStream) callStream.getAudioTracks().forEach((t) => { t.enabled = !on; });
+  $("selfmute").textContent = on ? "Stummschaltung aufheben" : "Stummschalten";
+  $("selfmute").classList.toggle("muted-on", on);
+  if (conn && conn.open) conn.send({ t: "self-mute", on });
+}
+$("selfmute").onclick = () => setSelfMute(!selfMuted);
 
 $("save").onclick = () => {
   for (const { take, buf } of takes) {

@@ -103,7 +103,7 @@ function render() {
     row.className = "guest";
     row.innerHTML = `<div><b></b><div class="muted"></div></div><div class="meter"><div id="m-${id}"></div></div>`;
     row.querySelector("b").textContent = g.name;
-    row.querySelector(".muted").textContent = g.file ? `überträgt Aufnahme ${g.file.take} … ${Math.round(100 * g.file.got / g.file.bytes)} %` : (g.src ? (g.muted ? "stummgeschaltet" : "verbunden") : "verbindet Ton …");
+    row.querySelector(".muted").textContent = g.file ? `überträgt Aufnahme ${g.file.take} … ${Math.round(100 * g.file.got / g.file.bytes)} %` : (g.src ? (g.muted ? "stummgeschaltet" : g.selfMuted ? "hat sich stummgeschaltet" : "verbunden") : "verbindet Ton …");
     el.appendChild(row);
   }
 }
@@ -152,6 +152,7 @@ function onData(id, d) {
   if (!d || !d.t) return;
   if (d.t === "hello") { g.name = d.name || g.name; render(); report(); }
   else if (d.t === "level") g.level = d.db;
+  else if (d.t === "self-mute") { g.selfMuted = !!d.on; render(); report(); }
   else if (d.t === "file-begin") { g.file = { take: d.take, bytes: d.bytes, got: 0, parts: [], started: g.starts[d.take] ?? Date.now() }; render(); }
   else if (d.t === "file-end" && g.file) {
     const f = g.file;
@@ -207,7 +208,7 @@ function onCall(call) {
 }
 
 async function report() {
-  const list = [...guests.values()].map((g) => ({ name: g.name, level: g.level, connected: !!g.src }));
+  const list = [...guests.values()].map((g) => ({ name: g.name, level: g.selfMuted ? -60 : g.level, connected: !!g.src, self_muted: !!g.selfMuted }));
   try { await fetch(api("guests"), { method: "POST", body: JSON.stringify(list) }); } catch { /* TalkCraft closed */ }
 }
 
