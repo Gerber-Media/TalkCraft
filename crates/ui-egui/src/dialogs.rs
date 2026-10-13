@@ -102,6 +102,11 @@ pub enum Dialog {
         keep_ms: f64,
         preview: Option<String>,
     },
+    /// A notice the user must see (e.g. the interface was unplugged during a recording).
+    Message {
+        title: String,
+        text: String,
+    },
     /// File > Export > Audiogram Video: where to, and square or portrait.
     Audiogram {
         path: String,
@@ -148,6 +153,7 @@ impl Dialogs {
             Dialog::ShortenPauses { .. } => "shorten_pauses",
             Dialog::DeleteSection { .. } => "delete_section",
             Dialog::Audiogram { .. } => "audiogram",
+            Dialog::Message { .. } => "message",
         })
     }
 
@@ -434,6 +440,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
         Dialog::Preferences { .. } => "Preferences",
         Dialog::ShortenPauses { .. } => "Shorten Pauses",
         Dialog::Audiogram { .. } => "Audiogram Video",
+        Dialog::Message { title, .. } => title.as_str(),
         Dialog::DeleteSection { clips, .. } if !clips.is_empty() => "Delete Clips",
         Dialog::DeleteSection { .. } => "Delete Section",
     }
@@ -656,6 +663,13 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                     );
                     if buttons(ui, "Shorten", enter) {
                         action = Some(("edit.truncate_silence".into(), params));
+                    }
+                }
+                Dialog::Message { text, .. } => {
+                    ui.label(text.as_str());
+                    ui.separator();
+                    if ui.button("OK").clicked() || enter {
+                        keep = false;
                     }
                 }
                 Dialog::Audiogram { path, portrait } => {

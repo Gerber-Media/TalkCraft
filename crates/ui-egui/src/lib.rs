@@ -265,6 +265,8 @@ pub struct SoundApp {
     pub loudness: loudness::Loudness,
     /// An audiogram video rendering in the background.
     pub audiogram: Option<audiogram::Job>,
+    /// Watches the audio devices: input callbacks seen at the last check, and when.
+    device_watch: (usize, std::time::Instant, std::time::Instant),
     /// Reused multichannel snapshot; populated at an adaptive rate by `logic`.
     meter_snapshot: soundcraft_playback::MeterSnapshot,
     pub gesture: Option<Gesture>,
@@ -330,6 +332,7 @@ impl SoundApp {
             main_meter: MeterDisplay::default(),
             loudness: loudness::Loudness::default(),
             audiogram: None,
+            device_watch: (0, std::time::Instant::now(), std::time::Instant::now()),
             meter_snapshot: soundcraft_playback::MeterSnapshot::default(),
             gesture: None,
             edit_layout: edit_window::EditLayout::default(),
@@ -616,6 +619,92 @@ impl SoundApp {
         }
     }
 
+    /// Notices an unplugged interface (stops a recording cleanly, keeping what was recorded) and a
+    /// re-plugged one (switches back to it when idle).
+    fn watch_devices(&mut self) {
+        let now = std::time::Instant::now();
+        let de = crate::i18n::german();
+        // Recording: the input stream reported the device gone, or delivered nothing for 1.5 s.
+        if let Some(rec) = &self.recorder {
+            let calls = rec.callbacks.load(std::sync::atomic::Ordering::Relaxed);
+            if calls != self.device_watch.0 {
+                self.device_watch.0 = calls;
+                self.device_watch.1 = now;
+            }
+            let stalled = self.engine.transport.recording && now.duration_since(self.device_watch.1) > std::time::Duration::from_millis(1500);
+            if rec.lost.load(std::sync::atomic::Ordering::Relaxed) || stalled {
+                let name = rec.device_name.clone();
+                let was_recording = self.engine.transport.recording;
+                if was_recording {
+                    // Ends the take: everything recorded so far becomes clips.
+                    self.stop_play();
+                }
+                self.recorder = None;
+                self.recorder_failed = false;
+                if was_recording {
+                    let (title, text) = if de {
+                        (
+                            "Aufnahme gestoppt",
+                            format!(
+                                "„{name}“ wurde getrennt. Alles bis zu diesem Moment ist gesichert und liegt auf den Spuren.\n\nGerät wieder anschließen und erneut aufnehmen."
+                            ),
+                        )
+                    } else {
+                        (
+                            "Recording stopped",
+                            format!(
+                                "\"{name}\" was disconnected. Everything up to this moment is saved on the tracks.\n\nReconnect it and record again."
+                            ),
+                        )
+                    };
+                    self.dialogs.open = Some(dialogs::Dialog::Message { title: title.into(), text });
+                } else {
+                    self.ui.status = if de { format!("Eingang „{name}“ getrennt") } else { format!("Input \"{name}\" disconnected") };
+                }
+            }
+        }
+        // Playback device gone: fall back to the system default (or the picked one, if back).
+        if self.player.as_ref().is_some_and(soundcraft_playback::Player::device_lost) {
+            let old = self.player.as_ref().map(|p| p.device_name.clone()).unwrap_or_default();
+            if self.is_playing() {
+                self.stop_play();
+            }
+            self.player = Some(soundcraft_playback::Player::new(self.engine.session_arc()));
+            let new = self.player.as_ref().map(|p| p.device_name.clone()).unwrap_or_default();
+            self.ui.status = if de {
+                format!("Ausgang „{old}“ getrennt – jetzt über „{new}“")
+            } else {
+                format!("Output \"{old}\" disconnected, now playing through \"{new}\"")
+            };
+        }
+        // Every 3 s while idle: the picked interface is back? Use it again.
+        if now.duration_since(self.device_watch.2) >= std::time::Duration::from_secs(3)
+            && !self.engine.transport.playing
+            && !self.engine.transport.recording
+        {
+            self.device_watch.2 = now;
+            if self.ui.output_device.is_some() || self.ui.input_device.is_some() {
+                let (outs, ins) = soundcraft_playback::record::list_devices();
+                if let (Some(want), Some(p)) = (&self.ui.output_device, &self.player)
+                    && p.device_name != *want
+                    && outs.iter().any(|d| d.name == *want)
+                {
+                    self.player = Some(soundcraft_playback::Player::new(self.engine.session_arc()));
+                    self.ui.status = if de { format!("„{want}“ wieder verbunden") } else { format!("\"{want}\" reconnected") };
+                }
+                if let (Some(want), Some(r)) = (&self.ui.input_device, &self.recorder)
+                    && r.device_name != *want
+                    && ins.iter().any(|d| d.name == *want)
+                {
+                    // Reopened on the next use (meters, record).
+                    self.recorder = None;
+                    self.recorder_failed = false;
+                    self.ui.status = if de { format!("„{want}“ wieder verbunden") } else { format!("\"{want}\" reconnected") };
+                }
+            }
+        }
+    }
+
     fn finish_recording(&mut self) {
         self.engine.transport.recording = false;
         if let Some(p) = &self.player {
@@ -842,6 +931,7 @@ impl SoundApp {
         }
         let playing = self.is_playing();
         crate::i18n::set(&self.ui.language);
+        self.watch_devices();
         self.loudness.update(&self.engine, playing, ctx);
         if let Some(job) = &self.audiogram {
             match job.done.try_recv() {

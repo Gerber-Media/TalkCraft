@@ -182,6 +182,11 @@ pub struct Recorder {
     shared: Arc<Shared>,
     /// Peak per input channel, for the setup window's meters and the soundcheck.
     pub levels: Arc<InputLevels>,
+    /// The input device went away (unplugged): set by the stream's error callback.
+    pub lost: Arc<AtomicBool>,
+    /// Input callbacks so far: when this stops moving while recording, the device is gone even
+    /// if no error arrived.
+    pub callbacks: Arc<AtomicUsize>,
     /// Live input for monitoring (always fed while the input stream runs).
     pub monitor: Arc<InputRing>,
     #[cfg(not(target_os = "freebsd"))]
@@ -218,12 +223,16 @@ impl Recorder {
         let mon = Arc::clone(&monitor);
         let levels = InputLevels::new(channels);
         let lv = Arc::clone(&levels);
+        let lost = Arc::new(AtomicBool::new(false));
+        let callbacks = Arc::new(AtomicUsize::new(0));
+        let (lost_cb, calls) = (Arc::clone(&lost), Arc::clone(&callbacks));
         let mut owed = 0;
         let stream = device
             .build_input_stream(
                 &config,
                 move |data: &[f32], _: &cpal::InputCallbackInfo| {
                     crate::mark_audio_thread();
+                    calls.fetch_add(1, Ordering::Relaxed);
                     mon.push(data);
                     lv.feed(data);
                     if sh.armed.load(Ordering::Acquire) {
@@ -232,9 +241,12 @@ impl Recorder {
                         owed = 0;
                     }
                 },
-                |e| {
+                move |e| {
                     // Possibly the audio thread (see `crate::mark_audio_thread`).
                     crate::mark_audio_thread();
+                    if matches!(e, cpal::StreamError::DeviceNotAvailable) {
+                        lost_cb.store(true, Ordering::Relaxed);
+                    }
                     log::warn!("input stream error: {e}");
                 },
                 None,
@@ -244,6 +256,8 @@ impl Recorder {
         Ok(Recorder {
             monitor,
             levels,
+            lost,
+            callbacks,
             shared,
             _stream: Some(stream),
             device_name: name,

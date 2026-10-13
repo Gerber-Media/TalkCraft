@@ -107,6 +107,104 @@ fn advice_text(a: &Advice) -> (String, Color32) {
     }
 }
 
+/// What kind of podcast hardware a device is, by its name.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Kind {
+    /// An audio interface whose microphone inputs come in order: mic 1 on In 1, mic 2 on In 2 …
+    Interface { mics: usize },
+    /// A podcast mixer/recorder: its USB channel layout depends on mode and firmware.
+    Mixer,
+    /// A USB microphone: one speaker per device.
+    UsbMic,
+}
+
+/// A known device: display name and kind.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Profile {
+    pub name: &'static str,
+    pub kind: Kind,
+}
+
+/// Known podcast hardware, matched by (lower-case) parts of the device name.
+const PROFILES: &[(&[&str], &str, Kind)] = &[
+    (&["rodecaster", "rødecaster"], "RØDECaster", Kind::Mixer),
+    (&["podtrak"], "Zoom PodTrak", Kind::Mixer),
+    (&["mixcast"], "Tascam Mixcast", Kind::Mixer),
+    (&["go xlr", "goxlr"], "GoXLR", Kind::Mixer),
+    (&["scarlett 2i2", "scarlett solo"], "Focusrite Scarlett", Kind::Interface { mics: 2 }),
+    (&["scarlett 4i4"], "Focusrite Scarlett 4i4", Kind::Interface { mics: 2 }),
+    (&["scarlett 8i6", "scarlett 18i8", "scarlett 18i20"], "Focusrite Scarlett", Kind::Interface { mics: 4 }),
+    (&["motu m2"], "MOTU M2", Kind::Interface { mics: 2 }),
+    (&["motu m4"], "MOTU M4", Kind::Interface { mics: 2 }),
+    (&["ssl 2+", "ssl 2"], "SSL 2", Kind::Interface { mics: 2 }),
+    (&["evo4", "evo 4"], "Audient EVO 4", Kind::Interface { mics: 2 }),
+    (&["evo8", "evo 8"], "Audient EVO 8", Kind::Interface { mics: 4 }),
+    (&["id4"], "Audient iD4", Kind::Interface { mics: 1 }),
+    (&["id14", "id24"], "Audient iD", Kind::Interface { mics: 2 }),
+    (&["umc202", "umc204", "umc404"], "Behringer U-Phoria", Kind::Interface { mics: 2 }),
+    (&["volt 2", "volt 276"], "UA Volt", Kind::Interface { mics: 2 }),
+    (&["volt 4", "volt 476"], "UA Volt", Kind::Interface { mics: 4 }),
+    (&["babyface"], "RME Babyface", Kind::Interface { mics: 2 }),
+    (&["shure mv7", "mv7"], "Shure MV7", Kind::UsbMic),
+    (&["nt-usb", "podmic usb", "rode podmic"], "RØDE USB mic", Kind::UsbMic),
+    (&["yeti"], "Blue Yeti", Kind::UsbMic),
+    (&["at2020usb", "atr2100"], "Audio-Technica USB mic", Kind::UsbMic),
+    (&["samson q2u", "q9u"], "Samson USB mic", Kind::UsbMic),
+];
+
+/// The profile of a device called `name`, if it is known podcast hardware.
+pub fn profile(name: &str) -> Option<Profile> {
+    let n = name.to_lowercase();
+    PROFILES.iter().find(|(keys, _, _)| keys.iter().any(|k| n.contains(k))).map(|(_, name, kind)| Profile { name, kind: kind.clone() })
+}
+
+/// The tip shown for a known device.
+fn profile_tip(p: &Profile, speakers: usize) -> String {
+    let de = crate::i18n::german();
+    match &p.kind {
+        Kind::Interface { mics } if speakers > *mics => {
+            if de {
+                format!("{}: {mics} Mikrofoneingänge – für {speakers} Sprecher reicht das nicht ganz.", p.name)
+            } else {
+                format!("{}: {mics} microphone inputs, fewer than the {speakers} speakers.", p.name)
+            }
+        }
+        Kind::Interface { .. } => {
+            if de {
+                format!("{} erkannt: Mikrofon 1 auf Eingang 1, Mikrofon 2 auf Eingang 2 …", p.name)
+            } else {
+                format!("{} recognised: mic 1 on input 1, mic 2 on input 2 …", p.name)
+            }
+        }
+        Kind::Mixer => {
+            if de {
+                format!(
+                    "{} erkannt: Für getrennte Spuren das Gerät in den Mehrspur-Modus (Multitrack) schalten. Die Kanalbelegung hängt vom Modus ab – deshalb pro Sprecher „Erkennen“ nutzen.",
+                    p.name
+                )
+            } else {
+                format!(
+                    "{} recognised: switch it to multitrack mode for separate tracks. Its channel layout depends on the mode, so use “Detect” for each speaker.",
+                    p.name
+                )
+            }
+        }
+        Kind::UsbMic => {
+            if de {
+                format!(
+                    "{} erkannt: ein USB-Mikrofon nimmt nur eine Person auf. Für mehrere USB-Mikrofone in „Audio-MIDI-Setup“ ein Aggregatgerät anlegen und dieses hier wählen.",
+                    p.name
+                )
+            } else {
+                format!(
+                    "{} recognised: a USB microphone records one person. For several USB mics, create an aggregate device in Audio MIDI Setup and pick it here.",
+                    p.name
+                )
+            }
+        }
+    }
+}
+
 fn db(x: f32) -> f32 {
     20.0 * x.max(1e-6).log10()
 }
@@ -218,6 +316,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let mut detect: Option<TrackId> = None;
     let mut assign: Option<(TrackId, usize)> = None;
     let mut soundcheck = false;
+    let mut in_order: Option<usize> = None;
     let channels = app.recorder.as_ref().map_or(0, |r| r.channels);
     let speakers: Vec<(TrackId, String, Option<usize>)> = {
         let s = app.engine.session();
@@ -244,6 +343,19 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             .map_or_else(|| tr("No input open").to_string(), |r| format!("{} · {} ch · {} Hz", r.device_name, r.channels, r.sample_rate));
         ui.label(RichText::new(now).small().color(t.text_dim));
         ui.label(RichText::new(tr("TalkCraft remembers the interface and uses it whenever it is connected.")).small().color(t.text_dim));
+        if let Some(p) = app.recorder.as_ref().and_then(|r| profile(&r.device_name)) {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(profile_tip(&p, speakers.len())).color(Color32::from_rgb(140, 200, 240)));
+                if let Kind::Interface { mics } = p.kind
+                    && ui.button(tr("Assign in order")).on_hover_text(tr("First speaker on input 1, the next on input 2 …")).clicked()
+                {
+                    in_order = Some(mics);
+                }
+                if p.kind == Kind::UsbMic && cfg!(target_os = "macos") && ui.button(tr("Open Audio MIDI Setup")).clicked() {
+                    let _ = std::process::Command::new("open").args(["-a", "Audio MIDI Setup"]).spawn();
+                }
+            });
+        }
         ui.separator();
 
         ui.label(RichText::new(tr("Inputs")).strong());
@@ -326,6 +438,11 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             app.extra.audio_setup.meters.clear();
         }
     }
+    if let Some(mics) = in_order {
+        for (n, (id, _, _)) in speakers.iter().enumerate().take(mics.max(1)) {
+            let _ = app.run("track.input", json!({"tracks": [id.0], "input": format!("In {}", n + 1)}));
+        }
+    }
     if let Some((track, i)) = assign {
         let _ = app.run("track.input", json!({"tracks": [track.0], "input": format!("In {}", i + 1)}));
     }
@@ -355,6 +472,15 @@ mod tests {
         assert_eq!(detect_channel(&[0.5, 0.4]), None, "two inputs equally loud: unclear (bleed or a stereo mic)");
         assert_eq!(detect_channel(&[0.0, 0.00001]), None, "silence");
         assert_eq!(detect_channel(&[]), None);
+    }
+
+    #[test]
+    fn podcast_hardware_is_recognised_by_name() {
+        assert_eq!(profile("Scarlett 2i2 USB").map(|p| p.kind), Some(Kind::Interface { mics: 2 }));
+        assert_eq!(profile("RØDECaster Pro II Multitrack").map(|p| p.kind), Some(Kind::Mixer));
+        assert_eq!(profile("ZOOM PodTrak P4").map(|p| p.name), Some("Zoom PodTrak"));
+        assert_eq!(profile("Shure MV7").map(|p| p.kind), Some(Kind::UsbMic));
+        assert_eq!(profile("MacBook Pro-Mikrofon"), None);
     }
 
     #[test]

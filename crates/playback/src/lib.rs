@@ -74,6 +74,8 @@ struct Shared {
     /// Speed × 1000.
     speed: AtomicU32,
     meters: Mutex<MeterSnapshot>,
+    /// The output device went away (unplugged): set by the stream's error callback.
+    device_lost: AtomicBool,
 }
 
 /// State owned by the audio callback.
@@ -362,6 +364,11 @@ pub struct Player {
 }
 
 impl Player {
+    /// True once the output device has gone away (unplugged); open a new Player to recover.
+    pub fn device_lost(&self) -> bool {
+        self.shared.device_lost.load(Ordering::Relaxed)
+    }
+
     /// Open the default output device. Never fails: without a device it runs a silent clock.
     pub fn new(session: Arc<Session>) -> Player {
         let p = Player::open(Arc::clone(&session));
@@ -382,6 +389,7 @@ impl Player {
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
+            device_lost: AtomicBool::new(false),
         });
         let (tx, rx) = channel();
         let want = session.sample_rate.hz();
@@ -393,8 +401,12 @@ impl Player {
                 let mut state = AudioState::new(rx, Arc::clone(&shared), session, f64::from(rate), gtx);
                 // cpal may call this on the audio thread (on ALSA in a loop while the device
                 // stays broken): marked, so the logger hands the record off instead of writing it.
-                let err_fn = |e: cpal::StreamError| {
+                let lost = Arc::clone(&shared);
+                let err_fn = move |e: cpal::StreamError| {
                     mark_audio_thread();
+                    if matches!(e, cpal::StreamError::DeviceNotAvailable) {
+                        lost.device_lost.store(true, Ordering::Relaxed);
+                    }
                     log::warn!("audio stream error: {e}");
                 };
                 use cpal::traits::{DeviceTrait, StreamTrait};
@@ -776,6 +788,7 @@ mod tests {
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
+            device_lost: AtomicBool::new(false),
         });
         let (tx, rx) = channel();
         let mut st = AudioState::new(rx, Arc::clone(&shared), s, 48_000.0, channel().0);
@@ -794,6 +807,7 @@ mod tests {
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
+            device_lost: AtomicBool::new(false),
         });
         let (tx, rx) = channel();
         let mut st = AudioState::new(rx, Arc::clone(&shared), s, 48_000.0, channel().0);
@@ -819,6 +833,7 @@ mod tests {
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
+            device_lost: AtomicBool::new(false),
         });
         let (tx, rx) = channel();
         let mut st = AudioState::new(rx, Arc::clone(&shared), Arc::clone(&s), 48_000.0, channel().0);
@@ -878,6 +893,7 @@ mod tests {
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
+            device_lost: AtomicBool::new(false),
         });
         let (tx, rx) = channel();
         let (gtx, grx) = channel();
@@ -941,6 +957,7 @@ mod tests {
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
+            device_lost: AtomicBool::new(false),
         });
         let (tx, rx) = channel();
         let mut st = AudioState::new(rx, Arc::clone(&shared), s, 48_000.0, channel().0);
@@ -963,6 +980,7 @@ mod tests {
             playing: AtomicBool::new(false),
             speed: AtomicU32::new(1000),
             meters: Mutex::new(MeterSnapshot::default()),
+            device_lost: AtomicBool::new(false),
         });
         let (tx, rx) = channel();
         let mut st = AudioState::new(rx, Arc::clone(&shared), Arc::new(s), 48_000.0, channel().0);
