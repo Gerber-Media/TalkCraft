@@ -25,7 +25,11 @@ pub struct AudioSetup {
     check: Option<(Instant, Vec<f32>)>,
     /// Last soundcheck: per speaker track, (name, input, peak dBFS).
     pub results: Vec<(String, Option<usize>, f32)>,
+    /// The device lists and when they were read: asking Core Audio every frame is expensive.
+    devices: Option<(Instant, DeviceLists)>,
 }
+
+type DeviceLists = (Vec<soundcraft_playback::record::DeviceInfo>, Vec<soundcraft_playback::record::DeviceInfo>);
 
 /// The 0-based input of `In N` routes.
 pub fn input_index(route: &Route) -> Option<usize> {
@@ -308,7 +312,11 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     app.ensure_input();
     update(app);
     let t = Tokens::current();
-    let (outs, ins) = soundcraft_playback::record::list_devices();
+    let fresh = app.extra.audio_setup.devices.as_ref().is_some_and(|(t, _)| t.elapsed() < Duration::from_secs(2));
+    if !fresh {
+        app.extra.audio_setup.devices = Some((Instant::now(), soundcraft_playback::record::list_devices()));
+    }
+    let (outs, ins) = app.extra.audio_setup.devices.as_ref().map(|(_, l)| l.clone()).unwrap_or_default();
     let mut open = true;
     let mut out_dev = app.ui.output_device.clone();
     let mut in_dev = app.ui.input_device.clone();
