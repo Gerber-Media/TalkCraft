@@ -30,6 +30,7 @@ TITLE_BAR = 32
 ICON_SIZE = 128
 PALETTE = 16  # colours in background.tiff
 ICONS = {"TalkCraft.app": (326, 205), "Applications": (574, 205)}
+HIDDEN = [".background", ".fseventsd", ".Trashes", ".VolumeIcon.icns", ".DS_Store"]
 # A fixed date for the alias and the colour profile. Finder never matches it against the image
 # (each build is a new volume): it finds the background by volume name and path.
 FIXED_DATE = datetime.datetime(2026, 10, 8, tzinfo=datetime.timezone.utc)
@@ -145,6 +146,10 @@ def write_ds_store(out):
         d["."]["vSrn"] = ("long", 1)
         for name, pos in ICONS.items():
             d[name]["Iloc"] = pos
+        # Invisible items, shown when Finder shows hidden files: parked right of the window so
+        # they never cover the artwork or the text.
+        for k, name in enumerate(HIDDEN):
+            d[name]["Iloc"] = (WIDTH + 160 + 120 * k, 205)
 
 
 def main():
