@@ -111,7 +111,8 @@ function render() {
 function meters() {
   for (const [id, g] of guests) {
     const bar = document.getElementById("m-" + id);
-    if (bar) bar.style.width = Math.max(0, Math.min(100, ((g.level ?? -60) + 60) / 60 * 100)) + "%";
+    const db = g.muted || g.selfMuted ? -60 : (g.level ?? -60);
+    if (bar) bar.style.width = Math.max(0, Math.min(100, (db + 60) / 60 * 100)) + "%";
   }
   requestAnimationFrame(meters);
 }
@@ -152,7 +153,7 @@ function onData(id, d) {
   if (!d || !d.t) return;
   if (d.t === "hello") { g.name = d.name || g.name; render(); report(); }
   else if (d.t === "level") g.level = d.db;
-  else if (d.t === "self-mute") { g.selfMuted = !!d.on; render(); report(); }
+  else if (d.t === "self-mute") { g.selfMuted = !!d.on; if (g.out) g.out.gain.value = g.muted || g.selfMuted ? 0 : 1; render(); report(); }
   else if (d.t === "file-begin") { g.file = { take: d.take, bytes: d.bytes, got: 0, parts: [], started: g.starts[d.take] ?? Date.now() }; render(); }
   else if (d.t === "file-end" && g.file) {
     const f = g.file;
@@ -193,7 +194,7 @@ function onCall(call) {
     keep.play().catch(() => {});
     g.src = ctx.createMediaStreamSource(remote);
     g.out = ctx.createGain();
-    g.out.gain.value = g.muted ? 0 : 1;
+    g.out.gain.value = g.muted || g.selfMuted ? 0 : 1;
     g.src.connect(g.out);
     g.out.connect(ctx.destination);
     const tap = new AudioWorkletNode(ctx, "tap");
@@ -219,7 +220,7 @@ async function poll() {
       const m = (s.muted || []).includes(g.name);
       if (m !== g.muted) {
         g.muted = m;
-        if (g.out) g.out.gain.value = m ? 0 : 1;
+        if (g.out) g.out.gain.value = m || g.selfMuted ? 0 : 1;
         if (g.conn.open) g.conn.send({ t: "muted", on: m });
         render();
       }

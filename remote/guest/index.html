@@ -149,6 +149,7 @@ function meter() {
     analyser.getFloatTimeDomainData(buf);
     let peak = 0;
     for (const v of buf) peak = Math.max(peak, Math.abs(v));
+    if (selfMuted) peak = 0;
     const pct = Math.max(0, Math.min(100, (20 * Math.log10(peak + 1e-6) + 60) / 60 * 100));
     $("level").style.width = $("level2").style.width = pct + "%";
     if (conn && conn.open && Math.random() < 0.2) conn.send({ t: "level", db: 20 * Math.log10(peak + 1e-6) });
@@ -264,8 +265,16 @@ $("join").onclick = () => {
 function setSelfMute(on) {
   selfMuted = on;
   if (callStream) callStream.getAudioTracks().forEach((t) => { t.enabled = !on; });
+  // Also take the microphone off the connection itself, so nothing at all is sent.
+  const pc = call && call.peerConnection;
+  const track = callStream && callStream.getAudioTracks()[0];
+  if (pc && track) for (const sender of pc.getSenders()) {
+    if (!sender.track || sender.track.kind === "audio") sender.replaceTrack(on ? null : track).catch(() => {});
+  }
   $("selfmute").textContent = on ? "Stummschaltung aufheben" : "Stummschalten";
   $("selfmute").classList.toggle("muted-on", on);
+  $("level2").parentElement.style.opacity = on ? 0.3 : 1;
+  $("state").textContent = on ? "Du bist stummgeschaltet – niemand hört dich, deine Aufnahme zeichnet Stille auf." : (recorder ? "Aufnahme läuft – sprich ganz normal." : "Verbunden. Du bist wieder zu hören.");
   if (conn && conn.open) conn.send({ t: "self-mute", on });
 }
 $("selfmute").onclick = () => setSelfMute(!selfMuted);
