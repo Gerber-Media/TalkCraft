@@ -458,6 +458,9 @@ pub fn invoke_menu(app: &mut SoundApp, id: &str, path: &str) {
         app.ui.audiosuite = p.get("process").and_then(Value::as_str).map(str::to_string);
         return;
     }
+    if pick_directly(app, id) {
+        return;
+    }
     if wants_dialog(id) && app.dialogs.open_for_command(&app.engine, id) {
         return;
     }
@@ -492,7 +495,30 @@ pub fn invoke_menu(app: &mut SoundApp, id: &str, path: &str) {
 /// Keyboard shortcut for a dialog command, or one that would close a modified session: open its
 /// dialog. Returns true when handled.
 pub fn invoke_shortcut_dialog(app: &mut SoundApp, id: &str) -> bool {
-    (wants_dialog(id) && app.dialogs.open_for_command(&app.engine, id)) || crate::dialogs::ask_to_save(app, id, &json!({}))
+    pick_directly(app, id) || (wants_dialog(id) && app.dialogs.open_for_command(&app.engine, id)) || crate::dialogs::ask_to_save(app, id, &json!({}))
+}
+
+/// Opening and importing go straight to the system's file dialog (when the host has one) instead
+/// of a path field; a failure is shown, never only logged. True when handled (also on Cancel).
+fn pick_directly(app: &mut SoundApp, id: &str) -> bool {
+    if !matches!(id, "file.import_audio" | "file.import_midi" | "file.import_video" | "session.open" | "subtitle.import") {
+        return false;
+    }
+    let Some(pick) = &app.services.pick_open else { return false };
+    let exts: &[&str] = match id {
+        "file.import_video" => &["mov", "mp4", "m4v", "mkv"],
+        _ => &[],
+    };
+    let Some(path) = pick(id, exts) else { return true };
+    let mut params = json!({"path": path});
+    if matches!(id, "file.import_audio" | "file.import_video") {
+        params["at"] = json!(app.engine.session().edit.selection.start);
+    }
+    if let Err(e) = crate::dialogs::run_or_ask(app, id, params) {
+        app.ui.status = e.clone();
+        app.dialogs.open = Some(crate::dialogs::Dialog::Message { title: crate::i18n::tr("Could not open the file").into(), text: e });
+    }
+    true
 }
 
 /// Commands that open a dialog first: the listed ones, Score Setup, and anything that needs a path.

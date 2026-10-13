@@ -347,6 +347,7 @@ const DE: &[(&str, &str)] = &[
     ("muted themselves", "hat sich stummgeschaltet"),
     ("Browse…", "Durchsuchen …"),
     ("Waveform", "Wellenform"),
+    ("Could not open the file", "Die Datei ließ sich nicht öffnen"),
     ("Work Mode", "Arbeitsmodus"),
     ("I want to …", "Ich möchte …"),
     ("record a podcast", "einen Podcast aufnehmen"),
