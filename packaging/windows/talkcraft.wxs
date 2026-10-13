@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  TalkCraft MSI (WiX Toolset v5: `dotnet tool install -g wix`). Built by package.ps1:
+
+    wix build talkcraft.wxs -arch x64 -d Version=1.2.3 -d BinDir=... -d IconPath=... -o out.msi
+
+  Per-machine install into Program Files, a Start Menu shortcut, `.scraft` sessions owned by
+  TalkCraft, and TalkCraft offered under "Open with" for WAV/AIFF/FLAC/MP3 and MIDI files
+  (without taking over the user's default player for them).
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="TalkCraft"
+      Manufacturer="GERBER.MEDIA"
+      Version="$(var.Version)"
+      UpgradeCode="9FD671AA-B2C2-4EC2-8F67-8A3CCB5AE45A"
+      Scope="perMachine"
+      Compressed="yes"
+      Language="1033">
+    <SummaryInformation Description="TalkCraft podcast studio" Manufacturer="GERBER.MEDIA" />
+    <!-- Same-version upgrades let successive pre-releases of one X.Y.Z replace each other
+         (MSI versions are numeric, so 1.2.3-rc.1 and 1.2.3-rc.2 are both 1.2.3). -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+        DowngradeErrorMessage="A newer version of TalkCraft is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="TalkcraftIcon.ico" SourceFile="$(var.IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="TalkcraftIcon.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://codefloe.com/GerberMedia/TalkCraft" />
+    <Property Id="ARPURLUPDATEINFO" Value="https://codefloe.com/GerberMedia/TalkCraft" />
+    <Property Id="ARPHELPLINK" Value="https://codefloe.com/GerberMedia/TalkCraft" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="TalkCraft" />
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder" />
+
+    <Feature Id="Main" Title="TalkCraft" Level="1">
+      <ComponentGroupRef Id="TalkcraftFiles" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <ComponentGroup Id="TalkcraftFiles" Directory="INSTALLFOLDER">
+      <Component Id="TalkcraftApp" Guid="E277DF5A-4A9D-4260-90E3-21A1DA8291EE">
+        <File Id="TalkcraftExe" Source="$(var.BinDir)\talkcraft.exe" KeyPath="yes">
+          <Shortcut Id="StartMenuShortcut" Directory="ProgramMenuFolder" Name="TalkCraft"
+              Description="TalkCraft podcast studio" WorkingDirectory="INSTALLFOLDER" Advertise="yes"
+              Icon="TalkcraftIcon.ico" IconIndex="0" />
+        </File>
+
+        <!-- .scraft: TalkCraft's own session format; TalkCraft is its default app. -->
+        <ProgId Id="TalkCraft.Session" Description="TalkCraft Session" Icon="TalkcraftExe" IconIndex="0">
+          <Extension Id="scraft" ContentType="application/x-talkcraft-session">
+            <Verb Id="open" Command="Open" TargetFile="TalkcraftExe" Argument="&quot;%1&quot;" />
+          </Extension>
+        </ProgId>
+        <!-- Audio and MIDI files: offered under "Open with" (imported into a session), never forced
+             as the default. -->
+        <ProgId Id="TalkCraft.Audio" Description="Audio File" Icon="TalkcraftExe" IconIndex="0" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\TalkCraft.Audio\shell\open\command" Value="&quot;[#TalkcraftExe]&quot; &quot;%1&quot;" Type="string" />
+        <ProgId Id="TalkCraft.Midi" Description="MIDI File" Icon="TalkcraftExe" IconIndex="0" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\TalkCraft.Midi\shell\open\command" Value="&quot;[#TalkcraftExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.wav\OpenWithProgids" Name="TalkCraft.Audio" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.aif\OpenWithProgids" Name="TalkCraft.Audio" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.aiff\OpenWithProgids" Name="TalkCraft.Audio" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.flac\OpenWithProgids" Name="TalkCraft.Audio" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.mp3\OpenWithProgids" Name="TalkCraft.Audio" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.mid\OpenWithProgids" Name="TalkCraft.Midi" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.midi\OpenWithProgids" Name="TalkCraft.Midi" Value="" Type="string" />
+
+        <!-- "Open with" app list and the Run dialog (Win+R "talkcraft"). -->
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\talkcraft.exe" Name="FriendlyAppName" Value="TalkCraft" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\talkcraft.exe\shell\open\command" Value="&quot;[#TalkcraftExe]&quot; &quot;%1&quot;" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\talkcraft.exe\SupportedTypes" Name=".scraft" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\talkcraft.exe\SupportedTypes" Name=".wav" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\talkcraft.exe\SupportedTypes" Name=".aif" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\talkcraft.exe\SupportedTypes" Name=".aiff" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\talkcraft.exe\SupportedTypes" Name=".flac" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\talkcraft.exe\SupportedTypes" Name=".mp3" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\talkcraft.exe\SupportedTypes" Name=".mid" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\talkcraft.exe\SupportedTypes" Name=".midi" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\talkcraft.exe" Value="[#TalkcraftExe]" Type="string" />
+      </Component>
+
+      <Component Id="TalkcraftCli" Guid="8871A8D3-ADE5-423B-8335-419214991C54">
+        <File Id="TalkcraftCliExe" Source="$(var.BinDir)\talkcraft-cli.exe" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

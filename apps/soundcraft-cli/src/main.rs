@@ -58,7 +58,7 @@ fn main() -> ExitCode {
     let rest: Vec<String> = args.iter().skip(1).cloned().collect();
     let code = match cmd.as_str() {
         "--version" | "-V" | "version" => {
-            outln!("SoundCraft CLI {}", env!("CARGO_PKG_VERSION"));
+            outln!("TalkCraft CLI {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
         "--help" | "-h" | "help" => {

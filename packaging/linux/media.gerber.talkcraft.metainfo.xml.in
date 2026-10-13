@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata (software centres, Flathub). Template: package.sh and the Flatpak
+     manifest substitute @VERSION@ and @DATE@ from Cargo.toml and the build date. -->
+<component type="desktop-application">
+  <id>media.gerber.talkcraft</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT OR Apache-2.0</project_license>
+  <name>TalkCraft</name>
+  <summary>Record, edit, subtitle and publish podcasts</summary>
+  <developer id="media.gerber">
+    <name>GERBER.MEDIA</name>
+  </developer>
+  <description>
+    <p>
+      TalkCraft is an open-source, native podcast studio, built on the SoundCraft audio engine.
+      Record every speaker on their own track, cut, transcribe and publish the episode.
+    </p>
+    <ul>
+      <li>A podcast template with a voice chain for each speaker and a limited master</li>
+      <li>Record all speakers at once, or one speaker from their own track</li>
+      <li>Cut with the blade, delete sections and shorten long pauses on all tracks at once</li>
+      <li>Subtitles (SRT, WebVTT) with automatic transcription through whisper.cpp</li>
+      <li>MP3 export at -16 LUFS with ID3 tags, cover and chapters; shownotes and chapters.json</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">media.gerber.talkcraft.desktop</launchable>
+  <icon type="stock">media.gerber.talkcraft</icon>
+  <!-- Only url types known to appstream 0.15 (Ubuntu 22.04, where CI validates): no vcs-browser. -->
+  <url type="homepage">https://codefloe.com/GerberMedia/TalkCraft</url>
+  <url type="bugtracker">https://codefloe.com/GerberMedia/TalkCraft/issues</url>
+  <url type="help">https://codefloe.com/GerberMedia/TalkCraft</url>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Audio</category>
+  </categories>
+  <keywords>
+    <keyword>podcast</keyword>
+    <keyword>audio</keyword>
+    <keyword>recording</keyword>
+    <keyword>subtitles</keyword>
+    <keyword>transcription</keyword>
+  </keywords>
+  <branding>
+    <color type="primary" scheme_preference="light">#9fdcb9</color>
+    <color type="primary" scheme_preference="dark">#1f6e44</color>
+  </branding>
+  <requires>
+    <display_length compare="ge">760</display_length>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <provides>
+    <binary>talkcraft</binary>
+    <mediatype>application/x-talkcraft-session</mediatype>
+  </provides>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="@VERSION@" date="@DATE@"/>
+  </releases>
+</component>

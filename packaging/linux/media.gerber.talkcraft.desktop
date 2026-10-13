@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=TalkCraft
+GenericName=Podcast Studio
+Comment=Record, edit, subtitle and publish podcasts
+Exec=talkcraft %F
+TryExec=talkcraft
+Icon=media.gerber.talkcraft
+Terminal=false
+StartupNotify=true
+StartupWMClass=media.gerber.talkcraft
+Categories=AudioVideo;Audio;Recorder;AudioVideoEditing;
+MimeType=application/x-talkcraft-session;audio/x-wav;audio/wav;audio/vnd.wave;audio/x-aiff;audio/aiff;audio/flac;audio/x-flac;audio/mpeg;audio/midi;audio/x-midi;
+Keywords=podcast;audio;recording;editor;multitrack;subtitles;transcription;mp3;

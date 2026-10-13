@@ -3,7 +3,7 @@
 **A talking parrot**, as an engraving-style head-and-shoulders portrait in the Crafting Apps'
 framing: a full-bleed colour field, the bird in profile facing left with its hooked bill open,
 feather scallops and cross-hatching, three sound arcs leaving the bill (the arcs come from the
-SoundCraft icon this app forked from).
+TalkCraft icon this app forked from).
 
 ## Palette
 
@@ -18,7 +18,7 @@ Exactly three colours:
 ## Geometry
 
 A 512 × 512 viewBox, clipped to a rounded square with `rx=112`. Windows and Linux use the full
-tile. The macOS icons (`soundcraft.icns`, `soundcraft-macos-512.png`) sit on Apple's grid: an
+tile. The macOS icons (`talkcraft.icns`, `talkcraft-macos-512.png`) sit on Apple's grid: an
 824/1024 body with a transparent margin.
 
 ## Provenance and licence
@@ -32,11 +32,11 @@ script, run `python3 source/parrot.py` to rewrite `icon.svg`, then `packaging/ic
 | File | What it is |
 |---|---|
 | `icon.svg` | The canonical vector |
-| `soundcraft-1024.png` | 1024 px render |
-| `soundcraft-macos-512.png` | Runtime window/Dock icon on macOS (Apple grid margin) |
-| `soundcraft.icns` | macOS bundle icon |
-| `soundcraft.ico` | Windows icon (16–256 px), embedded in `soundcraft.exe` and used by the MSI |
-| `hicolor/<size>x<size>/apps/ai.storyteller.soundcraft.png` | Linux/FreeBSD icon theme, 16–512 px, plus `scalable/` |
+| `talkcraft-1024.png` | 1024 px render |
+| `talkcraft-macos-512.png` | Runtime window/Dock icon on macOS (Apple grid margin) |
+| `talkcraft.icns` | macOS bundle icon |
+| `talkcraft.ico` | Windows icon (16–256 px), embedded in `talkcraft.exe` and used by the MSI |
+| `hicolor/<size>x<size>/apps/media.gerber.talkcraft.png` | Linux/FreeBSD icon theme, 16–512 px, plus `scalable/` |
 
 Regenerate everything with `packaging/icons.sh` (needs `resvg`, and `iconutil` on macOS for the
 `.icns`).
