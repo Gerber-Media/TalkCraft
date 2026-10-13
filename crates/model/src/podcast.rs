@@ -84,6 +84,8 @@ impl Default for EpisodeInfo {
 pub struct PodcastSettings {
     pub export: PodcastExport,
     pub episode: EpisodeInfo,
+    /// Audio files on the jingle pads (intro, outro, stingers), up to eight; "" = empty pad.
+    pub jingles: Vec<String>,
 }
 
 /// One subtitle (caption) cue on the session timeline.

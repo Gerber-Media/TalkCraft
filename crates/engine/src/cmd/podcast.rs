@@ -66,6 +66,15 @@ pub fn specs() -> Vec<CommandSpec> {
             match_speakers
         ),
         cmd!(
+            "podcast.place_jingle",
+            "Place Jingle",
+            [],
+            None,
+            "{pad: 1..8, at?: position (default: the insertion point)} — places the pad's audio file on the jingle track",
+            has_tracks,
+            place_jingle
+        ),
+        cmd!(
             "podcast.sync_clip",
             "Sync Clip to Other Tracks",
             [],
@@ -84,6 +93,29 @@ pub fn specs() -> Vec<CommandSpec> {
             auto_duck
         ),
     ]
+}
+
+/// Most jingle pads.
+pub const JINGLE_PADS: usize = 8;
+
+/// The music/jingle track: the first audio track locked against recording.
+pub fn jingle_track(s: &soundcraft_model::Session) -> Option<soundcraft_model::TrackId> {
+    s.tracks.iter().find(|t| t.kind == soundcraft_model::TrackKind::Audio && t.mixer.record_lock).map(|t| t.id)
+}
+
+fn place_jingle(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "podcast.place_jingle";
+    let pad = p.get("pad").and_then(Value::as_u64).filter(|n| (1..=JINGLE_PADS as u64).contains(n)).ok_or_else(|| bad(ID, "`pad` is 1 to 8"))?;
+    let path = e.session().podcast.jingles.get(pad as usize - 1).cloned().unwrap_or_default();
+    if path.trim().is_empty() {
+        return Err(bad(ID, format!("pad {pad} is empty: give it an audio file first")));
+    }
+    let track = jingle_track(e.session()).ok_or_else(|| bad(ID, "no jingle track: lock a track against recording to use it for jingles"))?;
+    let at = position_param(e, ID, p, "at")?.unwrap_or(e.session().edit.selection.start).max(0);
+    let bytes = std::fs::read(&path).map_err(|err| bad(ID, format!("{path}: {err}")))?;
+    let name = std::path::Path::new(&path).file_name().and_then(|n| n.to_str()).unwrap_or("Jingle").to_string();
+    let r = crate::io::import_audio_bytes(e, &name, &bytes, Some(path.as_str()), Some(track), at)?;
+    Ok(json!({"pad": pad, "placed": r}))
 }
 
 /// The speaker tracks: `tracks`, else every audio track that records (not locked).
@@ -229,12 +261,7 @@ fn auto_duck(e: &mut Engine, p: &Value) -> Result<Value> {
     let s = e.session();
     let music = match p.get("music").and_then(Value::as_u64) {
         Some(m) => soundcraft_model::TrackId(m),
-        None => s
-            .tracks
-            .iter()
-            .find(|t| t.kind == soundcraft_model::TrackKind::Audio && t.mixer.record_lock)
-            .map(|t| t.id)
-            .ok_or_else(|| bad(ID, "name the music track (`music`): no locked jingle track found"))?,
+        None => jingle_track(s).ok_or_else(|| bad(ID, "name the music track (`music`): no locked jingle track found"))?,
     };
     let amount = f64_or(p, "amount_db", -12.0).clamp(-40.0, -1.0) as f32;
     let attack = s.sample_rate.samples(f64_or(p, "attack_ms", 300.0).clamp(10.0, 5000.0) / 1000.0);
@@ -317,6 +344,9 @@ fn checked(id: &str, v: Value) -> Result<PodcastSettings> {
         && !(l.is_finite() && (-40.0..=0.0).contains(&l))
     {
         return Err(bad(id, "`loudness_lufs` is between -40 and 0 LUFS, or null for none"));
+    }
+    if s.jingles.len() > JINGLE_PADS {
+        return Err(bad(id, format!("at most {JINGLE_PADS} jingle pads")));
     }
     Ok(s)
 }
@@ -645,6 +675,26 @@ mod tests {
         let v = e.execute("podcast.sync_clip", &json!({"clip": guest.0, "max_shift_s": 2.0})).unwrap();
         let start = e.session().find_clip(guest).unwrap().1.start;
         assert_eq!(start, 96_000, "moved onto the moderation track exactly: {v}");
+        assert!(std::fs::remove_dir_all(&dir).is_ok());
+    }
+
+    #[test]
+    fn a_jingle_pad_places_its_file_on_the_jingle_track() {
+        let dir = std::env::temp_dir().join(format!("sc-podcast-jingle-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let wav = dir.join("intro.wav");
+        let buf = AudioBuffer { sample_rate: 48_000, channels: vec![vec![0.1; 48_000]] };
+        std::fs::write(&wav, soundcraft_audio_io::encode(&buf, &EncodeOptions::default()).unwrap()).unwrap();
+        let mut e = Engine::default();
+        e.execute("session.new", &json!({"name": "J", "template": "podcast", "speakers": 1})).unwrap();
+        assert!(e.execute("podcast.place_jingle", &json!({"pad": 1})).is_err(), "empty pad");
+        e.execute("podcast.set", &json!({"jingles": ["", wav.to_string_lossy()]})).unwrap();
+        e.execute("podcast.place_jingle", &json!({"pad": 2, "at": {"seconds": 2.0}})).unwrap();
+        let music = e.session().track_by_name("Jingles & Musik").unwrap();
+        assert_eq!(music.clips().len(), 1);
+        assert_eq!(music.clips()[0].start, 96_000);
+        assert!(e.execute("podcast.set", &json!({"jingles": vec![""; 9]})).is_err(), "eight pads at most");
         assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 

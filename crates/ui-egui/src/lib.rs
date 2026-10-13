@@ -12,6 +12,7 @@ pub mod edit_window;
 pub mod extra_windows;
 pub mod fonts;
 pub mod icons;
+pub mod jingles_window;
 pub mod loudness;
 pub mod menus;
 pub mod midi_editor;
