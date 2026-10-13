@@ -9,8 +9,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 use wasm_bindgen::JsCast as _;
 
-const CANVAS_ID: &str = "soundcraft_canvas";
-const LOADING_ID: &str = "soundcraft_loading";
+const CANVAS_ID: &str = "talkcraft_canvas";
+const LOADING_ID: &str = "talkcraft_loading";
 
 pub fn start() {
     eframe::WebLogger::init(log::LevelFilter::Info).ok();
@@ -36,7 +36,7 @@ pub fn start() {
                 options,
                 Box::new(move |cc| {
                     if let Some(rs) = &cc.wgpu_render_state {
-                        log::info!("soundcraft-web: wgpu backend {:?}", rs.adapter.get_info().backend);
+                        log::info!("talkcraft-web: wgpu backend {:?}", rs.adapter.get_info().backend);
                     }
                     let engine = if query().contains("empty") { Engine::default() } else { soundcraft_engine::demo::demo_engine() };
                     let player = soundcraft_playback::Player::new(Arc::new(engine.session().clone()));

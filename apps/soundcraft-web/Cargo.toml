@@ -1,6 +1,6 @@
 [package]
-name = "soundcraft-web"
-description = "SoundCraft in the browser (eframe web runner, WebGPU with WebGL2 fallback, WebAudio playback)"
+name = "talkcraft-web"
+description = "TalkCraft in the browser (eframe web runner, WebGPU with WebGL2 fallback, WebAudio playback)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,7 +10,7 @@ publish = false
 workspace = true
 
 [[bin]]
-name = "soundcraft-web"
+name = "talkcraft-web"
 path = "src/main.rs"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

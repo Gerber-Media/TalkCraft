@@ -28,5 +28,5 @@ fn main() {
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    eprintln!("soundcraft-web only runs in the browser: build it with `trunk build --release` in apps/soundcraft-web");
+    eprintln!("talkcraft-web only runs in the browser: build it with `trunk build --release` in apps/soundcraft-web");
 }

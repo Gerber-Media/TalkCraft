@@ -44,7 +44,7 @@ People trust SoundCraft with their recordings; a crash loses takes. **This outra
 | L4 | `soundcraft-engine`, `soundcraft-playback` | Command registry, undo, editing, import/export/bounce, parity catalog; audio device I/O (cpal) |
 | L5 | `soundcraft-automation` | MCP server + control-channel client |
 | L6 | `soundcraft-ui-egui` | The swappable UI (egui) |
-| apps | `talkcraft` (dir `apps/soundcraft`), `talkcraft-cli` (dir `apps/soundcraft-cli`), `soundcraft-web` | Entry points |
+| apps | `talkcraft` (dir `apps/soundcraft`), `talkcraft-cli` (dir `apps/soundcraft-cli`), `talkcraft-web` | Entry points |
 
 Nothing below L6 depends on egui/eframe/winit/rfd. The UI is thin: panels read engine state and act through `engine.execute(id, params)`.
 

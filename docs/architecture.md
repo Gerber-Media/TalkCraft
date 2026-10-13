@@ -21,7 +21,7 @@ L3  mix                                         (the mix engine)
 L4  engine      playback                        (commands, undo, I/O · audio devices)
 L5  automation                                  (MCP server, control-channel client)
 L6  ui-egui                                     (the user interface)
-    apps: soundcraft (desktop) · soundcraft-cli · soundcraft-web (wasm)
+    apps: talkcraft (desktop) · talkcraft-cli · talkcraft-web (wasm)
 ```
 
 ## The document

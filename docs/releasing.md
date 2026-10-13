@@ -54,7 +54,7 @@ web build and are checked, the signing jobs are refused, and no release is draft
 | AppImage updates | `soundcraft-<v>-linux-{x86_64,aarch64}.AppImage.zsync` | with the AppImage |
 | Flatpak x86_64, aarch64 | `soundcraft-<v>-linux-{x86_64,aarch64}.flatpak` | `ubuntu-24.04`, `ubuntu-24.04-arm` (repackages the Linux tarball) |
 | FreeBSD 14 x86_64 | `soundcraft-<v>-freebsd-x86_64.tar.gz` (a `/usr/local` tree) | FreeBSD 14.3 VM on `ubuntu-latest` |
-| Web | `soundcraft-web-<v>.zip` (static site; see [`packaging/web/README.md`](../packaging/web/README.md)) | `ubuntu-latest` |
+| Web | `talkcraft-web-<v>.zip` (static site; see [`packaging/web/README.md`](../packaging/web/README.md)) | `ubuntu-latest` |
 
 The from-source Flatpak manifest (`packaging/linux/flatpak/ai.storyteller.soundcraft.yml`) is
 kept ready for a Flathub submission; the release's `.flatpak` bundles come from
