@@ -17,6 +17,7 @@ pub struct ExtraState {
     pub words: crate::words_window::WordsWindow,
     pub jingles: crate::jingles_window::JinglesWindow,
     pub audio_setup: crate::audio_setup::AudioSetup,
+    pub remote: crate::remote::RemoteStudio,
     pub show_ui_customization: bool,
     pub auto_update_config: bool,
     pub ui_scale: f32,
@@ -34,6 +35,7 @@ impl Default for ExtraState {
             words: Default::default(),
             jingles: Default::default(),
             audio_setup: Default::default(),
+            remote: Default::default(),
             show_ui_customization: false,
             auto_update_config: false,
             ui_scale: 1.0,
@@ -58,6 +60,7 @@ pub fn run(app: &mut SoundApp, id: &str, p: &Value) -> Option<Value> {
         "window.subtitles" => crate::subtitle_editor::toggle(app, p),
         "window.words" => crate::words_window::toggle(app, p),
         "window.jingles" => crate::jingles_window::toggle(app, p),
+        "window.remote" => crate::remote::toggle(app, p),
         "window.audiogram" => {
             app.dialogs.open_audiogram(&app.engine);
             json!({})
@@ -72,6 +75,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     crate::subtitle_editor::window(app, ctx);
     crate::words_window::window(app, ctx);
     crate::jingles_window::window(app, ctx);
+    crate::remote::window(app, ctx);
     ui_customization(app, ctx);
     apply_customization(app, ctx);
 }

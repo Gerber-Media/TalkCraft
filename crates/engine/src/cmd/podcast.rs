@@ -79,9 +79,18 @@ pub fn specs() -> Vec<CommandSpec> {
             "Sync Clip to Other Tracks",
             [],
             None,
-            "{clip, max_shift_s?: 20} — moves the clip so its audio lines up with the other tracks (cross-correlation; e.g. a guest's own recording against the call)",
+            "{clip, max_shift_s?: 20, reference?: track} — moves the clip so its audio lines up with the other tracks, or only with `reference` (cross-correlation; e.g. a guest's own recording against the call)",
             has_tracks,
             sync_clip
+        ),
+        cmd!(
+            "podcast.import_remote",
+            "Import Remote Guest",
+            [],
+            None,
+            "{guest: name, path: the guest's own recording, at?: position, live?: path of the call recording, live_at?: position (default `at`)} — puts the recording on the guest's track (made when missing); with `live`, the call recording goes muted onto \"<guest> (Live)\" and the recording is synced to it",
+            always,
+            import_remote
         ),
         cmd!(
             "podcast.auto_duck",
@@ -225,9 +234,14 @@ fn sync_clip(e: &mut Engine, p: &Value) -> Result<Value> {
     // Everything else, over the clip's span plus the search range.
     let shift = sr.samples(max_s);
     let r = soundcraft_time::Range::new((clip.start - shift).max(0), clip.start + n as i64 + shift);
+    let reference_track = track_param(e, ID, p, "reference")?;
     let mut others = s.clone();
-    if let Some(t) = others.track_mut(track) {
-        t.mixer.mute = true;
+    for t in &mut others.tracks {
+        if t.id == track || reference_track.is_some_and(|r| r != t.id) {
+            t.mixer.mute = true;
+        } else if reference_track.is_some() {
+            t.mixer.mute = false;
+        }
     }
     let refch = soundcraft_mix::render_range(&others, r, 1024);
     let rn = refch.iter().map(Vec::len).min().unwrap_or(0);
@@ -254,6 +268,46 @@ fn sync_clip(e: &mut Engine, p: &Value) -> Result<Value> {
         crate::edit::move_clips(s, &[id], delta, None);
     }
     Ok(json!({"moved": delta, "moved_s": sr.seconds(delta), "correlation": score}))
+}
+
+/// Track named `name`, made as a mono audio track when there is none.
+fn track_named(e: &mut Engine, name: &str) -> soundcraft_model::TrackId {
+    if let Some(t) = e.session().track_by_name(name) {
+        return t.id;
+    }
+    e.session_mut().add_track(soundcraft_model::TrackKind::Audio, soundcraft_model::ChannelFormat::Mono, Some(name))
+}
+
+fn import_file(e: &mut Engine, id: &str, path: &str, track: soundcraft_model::TrackId, at: Samples) -> Result<u64> {
+    let bytes = std::fs::read(path).map_err(|err| EngineError::Io(format!("{path}: {err}")))?;
+    let name = std::path::Path::new(path).file_name().and_then(|n| n.to_str()).unwrap_or("Audio").to_string();
+    let v = crate::io::import_audio_bytes(e, &name, &bytes, Some(path), Some(track), at.max(0))?;
+    v["clip"].as_u64().ok_or_else(|| bad(id, "import made no clip"))
+}
+
+/// A remote guest's take: their own lossless recording, and optionally the call as heard in the
+/// studio. The call recording sits where the studio heard it, so the guest's file is synced onto it.
+fn import_remote(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "podcast.import_remote";
+    let guest = str_param(p, "guest").map(str::trim).filter(|g| !g.is_empty()).ok_or_else(|| bad(ID, "`guest` required"))?.to_string();
+    let path = str_param(p, "path").ok_or_else(|| bad(ID, "`path` required"))?.to_string();
+    let at = position_param(e, ID, p, "at")?.unwrap_or(0);
+    let track = track_named(e, &guest);
+    let clip = import_file(e, ID, &path, track, at)?;
+    let Some(live) = str_param(p, "live").map(str::to_string) else {
+        return Ok(json!({"track": track, "clip": clip}));
+    };
+    let live_at = position_param(e, ID, p, "live_at")?.unwrap_or(at);
+    let live_track = track_named(e, &format!("{guest} (Live)"));
+    let live_clip = import_file(e, ID, &live, live_track, live_at)?;
+    if let Some(t) = e.session_mut().track_mut(live_track) {
+        t.mixer.mute = true;
+        t.mixer.record_lock = true;
+    }
+    // A failed sync leaves the recording where the studio started it, which is close: say so.
+    let sync =
+        sync_clip(e, &json!({"clip": clip, "reference": live_track.0, "max_shift_s": 5.0})).unwrap_or_else(|err| json!({"error": err.to_string()}));
+    Ok(json!({"track": track, "clip": clip, "live_track": live_track, "live_clip": live_clip, "sync": sync}))
 }
 
 fn auto_duck(e: &mut Engine, p: &Value) -> Result<Value> {
@@ -675,6 +729,42 @@ mod tests {
         let v = e.execute("podcast.sync_clip", &json!({"clip": guest.0, "max_shift_s": 2.0})).unwrap();
         let start = e.session().find_clip(guest).unwrap().1.start;
         assert_eq!(start, 96_000, "moved onto the moderation track exactly: {v}");
+        assert!(std::fs::remove_dir_all(&dir).is_ok());
+    }
+
+    #[test]
+    fn a_remote_guest_is_synced_onto_the_call_recording() {
+        let dir = std::env::temp_dir().join(format!("sc-podcast-remote-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut seed = 11u32;
+        let mut rnd = move || {
+            seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (seed >> 8) as f32 / (1u32 << 24) as f32 - 0.5
+        };
+        let talk: Vec<f32> =
+            (0..48_000 * 6).map(|i| if (i / 6_000) % 3 == 1 || (i / 13_000) % 4 == 2 { rnd() * 0.6 } else { rnd() * 0.01 }).collect();
+        // The call drops a little and arrives 0.25 s late; the guest's own file is clean.
+        let live: Vec<f32> = std::iter::repeat_n(0.0, 12_000).chain(talk.iter().map(|x| x * 0.5)).collect();
+        let write = |name: &str, ch: Vec<f32>| {
+            let path = dir.join(name);
+            let buf = AudioBuffer { sample_rate: 48_000, channels: vec![ch] };
+            std::fs::write(&path, soundcraft_audio_io::encode(&buf, &EncodeOptions::default()).unwrap()).unwrap();
+            path.to_string_lossy().to_string()
+        };
+        let (hq, call) = (write("hq.wav", talk.clone()), write("live.wav", live));
+        let mut e = Engine::default();
+        e.execute("session.new", &json!({"name": "R", "template": "podcast", "speakers": 1})).unwrap();
+        let v = e.execute("podcast.import_remote", &json!({"guest": "Anna", "path": hq, "live": call, "at": {"seconds": 1.0}})).unwrap();
+        let s = e.session();
+        let anna = s.track_by_name("Anna").unwrap();
+        assert_eq!(anna.clips()[0].start, 48_000 + 12_000, "lined up with the call: {v}");
+        let call_track = s.track_by_name("Anna (Live)").unwrap();
+        assert!(call_track.mixer.mute && call_track.mixer.record_lock, "the call recording is only a backup");
+        // A second take goes onto the same tracks.
+        e.execute("podcast.import_remote", &json!({"guest": "Anna", "path": hq, "at": {"seconds": 20.0}})).unwrap();
+        assert_eq!(e.session().track_by_name("Anna").unwrap().clips().len(), 2);
+        assert!(e.execute("podcast.import_remote", &json!({"guest": " ", "path": hq})).is_err());
         assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 
