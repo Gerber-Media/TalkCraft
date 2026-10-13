@@ -51,6 +51,10 @@ struct Shared {
     take: u32,
     guests: Vec<Guest>,
     guests_seen: Option<Instant>,
+    /// Guests muted in the call (their track's mute button).
+    muted: Vec<String>,
+    /// Guests to send away, collected until the host page next asks.
+    kick: Vec<String>,
     /// Where uploads are written.
     dir: PathBuf,
 }
@@ -155,7 +159,9 @@ fn route(method: &str, path: &str, body: &[u8], srv: &Server, tx: &Sender<Upload
             (200, "text/html; charset=utf-8", page.into_bytes())
         }
         ("GET", "/state") => {
-            (200, "application/json", json!({"recording": sh.recording, "take": sh.take, "room": srv.room}).to_string().into_bytes())
+            let kick = std::mem::take(&mut sh.kick);
+            let state = json!({"recording": sh.recording, "take": sh.take, "room": srv.room, "muted": sh.muted, "kick": kick});
+            (200, "application/json", state.to_string().into_bytes())
         }
         ("POST", "/guests") => {
             let list: Vec<Value> = serde_json::from_slice(body).unwrap_or_default();
@@ -267,6 +273,26 @@ impl Server {
     }
 }
 
+/// A remote guest's track in the session.
+pub fn track_name(guest: &str) -> String {
+    format!("Ferngast – {guest}")
+}
+
+/// Makes the guest's track when they join: mono, locked against local recording (their sound
+/// comes from their browser).
+fn ensure_track(app: &mut SoundApp, guest: &str) {
+    let name = track_name(guest);
+    if app.engine.session().track_by_name(&name).is_some() {
+        return;
+    }
+    let made = app
+        .run("track.new", json!({"name": name, "format": "mono"}))
+        .and_then(|_| app.run("mix.record_lock", json!({"tracks": [name], "value": true})));
+    if let Err(e) = made {
+        app.ui.status = format!("{name}: {e}");
+    }
+}
+
 /// Folder for guest files: next to the saved session, else in the autosave folder.
 fn upload_dir(app: &SoundApp) -> PathBuf {
     let base = app.engine.path.as_ref().and_then(|p| std::path::Path::new(p).parent().map(|d| d.join("Remote Guests")));
@@ -297,6 +323,27 @@ pub fn update(app: &mut SoundApp) {
             sh.guests.clear();
         }
     }
+    let guests = srv.shared.lock().map(|sh| sh.guests.clone()).unwrap_or_default();
+    for g in &guests {
+        ensure_track(app, &g.name);
+        // The guest's level on their track's meter.
+        if let Some(id) = app.engine.session().track_by_name(&track_name(&g.name)).map(|t| t.id) {
+            let lin = if g.connected { 10f32.powf(g.level_db.clamp(-120.0, 0.0) / 20.0) } else { 0.0 };
+            let m = app.meters.entry(id).or_default();
+            for (l, h) in m.level.iter_mut().zip(m.hold.iter_mut()) {
+                *l = l.max(lin);
+                *h = h.max(lin);
+            }
+        }
+    }
+    let muted: Vec<String> = guests
+        .iter()
+        .filter(|g| app.engine.session().track_by_name(&track_name(&g.name)).is_some_and(|t| t.mixer.mute))
+        .map(|g| g.name.clone())
+        .collect();
+    if let Ok(mut sh) = srv.shared.lock() {
+        sh.muted = muted;
+    }
     let got: Vec<Upload> = srv.uploads.lock().map(|rx| rx.try_iter().collect()).unwrap_or_default();
     for up in got {
         if up.hq {
@@ -312,7 +359,7 @@ fn file_take(app: &mut SoundApp, hq: Upload) {
     let (start, wall) = app.extra.remote.takes.get(&hq.take).copied().unwrap_or((app.record_start, hq.started_ms));
     let live = app.extra.remote.live.remove(&(hq.guest.clone(), hq.take));
     let mut p = json!({
-        "guest": hq.guest,
+        "guest": track_name(&hq.guest),
         "path": hq.path.to_string_lossy(),
         "at": timeline_position(start, wall, hq.started_ms, rate),
     });
@@ -366,6 +413,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     if !app.extra.remote.show {
         if app.extra.remote.server.is_some() {
             update(app);
+            ctx.request_repaint_after(Duration::from_millis(250));
         }
         return;
     }
@@ -373,6 +421,9 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let t = Tokens::current();
     let mut open = true;
     let mut start = false;
+    let mut mute: Option<(String, bool)> = None;
+    let mut kick: Option<String> = None;
+    let muted = |name: &str| app.engine.session().track_by_name(&track_name(name)).is_some_and(|t| t.mixer.mute);
     let guests = app.extra.remote.server.as_ref().and_then(|s| s.shared.lock().ok().map(|sh| sh.guests.clone())).unwrap_or_default();
     egui::Window::new(tr("Remote Guests")).open(&mut open).default_size(vec2(460.0, 300.0)).resizable(true).show(ctx, |ui| {
         let w = &app.extra.remote;
@@ -408,6 +459,13 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                         if !g.connected {
                             ui.label(RichText::new(tr("connecting …")).color(t.text_dim));
                         }
+                        let on = muted(&g.name);
+                        if ui.selectable_label(on, tr("Mute")).on_hover_text(tr("Mutes the guest in the call (same as M on their track)")).clicked() {
+                            mute = Some((g.name.clone(), !on));
+                        }
+                        if ui.button(tr("Remove")).on_hover_text(tr("Ends the call for this guest")).clicked() {
+                            kick = Some(g.name.clone());
+                        }
                     });
                 }
             }
@@ -425,6 +483,19 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
         );
     });
     app.extra.remote.show = open;
+    if let Some((name, value)) = mute
+        && let Err(e) = app.run("mix.mute", json!({"tracks": [track_name(&name)], "value": value}))
+    {
+        app.ui.status = e;
+    }
+    if let (Some(name), Some(srv)) = (kick, &app.extra.remote.server)
+        && let Ok(mut sh) = srv.shared.lock()
+    {
+        sh.kick.push(name);
+    }
+    if !guests.is_empty() {
+        ctx.request_repaint_after(Duration::from_millis(100));
+    }
     if start {
         open_studio(app);
     }

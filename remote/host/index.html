@@ -100,7 +100,7 @@ function render() {
     row.className = "guest";
     row.innerHTML = `<div><b></b><div class="muted"></div></div><div class="meter"><div id="m-${id}"></div></div>`;
     row.querySelector("b").textContent = g.name;
-    row.querySelector(".muted").textContent = g.file ? `überträgt Aufnahme ${g.file.take} … ${Math.round(100 * g.file.got / g.file.bytes)} %` : (g.src ? "verbunden" : "verbindet Ton …");
+    row.querySelector(".muted").textContent = g.file ? `überträgt Aufnahme ${g.file.take} … ${Math.round(100 * g.file.got / g.file.bytes)} %` : (g.src ? (g.muted ? "stummgeschaltet" : "verbunden") : "verbindet Ton …");
     el.appendChild(row);
   }
 }
@@ -118,7 +118,7 @@ function rewire() {
   for (const [id, g] of guests) {
     if (!g.dest) continue;
     for (const [other, o] of guests) {
-      if (other !== id && o.src && !g.hears.has(other)) { o.src.connect(g.dest); g.hears.add(other); }
+      if (other !== id && o.out && !g.hears.has(other)) { o.out.connect(g.dest); g.hears.add(other); }
     }
   }
 }
@@ -159,7 +159,7 @@ function onData(id, d) {
 }
 
 function addGuest(conn) {
-  const g = { name: conn.metadata?.name || "Gast", conn, src: null, dest: null, hears: new Set(), live: null, level: -60, file: null, starts: {} };
+  const g = { name: conn.metadata?.name || "Gast", conn, src: null, out: null, muted: false, dest: null, hears: new Set(), live: null, level: -60, file: null, starts: {} };
   guests.set(conn.peer, g);
   conn.on("open", () => {
     conn.send({ t: "hello", host: "TalkCraft" });
@@ -188,7 +188,10 @@ function onCall(call) {
     keep.srcObject = remote;
     keep.play().catch(() => {});
     g.src = ctx.createMediaStreamSource(remote);
-    g.src.connect(ctx.destination);
+    g.out = ctx.createGain();
+    g.out.gain.value = g.muted ? 0 : 1;
+    g.src.connect(g.out);
+    g.out.connect(ctx.destination);
     const tap = new AudioWorkletNode(ctx, "tap");
     tap.port.onmessage = (e) => { if (g.live) g.live.push(e.data); };
     g.src.connect(tap);
@@ -208,6 +211,19 @@ async function report() {
 async function poll() {
   try {
     const s = await (await fetch(api("state"))).json();
+    for (const g of guests.values()) {
+      const m = (s.muted || []).includes(g.name);
+      if (m !== g.muted) {
+        g.muted = m;
+        if (g.out) g.out.gain.value = m ? 0 : 1;
+        if (g.conn.open) g.conn.send({ t: "muted", on: m });
+        render();
+      }
+      if ((s.kick || []).includes(g.name) && g.conn.open) {
+        g.conn.send({ t: "kick" });
+        setTimeout(() => g.conn.close(), 500);
+      }
+    }
     if (s.recording && !recording) {
       recording = true; take = s.take; takeStarted = Date.now();
       for (const g of guests.values()) { g.starts[take] = takeStarted; startLive(g); if (g.conn.open) g.conn.send({ t: "start", take }); }

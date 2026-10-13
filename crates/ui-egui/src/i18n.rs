@@ -340,6 +340,9 @@ const DE: &[(&str, &str)] = &[
     ("Show Studio Page", "Studio-Seite zeigen"),
     ("Keep the studio page open in your browser while guests are on.", "Die Studio-Seite im Browser offen lassen, solange Gäste zugeschaltet sind."),
     ("No guests yet.", "Noch keine Gäste."),
+    ("Mutes the guest in the call (same as M on their track)", "Schaltet den Gast im Gespräch stumm (wie M auf seiner Spur)"),
+    ("Remove", "Entfernen"),
+    ("Ends the call for this guest", "Beendet das Gespräch für diesen Gast"),
     ("connecting …", "verbindet …"),
     (
         "Record starts every guest's own recording too. After Stop, their files arrive on their tracks, synced to the call.",

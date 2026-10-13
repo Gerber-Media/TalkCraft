@@ -61,7 +61,7 @@
 const room = decodeURIComponent((location.hash || "").slice(1));
 const $ = (id) => document.getElementById(id);
 const CHUNK = 64 * 1024;
-let stream, ctx, analyser, peer, conn, call, recorder = null, takes = [];
+let stream, ctx, analyser, peer, conn, call, recorder = null, takes = [], muted = false, kicked = false;
 
 if (!room) {
   $("intro").textContent = "Dieser Link ist unvollständig: es fehlt die Raum-Kennung hinter dem #. Bitte den vollständigen Link aus der Einladung öffnen.";
@@ -165,6 +165,12 @@ function onMessage(m) {
     const buf = wav(chunks, ctx.sampleRate);
     takes.push({ take: m.take, buf });
     sendFile(m.take, buf);
+  } else if (m.t === "muted") {
+    muted = m.on; // The call is muted in the studio; the own recording keeps running.
+    $("state").textContent = m.on ? "Das Studio hat dich stummgeschaltet." : (recorder ? "Aufnahme läuft – sprich ganz normal." : "Verbunden. Du bist wieder zu hören.");
+  } else if (m.t === "kick") {
+    kicked = true;
+    $("state").textContent = "Das Studio hat das Gespräch für dich beendet. Danke fürs Mitmachen!";
   } else if (m.t === "hello") {
     $("state").textContent = `Verbunden mit ${m.host || "dem Studio"}. Wartet auf den Start der Aufnahme …`;
   }
@@ -189,7 +195,7 @@ $("join").onclick = () => {
       });
     });
     conn.on("data", (d) => { if (d && d.t) onMessage(d); });
-    conn.on("close", () => { $("state").textContent = "Verbindung beendet. Danke fürs Mitmachen!"; });
+    conn.on("close", () => { if (!kicked) $("state").textContent = "Verbindung beendet. Danke fürs Mitmachen!"; });
   });
   peer.on("error", (e) => { $("state").textContent = "Verbindungsfehler: " + e.type + ". Bitte Seite neu laden."; });
 };
