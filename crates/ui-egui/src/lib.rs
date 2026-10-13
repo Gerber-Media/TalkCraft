@@ -4,6 +4,7 @@
 //! executing commands. It can be replaced without touching anything below it.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+pub mod audiogram;
 pub mod control;
 pub mod credits;
 pub mod dialogs;
@@ -245,6 +246,8 @@ pub struct SoundApp {
     pub main_meter: MeterDisplay,
     /// The whole episode's loudness, measured in the background (toolbar readout).
     pub loudness: loudness::Loudness,
+    /// An audiogram video rendering in the background.
+    pub audiogram: Option<audiogram::Job>,
     /// Reused multichannel snapshot; populated at an adaptive rate by `logic`.
     meter_snapshot: soundcraft_playback::MeterSnapshot,
     pub gesture: Option<Gesture>,
@@ -309,6 +312,7 @@ impl SoundApp {
             meters: HashMap::new(),
             main_meter: MeterDisplay::default(),
             loudness: loudness::Loudness::default(),
+            audiogram: None,
             meter_snapshot: soundcraft_playback::MeterSnapshot::default(),
             gesture: None,
             edit_layout: edit_window::EditLayout::default(),
@@ -821,6 +825,23 @@ impl SoundApp {
         }
         let playing = self.is_playing();
         self.loudness.update(&self.engine, playing, ctx);
+        if let Some(job) = &self.audiogram {
+            match job.done.try_recv() {
+                Ok(Ok(path)) => {
+                    self.ui.status = format!("Audiogram written: {path}");
+                    self.audiogram = None;
+                }
+                Ok(Err(e)) => {
+                    self.ui.status = e;
+                    self.audiogram = None;
+                }
+                Err(_) => {
+                    let p = job.progress.load(std::sync::atomic::Ordering::Relaxed);
+                    self.ui.status = format!("Rendering audiogram… {}%", p / 10);
+                    ctx.request_repaint_after(std::time::Duration::from_millis(250));
+                }
+            }
+        }
         // Fonts set now take effect next frame, so draw only from the frame after.
         if !self.fonts_ready {
             if self.fonts_installed {

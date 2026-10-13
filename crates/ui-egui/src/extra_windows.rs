@@ -56,6 +56,10 @@ pub fn run(app: &mut SoundApp, id: &str, p: &Value) -> Option<Value> {
         "window.subtitles" => crate::subtitle_editor::toggle(app, p),
         "window.words" => crate::words_window::toggle(app, p),
         "window.jingles" => crate::jingles_window::toggle(app, p),
+        "window.audiogram" => {
+            app.dialogs.open_audiogram(&app.engine);
+            json!({})
+        }
         _ => return None,
     })
 }

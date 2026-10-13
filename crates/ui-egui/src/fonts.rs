@@ -76,6 +76,18 @@ fn load(_: &[(&str, u32)], _: bool) -> Option<FontData> {
     None
 }
 
+/// Bytes and face index of a bold system font, else of egui's built-in proportional font (for
+/// drawing text outside egui, e.g. into audiogram frames).
+pub fn bold_font_bytes() -> Option<(Vec<u8>, u32)> {
+    if let Some(fd) = load(BOLD, true) {
+        return Some((fd.font.to_vec(), fd.index));
+    }
+    let defs = FontDefinitions::default();
+    let first = defs.families.get(&FontFamily::Proportional)?.first()?;
+    let fd = defs.font_data.get(first)?;
+    Some((fd.font.to_vec(), fd.index))
+}
+
 pub fn definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::default();
     let base: Vec<String> = fonts.families.get(&FontFamily::Proportional).cloned().unwrap_or_default();

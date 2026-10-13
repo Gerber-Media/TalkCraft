@@ -102,6 +102,11 @@ pub enum Dialog {
         keep_ms: f64,
         preview: Option<String>,
     },
+    /// File > Export > Audiogram Video: where to, and square or portrait.
+    Audiogram {
+        path: String,
+        portrait: bool,
+    },
     /// Delete/Backspace: remove the selected section (`clips` empty) or the selected clips.
     DeleteSection {
         start: Samples,
@@ -142,6 +147,7 @@ impl Dialogs {
             Dialog::Preferences { .. } => "preferences",
             Dialog::ShortenPauses { .. } => "shorten_pauses",
             Dialog::DeleteSection { .. } => "delete_section",
+            Dialog::Audiogram { .. } => "audiogram",
         })
     }
 
@@ -183,6 +189,12 @@ impl Dialogs {
             return Ok(());
         }
         Err("Nothing to delete: drag over the audio with the Selector, or click a clip with the Grabber".into())
+    }
+
+    /// File > Export > Audiogram Video.
+    pub fn open_audiogram(&mut self, e: &Engine) {
+        let name = &e.session().name;
+        self.open = Some(Dialog::Audiogram { path: format!("{}/{name} Audiogram.mp4", default_dir()), portrait: false });
     }
 
     pub fn open_rename_track(&mut self, id: TrackId, name: &str) {
@@ -421,6 +433,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
         Dialog::ExportEpisode { .. } => "Export Episode",
         Dialog::Preferences { .. } => "Preferences",
         Dialog::ShortenPauses { .. } => "Shorten Pauses",
+        Dialog::Audiogram { .. } => "Audiogram Video",
         Dialog::DeleteSection { clips, .. } if !clips.is_empty() => "Delete Clips",
         Dialog::DeleteSection { .. } => "Delete Section",
     }
@@ -645,6 +658,37 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         action = Some(("edit.truncate_silence".into(), params));
                     }
                 }
+                Dialog::Audiogram { path, portrait } => {
+                    ui.horizontal(|ui| {
+                        ui.label("File");
+                        ui.add(egui::TextEdit::singleline(path).desired_width(380.0));
+                    });
+                    ui.horizontal(|ui| {
+                        ui.radio_value(portrait, false, "Square 1080 × 1080 (feed)");
+                        ui.radio_value(portrait, true, "Portrait 1080 × 1920 (stories, reels)");
+                    });
+                    let s = app.engine.session();
+                    let r = crate::audiogram::range(s);
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "{:.0} s from {} — the edit selection, else the first minute. Cover, title and subtitles come from the episode.",
+                            s.sample_rate.seconds(r.len()),
+                            clock(s.sample_rate.seconds(r.start))
+                        ))
+                        .small()
+                        .color(Tokens::current().text_dim),
+                    );
+                    if !crate::audiogram::available() {
+                        ui.label(egui::RichText::new("Needs ffmpeg (macOS: brew install ffmpeg)").color(Tokens::current().text_dim));
+                    }
+                    if buttons(ui, "Render", enter) && crate::audiogram::available() {
+                        let p = std::path::Path::new(path.as_str()).with_extension("mp4").to_string_lossy().to_string();
+                        if let Err(e) = start_audiogram(app, p, *portrait) {
+                            app.ui.status = e;
+                        }
+                        keep = false;
+                    }
+                }
                 Dialog::DeleteSection { start, end, tracks, clips, summary, close_gap } => {
                     ui.label(summary.as_str());
                     if clips.is_empty() {
@@ -845,6 +889,28 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
 }
 
 /// Cancel/OK row; returns true when OK was pressed (or Enter).
+/// Gathers the audio, cues, title and cover, and starts rendering the audiogram in the background.
+fn start_audiogram(app: &mut SoundApp, out: String, portrait: bool) -> Result<(), String> {
+    let r = crate::audiogram::range(app.engine.session());
+    let ch = soundcraft_engine::io::render_mix(&app.engine, r, "audiogram").map_err(|e| e.to_string())?;
+    let n = ch.iter().map(Vec::len).min().unwrap_or(0);
+    let audio: Vec<f32> = (0..n).map(|i| ch.iter().filter_map(|c| c.get(i)).sum::<f32>() / ch.len().max(1) as f32).collect();
+    let s = app.engine.session();
+    let ep = &s.podcast.episode;
+    let title = match (ep.show.trim(), ep.title.trim()) {
+        ("", "") => s.name.clone(),
+        ("", t) => t.to_string(),
+        (show, "") => show.to_string(),
+        (show, t) => format!("{show} · {t}"),
+    };
+    let cover = Some(ep.cover.trim().to_string()).filter(|c| !c.is_empty());
+    let cues = soundcraft_engine::subtitles::file_cues(s, r);
+    let req = crate::audiogram::Request { out, portrait, title, cover, audio, rate: s.sample_rate.hz(), cues };
+    app.audiogram = Some(crate::audiogram::start(req)?);
+    app.ui.status = "Rendering audiogram…".into();
+    Ok(())
+}
+
 /// `m:ss.s` for dialog texts.
 fn clock(secs: f64) -> String {
     let secs = secs.max(0.0);
