@@ -136,7 +136,6 @@ fn dock_tabs(app: &mut SoundApp, ui: &mut Ui) {
     let r = ui.max_rect();
     let mut x = r.min.x + 10.0;
     for (label, on, id) in [
-        ("MIDI EDITOR", app.ui.show_midi_editor, "window.midi_editor"),
         ("MEMORY LOCATIONS", app.ui.show_memory_locations, "window.memory_locations"),
         ("UNDO HISTORY", app.ui.show_undo_history, "window.undo_history"),
     ] {

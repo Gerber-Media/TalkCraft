@@ -18,6 +18,7 @@ pub mod mix_window;
 pub mod ops_windows;
 pub mod palette;
 pub mod panels;
+pub mod podcast;
 pub mod score_editor;
 pub mod shortcuts;
 pub mod theme;

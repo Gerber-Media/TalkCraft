@@ -8,7 +8,7 @@ use soundcraft_time::SampleRate;
 
 pub fn specs() -> Vec<CommandSpec> {
     vec![
-        cmd!(noundo "session.new", "New...", ["File"], Some("Cmd+N"), "{name?: 'Untitled', sample_rate?: 48000, bit_depth?: 24, template?: blank|demo}", always, new_session),
+        cmd!(noundo "session.new", "New...", ["File"], Some("Cmd+N"), "{name?: 'Untitled', sample_rate?: 48000, bit_depth?: 24, template?: blank|podcast|demo, speakers?: 2}", always, new_session),
         cmd!(noundo "session.open", "Open Session...", ["File"], Some("Cmd+O"), "{path}", always, |e, p| {
             let path = str_param(p, "path").ok_or_else(|| bad("session.open", "`path` required"))?.to_string();
             let missing = crate::io::open_session(e, &path)?;
@@ -84,7 +84,7 @@ pub fn specs() -> Vec<CommandSpec> {
                 crate::io::import_video_bytes(e, &path, bytes, at)
             }
         ),
-        cmd!(noundo "file.bounce_mix", "Bounce Mix...", ["File"], Some("Cmd+Alt+B"), "{path, format?: wav|aiff|flac, bit_depth?: 16|24|32f, start?, end?, source?: main|bus name, normalize?: false, dither?: true, fold_down?: stereo}", always, bounce),
+        cmd!(noundo "file.bounce_mix", "Bounce Mix...", ["File"], Some("Cmd+Alt+B"), "{path, format?: wav|aiff|flac, bit_depth?: 16|24|32f, start?, end?, source?: main|bus name, normalize?: false, loudness?: LUFS|true (-16), dither?: true, fold_down?: stereo}", always, bounce),
         cmd!(noundo "file.bounce_stems", "Bounce Stems...", [], None, "{dir, format?: wav|aiff|flac, bit_depth?: 16|24|32f, start?, end?, fold_down?: stereo}", has_tracks, |e, p| {
             let dir = str_param(p, "dir").ok_or_else(|| bad("file.bounce_stems", "`dir` required"))?.to_string();
             let r = range_param(e, "file.bounce_stems", p)?;
@@ -204,7 +204,11 @@ fn new_session(e: &mut Engine, p: &Value) -> Result<Value> {
     let name = str_param(p, "name").unwrap_or("Untitled").to_string();
     let sr =
         SampleRate::new(i64_or(p, "sample_rate", 48_000).clamp(0, i64::from(u32::MAX)) as u32).map_err(|err| bad("session.new", err.to_string()))?;
-    let mut s = if str_param(p, "template") == Some("demo") { crate::demo::demo_session() } else { Session::new(name.clone(), sr) };
+    let mut s = match str_param(p, "template") {
+        Some("demo") => crate::demo::demo_session(),
+        Some("podcast") => crate::podcast::podcast_session(&name, sr, i64_or(p, "speakers", 2).clamp(1, 8) as usize),
+        _ => Session::new(name.clone(), sr),
+    };
     s.name = name;
     if let Some(b) = p.get("bit_depth") {
         s.bit_depth = match b.to_string().trim_matches('"') {
@@ -292,7 +296,16 @@ fn bounce(e: &mut Engine, p: &Value) -> Result<Value> {
     let normalize = bool_or(p, "normalize", false);
     let fold = fold_down_param(p, "file.bounce_mix")?;
     let bus = bounce_bus(e, p)?;
-    let (bytes, stats) = crate::io::bounce_source(e, r, &opts, normalize, fold, bus)?;
+    let loudness = match p.get("loudness") {
+        None | Some(Value::Null) | Some(Value::Bool(false)) => None,
+        Some(Value::Bool(true)) => Some(crate::podcast::PODCAST_LUFS),
+        Some(v) => Some(
+            v.as_f64()
+                .filter(|x| x.is_finite() && (-40.0..=0.0).contains(x))
+                .ok_or_else(|| bad("file.bounce_mix", "`loudness` is a target in LUFS between -40 and 0 (or true for -16)"))? as f32,
+        ),
+    };
+    let (bytes, stats) = crate::io::bounce_source(e, r, &opts, normalize, fold, bus, loudness)?;
     crate::io::write_file(&path, &bytes)?;
     Ok(
         json!({"path": path, "bytes": bytes.len(), "seconds": e.session().sample_rate.seconds(r.len()), "peak_db": stats.0, "lufs": stats.1, "true_peak_db": stats.2}),
@@ -394,6 +407,38 @@ mod tests {
         }
         let ok = dir.join("mix.flac");
         assert!(e.execute("file.bounce_mix", &json!({"path": ok.to_string_lossy(), "start": 0, "end": 480})).is_ok());
+        assert!(std::fs::remove_dir_all(&dir).is_ok());
+    }
+
+    #[test]
+    fn podcast_bounce_hits_the_loudness_target_under_the_true_peak_ceiling() {
+        let dir = std::env::temp_dir().join(format!("sc-podcast-loudness-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        // 5 s of a quiet, peaky voice-like signal (fundamental plus harmonics, syllable envelope).
+        let sr = 48_000.0f32;
+        let voice: Vec<f32> = (0..240_000)
+            .map(|i| {
+                let t = i as f32 / sr;
+                let env = (t * 3.0 * std::f32::consts::TAU).sin().abs();
+                let f = 140.0 * std::f32::consts::TAU * t;
+                (f.sin() + 0.5 * (2.0 * f).sin() + 0.3 * (3.0 * f).sin()) * env * 0.08
+            })
+            .collect();
+        let buf = AudioBuffer { sample_rate: 48_000, channels: vec![voice] };
+        let wav = dir.join("voice.wav");
+        std::fs::write(&wav, soundcraft_audio_io::encode(&buf, &EncodeOptions::default()).unwrap()).unwrap();
+        let mut e = Engine::default();
+        e.execute("session.new", &json!({"template": "podcast", "speakers": 1})).unwrap();
+        e.execute("file.import_audio", &json!({"path": wav.to_string_lossy(), "track": "Moderation", "new_tracks": false})).unwrap();
+        let out = dir.join("episode.wav");
+        let v = e.execute("file.bounce_mix", &json!({"path": out.to_string_lossy(), "loudness": -16, "bit_depth": "32f", "dither": false})).unwrap();
+        let lufs = v["lufs"].as_f64().unwrap();
+        let tp = v["true_peak_db"].as_f64().unwrap();
+        assert!((lufs + 16.0).abs() < 1.0, "integrated loudness {lufs} LUFS");
+        assert!(tp <= -0.9, "true peak {tp} dBTP");
+        let err = e.execute("file.bounce_mix", &json!({"path": out.to_string_lossy(), "loudness": 5})).unwrap_err();
+        assert!(err.to_string().contains("LUFS"), "{err}");
         assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 

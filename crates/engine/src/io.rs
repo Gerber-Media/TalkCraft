@@ -245,10 +245,11 @@ pub fn bounce_bytes(e: &Engine, r: Range, opts: &EncodeOptions, normalize: bool)
 /// Render the main mix in its own format (every main channel, SMPTE/WAV order, with the WAV
 /// speaker mask of the main format), or an ITU stereo fold-down when `fold_stereo`.
 pub fn bounce_bytes_with(e: &Engine, r: Range, opts: &EncodeOptions, normalize: bool, fold_stereo: bool) -> Result<(Vec<u8>, (f32, f32, f32))> {
-    bounce_source(e, r, opts, normalize, fold_stereo, None)
+    bounce_source(e, r, opts, normalize, fold_stereo, None, None)
 }
 
-/// [`bounce_bytes_with`] for the main mix, or for `bus` when one is named.
+/// [`bounce_bytes_with`] for the main mix, or for `bus` when one is named. `loudness` (LUFS)
+/// normalizes to that integrated loudness under the podcast true-peak ceiling instead of peaks.
 pub fn bounce_source(
     e: &Engine,
     r: Range,
@@ -256,13 +257,17 @@ pub fn bounce_source(
     normalize: bool,
     fold_stereo: bool,
     bus: Option<BusId>,
+    loudness: Option<f32>,
 ) -> Result<(Vec<u8>, (f32, f32, f32))> {
     let s = e.session();
     if r.len() > s.sample_rate.samples(4.0 * 3600.0) {
         return Err(EngineError::BadParams("file.bounce_mix".into(), "bounces are limited to 4 hours".into()));
     }
     let (mut ch, fmt) = render_bounce(s, r, fold_stereo, bus);
-    if normalize {
+    if let Some(target) = loudness {
+        let ceiling = crate::podcast::PODCAST_TRUE_PEAK - 0.5;
+        soundcraft_dsp::offline::normalize_loudness(&mut ch, s.sample_rate.as_f64() as f32, target, ceiling);
+    } else if normalize {
         soundcraft_dsp::offline::normalize(&mut ch, -0.1, false);
     }
     let peak = soundcraft_dsp::offline::peak_db(&ch);

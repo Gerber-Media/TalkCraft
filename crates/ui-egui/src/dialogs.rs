@@ -11,8 +11,8 @@ use soundcraft_time::Samples;
 #[derive(Debug, Clone)]
 pub enum Dialog {
     NewTracks { count: u32, format: String, kind: String, timebase: String, name: String },
-    NewSession { name: String, sample_rate: u32, demo: bool },
-    Bounce { path: String, format: String, bit_depth: String, normalize: bool },
+    NewSession { name: String, sample_rate: u32, template: String, speakers: u32 },
+    Bounce { path: String, format: String, bit_depth: String, normalize: bool, loudness: bool },
     RenameTrack { id: TrackId, name: String },
     RenameClip { id: ClipId, name: String },
     ClearClips { clips: Vec<ClipId>, sources: Vec<SourceId>, message: String },
@@ -83,10 +83,14 @@ impl Dialogs {
             "track.new" => {
                 Dialog::NewTracks { count: 1, format: "Mono".into(), kind: "audio".into(), timebase: "samples".into(), name: "Audio".into() }
             }
-            "session.new" => Dialog::NewSession { name: "Untitled".into(), sample_rate: 48_000, demo: false },
-            "file.bounce_mix" => {
-                Dialog::Bounce { path: format!("{home}/{name} Bounce.wav"), format: "wav".into(), bit_depth: "24".into(), normalize: false }
-            }
+            "session.new" => Dialog::NewSession { name: "Episode".into(), sample_rate: 48_000, template: "podcast".into(), speakers: 2 },
+            "file.bounce_mix" => Dialog::Bounce {
+                path: format!("{home}/{name} Bounce.wav"),
+                format: "wav".into(),
+                bit_depth: "24".into(),
+                normalize: false,
+                loudness: true,
+            },
             "file.import_audio" => Dialog::PathPrompt { cmd: id.into(), title: "Import Audio".into(), path: home, key: "path".into() },
             "file.import_midi" => Dialog::PathPrompt { cmd: id.into(), title: "Import MIDI".into(), path: home, key: "path".into() },
             "session.open" => Dialog::PathPrompt { cmd: id.into(), title: "Open Session".into(), path: home, key: "path".into() },
@@ -295,7 +299,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         egui::ComboBox::from_id_salt("nt_kind")
                             .selected_text(soundcraft_model::TrackKind::from_id(kind).map_or("Audio Track", |k| k.label()))
                             .show_ui(ui, |ui| {
-                                for k in soundcraft_model::TrackKind::ALL {
+                                for k in soundcraft_model::TrackKind::ALL.into_iter().filter(|k| !crate::podcast::hidden_track_kind(*k)) {
                                     if ui.selectable_label(kind == k.id(), k.label()).clicked() {
                                         *kind = k.id().to_string();
                                         *name = k.default_name().to_string();
@@ -318,7 +322,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                             Some(("track.new".into(), json!({"count": count, "format": format, "kind": kind, "timebase": timebase, "name": name})));
                     }
                 }
-                Dialog::NewSession { name, sample_rate, demo } => {
+                Dialog::NewSession { name, sample_rate, template, speakers } => {
                     ui.horizontal(|ui| {
                         ui.label("Name");
                         ui.text_edit_singleline(name);
@@ -328,15 +332,29 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                             ui.selectable_value(sample_rate, r, format!("{r} Hz"));
                         }
                     });
-                    ui.checkbox(demo, "Start from the demo session");
+                    ui.horizontal(|ui| {
+                        ui.radio_value(template, "podcast".to_string(), "Podcast episode");
+                        ui.radio_value(template, "blank".to_string(), "Empty session");
+                    });
+                    if template == "podcast" {
+                        ui.horizontal(|ui| {
+                            ui.label("Speakers");
+                            ui.add(egui::DragValue::new(speakers).range(1..=8));
+                        });
+                        ui.label(
+                            egui::RichText::new("One mono track per speaker with a voice chain (EQ, gate, compressor, de-esser), a jingle track and a limited master.")
+                                .small()
+                                .color(Tokens::current().text_dim),
+                        );
+                    }
                     if buttons(ui, "Create", enter) {
                         action = Some((
                             "session.new".into(),
-                            json!({"name": name, "sample_rate": sample_rate, "template": if *demo { "demo" } else { "blank" }}),
+                            json!({"name": name, "sample_rate": sample_rate, "template": template, "speakers": speakers}),
                         ));
                     }
                 }
-                Dialog::Bounce { path, format, bit_depth, normalize } => {
+                Dialog::Bounce { path, format, bit_depth, normalize, loudness } => {
                     ui.horizontal(|ui| {
                         ui.label("File");
                         ui.add(egui::TextEdit::singleline(path).desired_width(360.0));
@@ -353,7 +371,8 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                             }
                         });
                     });
-                    ui.checkbox(normalize, "Normalize to -0.1 dBFS");
+                    ui.checkbox(loudness, "Podcast loudness: -16 LUFS, -1 dBTP");
+                    ui.add_enabled(!*loudness, egui::Checkbox::new(normalize, "Normalize to -0.1 dBFS"));
                     ui.label(
                         egui::RichText::new("Bounces the edit selection, or the whole session when nothing is selected.")
                             .small()
@@ -363,7 +382,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         let p = std::path::Path::new(path.as_str()).with_extension(if format == "aiff" { "aif" } else { format.as_str() });
                         action = Some((
                             "file.bounce_mix".into(),
-                            json!({"path": p.to_string_lossy(), "format": format, "bit_depth": bit_depth, "normalize": normalize}),
+                            json!({"path": p.to_string_lossy(), "format": format, "bit_depth": bit_depth, "normalize": normalize, "loudness": loudness}),
                         ));
                     }
                 }

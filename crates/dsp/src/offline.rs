@@ -77,6 +77,41 @@ pub fn normalize(ch: &mut [Vec<f32>], target_db: f32, per_channel: bool) {
     }
 }
 
+/// Integrated loudness (BS.1770, LUFS) of planar buffers; -144 for silence.
+pub fn integrated_lufs(ch: &[Vec<f32>], sample_rate: f32) -> f32 {
+    let mut m = crate::meter::LoudnessMeter::new(sane_sr(sample_rate), ch.len());
+    m.process(ch, max_len(ch));
+    m.integrated_lufs()
+}
+
+/// Loudness-normalizes to `target_lufs` with a lookahead limiter holding sample peaks at
+/// `ceiling_db` (set it ~0.5 dB under the true-peak target). Limiting costs a little loudness,
+/// so a second, smaller pass corrects for it. Silence is left alone. Returns the gain applied (dB).
+pub fn normalize_loudness(ch: &mut [Vec<f32>], sample_rate: f32, target_lufs: f32, ceiling_db: f32) -> f32 {
+    if !target_lufs.is_finite() || !ceiling_db.is_finite() {
+        return 0.0;
+    }
+    let target = target_lufs.clamp(-40.0, 0.0);
+    let mut total = 0.0;
+    for _ in 0..2 {
+        let now = integrated_lufs(ch, sample_rate);
+        if now <= -70.0 {
+            return total;
+        }
+        let g = (target - now).clamp(-60.0, 40.0);
+        if g.abs() < 0.05 {
+            break;
+        }
+        gain(ch, g);
+        total += g;
+        let mut lim = crate::plugins::dynamics::Maximizer::new();
+        lim.set_param("threshold", 0.0);
+        lim.set_param("ceiling", ceiling_db.clamp(-30.0, 0.0));
+        apply_plugin(ch, &mut lim, sample_rate);
+    }
+    total
+}
+
 /// Applies a gain change in dB.
 pub fn gain(ch: &mut [Vec<f32>], db: f32) {
     let g = db_to_gain(if db.is_nan() { 0.0 } else { db.min(96.0) });
