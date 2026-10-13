@@ -43,14 +43,10 @@ fn edit_modes(app: &mut SoundApp, ui: &mut Ui) {
         let inner = r.shrink(6.0);
         let cw = inner.width() / 2.0;
         let ch = inner.height() / 2.0;
-        let modes = [
-            (EditMode::Shuffle, 0, 0, "SHUFFLE", "F1"),
-            (EditMode::Spot, 1, 0, "SPOT", "F3"),
-            (EditMode::Slip, 0, 1, "SLIP", "F2"),
-            (EditMode::Grid, 1, 1, "GRID", "F4"),
-        ];
-        for (m, cx, cy, label, key) in modes {
-            let cell = Rect::from_min_size(pos2(inner.min.x + cw * cx as f32, inner.min.y + ch * cy as f32), vec2(cw, ch)).shrink(1.0);
+        // TalkCraft leaves out Spot (timecode spotting); Grid spans the bottom row.
+        let modes = [(EditMode::Shuffle, 0, 0, 1, "SHUFFLE", "F1"), (EditMode::Slip, 1, 0, 1, "SLIP", "F2"), (EditMode::Grid, 0, 1, 2, "GRID", "F4")];
+        for (m, cx, cy, span, label, key) in modes {
+            let cell = Rect::from_min_size(pos2(inner.min.x + cw * cx as f32, inner.min.y + ch * cy as f32), vec2(cw * span as f32, ch)).shrink(1.0);
             let resp = ui.interact(cell, ui.id().with(("mode", label)), Sense::click());
             let on = cur == m || (m == EditMode::Grid && cur == EditMode::GridRelative);
             ui.painter().rect_filled(cell, 1.0, if on { t.mode_on } else { t.mode_off });
@@ -89,23 +85,6 @@ fn zoom_group(app: &mut SoundApp, ui: &mut Ui) {
                 if icon_button(ui, vec2(28.0, 22.0), "zoom", false, "Fill window with session (Alt+A)").clicked() {
                     let w = ui.ctx().content_rect().width() - 420.0;
                     let _ = app.run("view.zoom_fit", json!({"width_px": w}));
-                }
-            });
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 2.0;
-                for i in 1..=5 {
-                    let r = crate::widgets::text_toggle(
-                        ui,
-                        vec2(22.0, 18.0),
-                        &i.to_string(),
-                        false,
-                        Color32::GRAY,
-                        "Zoom preset (click to recall, Cmd-click to store)",
-                    );
-                    if r.clicked() {
-                        let store = ui.input(|x| x.modifiers.command);
-                        let _ = app.run("view.zoom_preset", json!({"preset": i, "store": store}));
-                    }
                 }
             });
         });
@@ -159,11 +138,6 @@ fn tools(app: &mut SoundApp, ui: &mut Ui) {
                     if icon_button(ui, vec2(36.0, 18.0), icon, on, tip).clicked() {
                         let _ = app.run(id, json!({}));
                     }
-                }
-                let focus = e.keyboard_focus == "commands";
-                if crate::widgets::text_toggle(ui, vec2(36.0, 18.0), "a-z", focus, t.accent, "Commands Keyboard Focus (single-key editing)").clicked()
-                {
-                    let _ = app.run("options.keyboard_focus", json!({}));
                 }
             });
         });

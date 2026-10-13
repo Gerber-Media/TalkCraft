@@ -187,10 +187,10 @@ fn insert_path(roots: &mut Vec<MenuNode>, line: &str) {
             path.push_str(" > ");
         }
         path.push_str(p);
-        let idx = match level.iter().position(|n| n.label == *p) {
+        let idx = match level.iter().position(|n| n.label == crate::podcast::menu_label(p)) {
             Some(i) => i,
             None => {
-                level.push(MenuNode { label: p.to_string(), path: path.clone(), children: Vec::new() });
+                level.push(MenuNode { label: crate::podcast::menu_label(p).to_string(), path: path.clone(), children: Vec::new() });
                 level.len() - 1
             }
         };

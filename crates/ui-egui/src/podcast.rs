@@ -48,10 +48,151 @@ const HIDDEN_PARTS: &[&str] = &[
     "Transcription Settings",
 ];
 
+/// Single entries a podcast does not need: items the fork never implemented (Dashboard, AAF,
+/// Melodyne …), music and film tools (punch modes, click, elastic audio, timecode spotting) and
+/// big-studio views (mic preamps, object, ten sends).
+const HIDDEN_EXACT: &[&str] = &[
+    "AudioSuite > Delay > Mod Delay III",
+    "AudioSuite > Harmonic > Eleven Lite",
+    "AudioSuite > Harmonic > Lo-Fi",
+    "AudioSuite > Harmonic > Recti-Fi",
+    "AudioSuite > Harmonic > SansAmp PSA-1",
+    "AudioSuite > Modulation > Sci-Fi",
+    "AudioSuite > Other > Signal Generator",
+    "AudioSuite > Pitch Shift > Pitch II",
+    "AudioSuite > Pitch Shift > Pitch Shift Legacy",
+    "AudioSuite > Pitch Shift > Vari-Fi",
+    "Clip > Capture...",
+    "Clip > Elastic Properties",
+    "Clip > Identify Sync Point",
+    "Clip > Loop...",
+    "Clip > Remove Pitch Shift",
+    "Clip > Remove Warp",
+    "Clip > Time Lock/Unlock",
+    "Clip > Unloop...",
+    "Edit > Automation > Coalesce Pan Guide Automation",
+    "Edit > Automation > Glide Pan Only",
+    "Edit > Automation > Glide to All Enabled",
+    "Edit > Automation > Glide to Current",
+    "Edit > Clear Special > Pan Automation",
+    "Edit > Clear Special > Plugin Automation",
+    "Edit > Copy Selection to... > Target Playlist",
+    "Edit > Copy Special > Pan Automation",
+    "Edit > Copy Special > Plugin Automation",
+    "Edit > Cut Special > Pan Automation",
+    "Edit > Cut Special > Plugin Automation",
+    "Edit > Move Selection to... > Target Playlist",
+    "Edit > Selection > Double Edit",
+    "Edit > Selection > Duplicate and Extend Edit",
+    "Edit > Selection > Extend Edit Selection To Marker Lane Above",
+    "Edit > Selection > Extend Edit Selection To Marker Lane Below",
+    "Edit > Selection > Halve Edit",
+    "Edit > Selection > Move Edit Selection To Marker Lane Above",
+    "Edit > Selection > Move Edit Selection To Marker Lane Below",
+    "Edit > Separate > At Transients",
+    "Edit > Separate > On Grid",
+    "Edit > TCE Edit to Timeline Selection",
+    "File > Dashboard...",
+    "File > Export > Selected Tracks as New AAF/OMF...",
+    "File > Export > Selected Tracks as New Media Composer Compatible Session...",
+    "File > Export > Session Info as Text...",
+    "File > Get Info...",
+    "File > Import > VENUE Channel Names as Track Names",
+    "File > Sign In",
+    "Options > Calibration Mode",
+    "Options > Click",
+    "Options > Destructive Record",
+    "Options > DestructivePunch",
+    "Options > Dynamic Transport",
+    "Options > Edit/Tool Mode Keyboard Lock",
+    "Options > Layered Editing",
+    "Options > Prepare DPE Tracks",
+    "Options > QuickPunch",
+    "Options > Solo Mode > AFL (After Fader Listen)",
+    "Options > Solo Mode > PFL (Pre Fader Listen)",
+    "Options > Solo Mode > X-OR (Cancels Previous Solo)",
+    "Options > Tab to Transient",
+    "Options > TrackPunch",
+    "Options > Transport Online",
+    "Track > Commit...",
+    "Track > Convert Aux to Routing Folder",
+    "Track > Create Click Track",
+    "Track > Designate as Target Playlist",
+    "Track > Freeze",
+    "Track > Set Record Tracks to Input Only",
+    "Track > Show Target Playlist",
+    "Track > Split into Mono",
+    "View > Clip > Original Time Stamp",
+    "View > Clip > Scene And Take",
+    "View > Clip > Sync Point",
+    "View > Clip > User Time Stamp",
+    "View > Edit Window Views > Inserts F-J",
+    "View > Edit Window Views > Mic Preamps",
+    "View > Edit Window Views > Object",
+    "View > Edit Window Views > Real-Time Properties",
+    "View > Edit Window Views > Sends F-J",
+    "View > Main Counter > Samples",
+    "View > Mix Window Views > Delay Compensation",
+    "View > Mix Window Views > Inserts F-J",
+    "View > Mix Window Views > Mic Preamps",
+    "View > Mix Window Views > Object",
+    "View > Mix Window Views > Sends F-J",
+    "View > Rulers > Markers 2",
+    "View > Rulers > Markers 3",
+    "View > Rulers > Markers 4",
+    "View > Rulers > Markers 5",
+    "View > Rulers > Samples",
+    "View > Transport > Ableton Link",
+    "Window > ARA Plugins",
+    "Window > Learn",
+    "Window > Renderer",
+    "Window > SoundFlow",
+    "Window > Splice",
+    "Window > Task Manager",
+    "Window > Transcript",
+    "Window > Trim and Downmix",
+];
+
+/// Whole submenus a podcast does not need.
+const HIDDEN_PREFIXES: &[&str] = &[
+    "Clip > Rating",
+    "View > Expanded Sends",
+    "Window > Configurations",
+    "Window > Workspaces",
+    "Window > New Workspace",
+    "Track > ARA Plugins",
+    "Clip > ARA Plugins",
+];
+
+/// Track widths a podcast uses; the surround and Ambisonics formats are left out.
+const KEPT_WIDTHS: &[&str] = &["Mono", "Stereo"];
+
 /// Whether a menu catalog line (`Root > … > Leaf`) is left out of the podcast menus.
 pub fn hidden_menu(path: &str) -> bool {
     let root = path.split(" > ").next().unwrap_or(path);
-    HIDDEN_ROOTS.contains(&root) || HIDDEN_PARTS.iter().any(|p| path.contains(p))
+    if let Some(width) = path.strip_prefix("Track > Change Track Width > ") {
+        return !KEPT_WIDTHS.contains(&width);
+    }
+    HIDDEN_ROOTS.contains(&root)
+        || HIDDEN_PARTS.iter().any(|p| path.contains(p))
+        || HIDDEN_EXACT.contains(&path)
+        || HIDDEN_PREFIXES.iter().any(|p| path.starts_with(p))
+}
+
+/// Neutral names for menu items the clean-room original named after Avid products.
+pub fn menu_label(label: &str) -> &str {
+    match label {
+        "EQ3 1-Band" => "EQ 1-Band",
+        "EQ3 7-Band" => "EQ 7-Band",
+        "BF-76" => "FET Compressor",
+        "Dyn3 Compressor/Limiter" => "Compressor/Limiter",
+        "Dyn3 De-Esser" => "De-Esser",
+        "Dyn3 Expander/Gate" => "Expander/Gate",
+        "Maxim" => "Maximizer",
+        "D-Verb" => "Reverb",
+        "Pro Tools Search" => "Search",
+        other => other,
+    }
 }
 
 /// Track kinds the New Tracks dialog does not offer.

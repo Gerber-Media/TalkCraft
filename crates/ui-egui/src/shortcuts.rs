@@ -126,11 +126,11 @@ fn fixed(app: &mut SoundApp, key: Key, m: Modifiers, mac: bool) -> bool {
             let _ = app.run("markers.add", json!({}));
             true
         }
-        Key::F1 | Key::F2 | Key::F3 | Key::F4 if plain => {
+        // F3 (Spot) is left out: TalkCraft has no timecode spotting.
+        Key::F1 | Key::F2 | Key::F4 if plain => {
             let mode = match key {
                 Key::F1 => "shuffle",
                 Key::F2 => "slip",
-                Key::F3 => "spot",
                 _ => "grid",
             };
             let _ = app.run("edit.mode", json!({"mode": mode}));
