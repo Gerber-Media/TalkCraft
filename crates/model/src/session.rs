@@ -309,6 +309,9 @@ pub struct Session {
     /// Podcast export settings and episode metadata.
     #[serde(default)]
     pub podcast: crate::PodcastSettings,
+    /// Subtitle cues, sorted by start.
+    #[serde(default)]
+    pub subtitles: Vec<crate::SubtitleCue>,
     /// Original MIDI performances keyed by clip id (Event › MIDI Operations › Restore/Flatten
     /// Performance). Independent of undo so a restore survives later edits.
     #[serde(default)]
@@ -350,6 +353,7 @@ impl Session {
             next_id: 1,
             comments: String::new(),
             podcast: crate::PodcastSettings::default(),
+            subtitles: Vec::new(),
             midi_originals: std::collections::BTreeMap::new(),
             pool: SourcePool::default(),
             folder: None,

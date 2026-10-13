@@ -21,6 +21,7 @@ pub mod panels;
 pub mod podcast;
 pub mod score_editor;
 pub mod shortcuts;
+pub mod subtitle_editor;
 pub mod theme;
 pub mod toolbar;
 pub mod video_track;

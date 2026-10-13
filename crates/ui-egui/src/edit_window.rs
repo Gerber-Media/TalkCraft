@@ -346,6 +346,7 @@ fn ruler_label(id: &str) -> &'static str {
         "tempo" => "Tempo",
         "meter" => "Meter",
         "markers" => "Markers",
+        "subtitles" => "Subtitles",
         "key" => "Key",
         "chords" => "Chords",
         "timecode2" => "Timecode 2",
@@ -399,6 +400,59 @@ fn tempo_editor(app: &mut SoundApp, ui: &mut Ui, painter: &egui::Painter, s: &Se
             let bpm = lo + f64::from((row.max.y - 4.0 - p.y) / (row.height() - 8.0)) * (hi - lo);
             let _ = app.run("event.tempo", json!({"bpm": (bpm * 10.0).round() / 10.0, "at": at}));
         }
+    }
+}
+
+/// The subtitle ruler: one block per cue with its text. Click a cue to go to it, double-click a
+/// cue to edit it in the Subtitles window, double-click empty space to add a cue there.
+fn subtitle_ruler(app: &mut SoundApp, ui: &mut Ui, painter: &egui::Painter, s: &Session, tl: Rect, row: Rect) {
+    painter.rect_filled(row, 0.0, Color32::from_rgb(34, 44, 58));
+    let now = app.position();
+    let selected = app.extra.subtitles.selected;
+    let mut blocks = Vec::new();
+    for c in &s.subtitles {
+        let (x0, x1) = (x_of(s, tl, c.start), x_of(s, tl, c.end));
+        if x1 < tl.min.x || x0 > tl.max.x {
+            continue;
+        }
+        let r = Rect::from_min_max(pos2(x0, row.min.y + 2.0), pos2(x1.max(x0 + 2.0), row.max.y - 2.0));
+        let live = now >= c.start && now < c.end;
+        let fill = if selected == Some(c.id) {
+            Color32::from_rgb(70, 120, 200)
+        } else if live {
+            Color32::from_rgb(200, 160, 60)
+        } else if c.text.trim().is_empty() {
+            Color32::from_rgb(70, 78, 92)
+        } else {
+            Color32::from_rgb(56, 92, 140)
+        };
+        painter.rect_filled(r, 3.0, fill);
+        let label = if c.text.trim().is_empty() { "…".to_string() } else { c.text.replace('\n', " ") };
+        let clip = painter.with_clip_rect(r.shrink2(vec2(4.0, 0.0)).intersect(row));
+        clip.text(pos2(r.min.x + 5.0, r.center().y), Align2::LEFT_CENTER, label, regular(10.5), Color32::WHITE);
+        blocks.push((r, c.id, c.start));
+    }
+    let resp = ui.interact(row, ui.id().with("subtitle_ruler"), Sense::click());
+    let Some(p) = resp.interact_pointer_pos() else { return };
+    let hit = blocks.iter().find(|(r, _, _)| r.contains(p)).map(|(_, id, at)| (*id, *at));
+    if resp.double_clicked() {
+        match hit {
+            Some((id, _)) => {
+                app.extra.subtitles.selected = Some(id);
+                let _ = app.run("window.subtitles", json!({"value": true}));
+            }
+            None => {
+                let at = sample_at(s, tl, p.x).max(0);
+                if let Ok(v) = app.run("subtitle.add", json!({"start": at, "end": at + s.sample_rate.samples(3.0)})) {
+                    app.extra.subtitles.selected = v["id"].as_u64();
+                }
+            }
+        }
+    } else if resp.clicked()
+        && let Some((id, at)) = hit
+    {
+        app.extra.subtitles.selected = Some(id);
+        let _ = app.run("transport.locate", json!({"at": at}));
     }
 }
 
@@ -504,6 +558,9 @@ fn draw_rulers(app: &mut SoundApp, ui: &mut Ui, area: Rect, tl: Rect, rulers: &[
                 let mut s2 = s.clone();
                 s2.frame_rate = alt;
                 timebase_ruler(ui, &painter, &s2, tl, row, view, TimeFormat::Timecode, i + 1 == rulers.len());
+            }
+            "subtitles" => {
+                subtitle_ruler(app, ui, &painter, &s, tl, row);
             }
             "markers" | "markers2" | "markers3" | "markers4" | "markers5" | "chords" => {
                 let lane: u8 = match id.as_str() {

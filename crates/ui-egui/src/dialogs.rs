@@ -26,6 +26,7 @@ pub enum Dialog {
     ScoreSetup { title: String, composer: String, bars_per_system: u32, show_track_names: bool },
     SaveChanges { then: (String, Value) },
     ExportEpisode { path: String, settings: Box<soundcraft_model::PodcastSettings> },
+    ShortenPauses { threshold: f64, longer_ms: f64, keep_ms: f64, preview: Option<String> },
 }
 
 #[derive(Default)]
@@ -54,6 +55,7 @@ impl Dialogs {
             Dialog::ScoreSetup { .. } => "score_setup",
             Dialog::SaveChanges { .. } => "save_changes",
             Dialog::ExportEpisode { .. } => "export_episode",
+            Dialog::ShortenPauses { .. } => "shorten_pauses",
         })
     }
 
@@ -124,6 +126,7 @@ impl Dialogs {
                 Dialog::Number { cmd: id.into(), title: "Quantize strength".into(), key: "strength".into(), value: 100.0, suffix: "%".into() }
             }
             "edit.fades_create" => Dialog::Fades { shape: "equal power".into() },
+            "edit.truncate_silence" => Dialog::ShortenPauses { threshold: -45.0, longer_ms: 1200.0, keep_ms: 600.0, preview: None },
             "edit.strip_silence" => Dialog::StripSilence { threshold: -48.0, min_ms: 50.0, pre_ms: 5.0, post_ms: 20.0 },
             "track.group" => {
                 let s = e.session();
@@ -267,6 +270,8 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     let mut save_first: Option<(String, Value)> = None;
     // Runs before `action` (the export dialog saves its settings into the session first).
     let mut before: Option<(String, Value)> = None;
+    // Shorten Pauses › Preview: a dry run whose summary goes back into the dialog.
+    let mut dry_run: Option<Value> = None;
     let confirmed = matches!(d, Dialog::SaveChanges { .. });
     let title = match &d {
         Dialog::NewTracks { .. } => "New Tracks",
@@ -285,6 +290,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
         Dialog::SaveChanges { then } if then.0 == "session.revert" => "Revert to Saved",
         Dialog::SaveChanges { .. } => "Unsaved Changes",
         Dialog::ExportEpisode { .. } => "Export Episode",
+        Dialog::ShortenPauses { .. } => "Shorten Pauses",
     }
     .to_string();
     let enter = ctx.input(|i| i.key_pressed(egui::Key::Enter));
@@ -482,6 +488,31 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         action = Some(("edit.fades_create".into(), json!({"shape": shape})));
                     }
                 }
+                Dialog::ShortenPauses { threshold, longer_ms, keep_ms, preview } => {
+                    ui.add(egui::Slider::new(threshold, -80.0..=-20.0).text("Silence below dB"));
+                    ui.add(egui::Slider::new(longer_ms, 300.0..=5000.0).text("Pauses longer than ms"));
+                    *keep_ms = keep_ms.min(*longer_ms);
+                    ui.add(egui::Slider::new(keep_ms, 0.0..=*longer_ms).text("Shorten them to ms"));
+                    let params = json!({"threshold_db": threshold, "longer_than_ms": longer_ms, "keep_ms": keep_ms});
+                    ui.horizontal(|ui| {
+                        if ui.button("Preview").clicked() {
+                            let mut p = params.clone();
+                            p["dry_run"] = json!(true);
+                            dry_run = Some(p);
+                        }
+                        if let Some(text) = preview.as_deref() {
+                            ui.label(egui::RichText::new(text).color(Tokens::current().text_dim));
+                        }
+                    });
+                    ui.label(
+                        egui::RichText::new("Works on all tracks at once (markers and subtitles move along). Applies to the edit selection, or the whole session; one undo step.")
+                            .small()
+                            .color(Tokens::current().text_dim),
+                    );
+                    if buttons(ui, "Shorten", enter) {
+                        action = Some(("edit.truncate_silence".into(), params));
+                    }
+                }
                 Dialog::StripSilence { threshold, min_ms, pre_ms, post_ms } => {
                     ui.add(egui::Slider::new(threshold, -96.0..=0.0).text("Threshold dB"));
                     ui.add(egui::Slider::new(min_ms, 0.0..=2000.0).text("Min strip duration ms"));
@@ -614,6 +645,9 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     if let Some((cmd, params)) = action {
         keep = false;
         match app.run(&cmd, params) {
+            Ok(v) if cmd == "edit.truncate_silence" => {
+                app.ui.status = format!("Shortened {} pause(s), {:.1} s removed", v["count"], v["removed_s"].as_f64().unwrap_or(0.0));
+            }
             Ok(v) if cmd == "file.export_podcast" => {
                 app.ui.status = format!(
                     "Exported {} ({:.1} LUFS, {:.1} dBTP, {} chapter(s))",
@@ -636,6 +670,14 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
         && let Err(e) = app.run(&then, params)
     {
         app.ui.status = e;
+    }
+    if let Some(p) = dry_run
+        && let Dialog::ShortenPauses { preview, .. } = &mut d
+    {
+        *preview = Some(match app.run("edit.truncate_silence", p) {
+            Ok(v) => format!("{} pause(s), {:.1} s would be removed", v["count"], v["removed_s"].as_f64().unwrap_or(0.0)),
+            Err(e) => e,
+        });
     }
     if keep {
         app.dialogs.open = Some(d);
@@ -805,6 +847,12 @@ fn export_episode_ui(ui: &mut egui::Ui, path: &mut String, s: &mut soundcraft_mo
             ui.checkbox(&mut x.chapters, "Write markers as chapters");
             ui.end_row();
         }
+        ui.label("Also write");
+        ui.vertical(|ui| {
+            ui.checkbox(&mut x.shownotes, "Shownotes (.md) and chapters (.chapters.json)");
+            ui.checkbox(&mut x.subtitles, "Subtitles (.srt and .vtt)");
+        });
+        ui.end_row();
     });
     if x.format == "mp3" {
         let e = &mut s.episode;

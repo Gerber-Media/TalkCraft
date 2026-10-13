@@ -149,24 +149,7 @@ fn cut_time(e: &mut Engine, p: &Value) -> Result<Value> {
     if r.is_empty() {
         return Err(bad("event.cut_time", "selection is empty"));
     }
-    let s = e.session_mut();
-    let ids: Vec<_> = s.tracks.iter().map(|t| t.id).collect();
-    for t in ids {
-        crate::edit::clear_range(s, t, r, true);
-        if let Some(tr) = s.track_mut(t) {
-            for l in &mut tr.automation {
-                l.clear_range(r.start, r.end);
-                l.shift_from(r.end, -r.len());
-            }
-        }
-    }
-    s.markers.retain(|m| !r.contains(m.start));
-    for m in &mut s.markers {
-        if m.start >= r.end {
-            m.start -= r.len();
-            m.end -= r.len();
-        }
-    }
+    crate::edit::cut_time(e.session_mut(), r, false);
     Ok(json!({"removed": r.len()}))
 }
 

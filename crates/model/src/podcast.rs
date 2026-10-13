@@ -19,6 +19,10 @@ pub struct PodcastExport {
     pub loudness_lufs: Option<f32>,
     /// Write the session's markers as MP3 chapters.
     pub chapters: bool,
+    /// Also write shownotes (`.md`) and Podcasting 2.0 chapters (`.chapters.json`) next to the file.
+    pub shownotes: bool,
+    /// Also write the subtitles as `.srt` and `.vtt` next to the file (when there are any).
+    pub subtitles: bool,
 }
 
 impl Default for PodcastExport {
@@ -31,6 +35,8 @@ impl Default for PodcastExport {
             bit_depth: "16".into(),
             loudness_lufs: Some(-16.0),
             chapters: true,
+            shownotes: true,
+            subtitles: true,
         }
     }
 }
@@ -78,4 +84,17 @@ impl Default for EpisodeInfo {
 pub struct PodcastSettings {
     pub export: PodcastExport,
     pub episode: EpisodeInfo,
+}
+
+/// One subtitle (caption) cue on the session timeline.
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+pub struct SubtitleCue {
+    /// Stable within the session (not reused after a delete).
+    pub id: u64,
+    pub start: soundcraft_time::Samples,
+    pub end: soundcraft_time::Samples,
+    /// Who speaks (written as a WebVTT voice tag), may be empty.
+    #[serde(default)]
+    pub speaker: String,
+    pub text: String,
 }

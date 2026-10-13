@@ -72,7 +72,7 @@ pub fn podcast_session(name: &str, sample_rate: SampleRate, speakers: usize) -> 
         s.edit.selected_tracks = vec![first];
     }
     s.edit.main_counter = soundcraft_time::TimeFormat::MinSecs;
-    s.edit.rulers = vec!["min_secs".into(), "markers".into()];
+    s.edit.rulers = vec!["min_secs".into(), "markers".into(), "subtitles".into()];
     s.edit.grid = soundcraft_time::GridValue::Seconds(1.0);
     s
 }

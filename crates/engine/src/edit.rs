@@ -402,6 +402,40 @@ pub fn delete_fades(s: &mut Session, track: TrackId, range: Range) -> usize {
     n
 }
 
+/// Removes `r` from the whole timeline: every track's clips and automation, the markers and the
+/// subtitles close up behind it. Markers inside `r` are deleted, or moved to its start when
+/// `keep_markers` (so trimming a pause keeps the chapter that starts in it).
+pub fn cut_time(s: &mut Session, r: Range, keep_markers: bool) {
+    if r.is_empty() {
+        return;
+    }
+    let ids: Vec<_> = s.tracks.iter().map(|t| t.id).collect();
+    for t in ids {
+        clear_range(s, t, r, true);
+        if let Some(tr) = s.track_mut(t) {
+            for l in &mut tr.automation {
+                l.clear_range(r.start, r.end);
+                l.shift_from(r.end, -r.len());
+            }
+        }
+    }
+    if keep_markers {
+        for m in s.markers.iter_mut().filter(|m| r.contains(m.start)) {
+            m.end = r.start + (m.end - m.start).max(0);
+            m.start = r.start;
+        }
+    } else {
+        s.markers.retain(|m| !r.contains(m.start));
+    }
+    for m in &mut s.markers {
+        if m.start >= r.end {
+            m.start -= r.len();
+            m.end -= r.len();
+        }
+    }
+    crate::subtitles::cut_time(s, r);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
