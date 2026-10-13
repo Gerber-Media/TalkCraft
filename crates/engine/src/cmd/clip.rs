@@ -69,6 +69,15 @@ pub fn specs() -> Vec<CommandSpec> {
         cmd!("clip.rename", "Rename...", ["Clip"], Some("Cmd+Alt+Shift+R"), "{clip?, name}", has_selection, rename),
         cmd!("clip.gain", "Clip Gain", [], None, "{clips?, db | delta_db}", has_selection, gain),
         cmd!(
+            "clip.set_fades",
+            "Set Clip Fades",
+            [],
+            None,
+            "{clip, fade_in?: samples|{seconds}, fade_out?: samples|{seconds}} — 0 removes a fade; both together never exceed the clip",
+            always,
+            set_fades
+        ),
+        cmd!(
             "clip.normalize",
             "Normalize Clip",
             [],
@@ -337,6 +346,27 @@ fn clip_audio(s: &soundcraft_model::Session, c: &soundcraft_model::Clip) -> Opti
     Some((ch, rate as f32))
 }
 
+fn set_fades(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "clip.set_fades";
+    let id = ClipId(p.get("clip").and_then(Value::as_u64).ok_or_else(|| bad(ID, "`clip` required"))?);
+    let fin = position_param(e, ID, p, "fade_in")?;
+    let fout = position_param(e, ID, p, "fade_out")?;
+    if fin.is_none() && fout.is_none() {
+        return Err(bad(ID, "`fade_in` or `fade_out` required"));
+    }
+    let c = e.session().find_clip(id).map(|(_, c)| c.clone()).ok_or_else(|| bad(ID, format!("no clip {}", id.0)))?;
+    let len = c.length.max(1);
+    let fin = fin.unwrap_or(c.fade_in.len).clamp(0, len);
+    let fout = fout.unwrap_or(c.fade_out.len).clamp(0, len - fin);
+    let shape = |f: &soundcraft_model::Fade| if f.len == 0 { soundcraft_model::FadeShape::SCurve } else { f.shape };
+    let s = e.session_mut();
+    if let Some(c) = s.find_clip_mut(id) {
+        c.fade_in = soundcraft_model::Fade { len: fin, shape: shape(&c.fade_in) };
+        c.fade_out = soundcraft_model::Fade { len: fout, shape: shape(&c.fade_out) };
+    }
+    Ok(json!({"fade_in": fin, "fade_out": fout}))
+}
+
 fn normalize(e: &mut Engine, p: &Value) -> Result<Value> {
     const ID: &str = "clip.normalize";
     let ids = clip_ids_param(e, p);
@@ -431,6 +461,23 @@ mod tests {
         assert!((lufs + 20.0).abs() < 0.05, "loudness after normalize {lufs}");
         e.execute("edit.undo", &json!({})).unwrap();
         assert_eq!(e.session().find_clip(ClipId(cid)).unwrap().1.gain_db, peak_gain, "one undo step per normalize");
+    }
+
+    #[test]
+    fn set_fades_lengthens_shortens_and_removes_within_the_clip() {
+        let mut e = crate::demo::demo_engine();
+        let pad = e.session().track_by_name("Pad").map(|t| t.id).unwrap();
+        let c = e.session().track(pad).unwrap().clips()[0].clone();
+        e.execute("clip.set_fades", &json!({"clip": c.id.0, "fade_in": {"seconds": 0.5}})).unwrap();
+        let sr = e.session().sample_rate;
+        assert_eq!(e.session().find_clip(c.id).unwrap().1.fade_in.len, sr.samples(0.5));
+        e.execute("clip.set_fades", &json!({"clip": c.id.0, "fade_out": c.length * 2})).unwrap();
+        let k = e.session().find_clip(c.id).unwrap().1.clone();
+        assert_eq!(k.fade_in.len + k.fade_out.len, c.length, "the fades never overlap past the clip");
+        e.execute("clip.set_fades", &json!({"clip": c.id.0, "fade_in": 0, "fade_out": 0})).unwrap();
+        let k = e.session().find_clip(c.id).unwrap().1.clone();
+        assert_eq!((k.fade_in.len, k.fade_out.len), (0, 0));
+        assert!(e.execute("clip.set_fades", &json!({"clip": c.id.0})).is_err());
     }
 
     #[test]

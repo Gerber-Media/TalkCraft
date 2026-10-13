@@ -1402,6 +1402,15 @@ fn draw_clip(app: &SoundApp, painter: &egui::Painter, s: &Session, track: &Track
             .collect();
         painter.add(Shape::line(pts, Stroke::new(1.2, fade_col)));
     }
+    // Fade handles: drag them to make a fade longer or shorter (TalkCraft).
+    if !dim && x1 - x0 > 24.0 {
+        let hc = Color32::from_rgba_unmultiplied(255, 255, 255, 200);
+        let fin = x_of(s, tl, clip.start + clip.fade_in.len).max(x0 + 4.0);
+        let fout = x_of(s, tl, clip.end() - clip.fade_out.len).min(x1 - 4.0);
+        for x in [fin, fout] {
+            painter.rect_filled(Rect::from_center_size(pos2(x, body_r.min.y + 4.0), vec2(7.0, 7.0)), 1.0, hc);
+        }
+    }
     // Optional clip overlays (View › Clip).
     let ov = Color32::from_rgb(16, 16, 16);
     if s.edit.flag("view.clip.rating") && clip.rating > 0 && name_h > 0.0 {
@@ -1664,16 +1673,19 @@ fn lane_interaction(app: &mut SoundApp, ui: &mut Ui, track: &Track, lane: Rect, 
         ui.painter().line_segment([pos2(x, lane.min.y), pos2(x, lane.max.y)], Stroke::new(2.0, t.rec));
     }
     let auto_view = AutoParam::parse(&track.view);
-    let fade_corner = if tool == Tool::Smart {
+    // The fade handles at the top of a clip (its corners, or the end of an existing fade).
+    let fade_corner = if matches!(tool, Tool::Smart | Tool::Selector | Tool::Grabber) {
         hit.as_ref().and_then(|c| {
             let xs = x_of(&s, tl, c.start);
             let xe = x_of(&s, tl, c.end());
+            let fin = x_of(&s, tl, c.start + c.fade_in.len);
+            let fout = x_of(&s, tl, c.end() - c.fade_out.len);
             let top = origin.y < lane.min.y + lane.height() * 0.28;
             if !top {
                 None
-            } else if (origin.x - xs) > 0.0 && (origin.x - xs) < 14.0 {
+            } else if (origin.x - fin).abs() < 7.0 || ((origin.x - xs) > 0.0 && (origin.x - xs) < 14.0) {
                 Some(true)
-            } else if (xe - origin.x) > 0.0 && (xe - origin.x) < 14.0 {
+            } else if (origin.x - fout).abs() < 7.0 || ((xe - origin.x) > 0.0 && (xe - origin.x) < 14.0) {
                 Some(false)
             } else {
                 None
@@ -1935,7 +1947,14 @@ fn finish_drag(app: &mut SoundApp, s: &Session, tl: Rect, p: Option<Pos2>) {
             if let Some((_, c)) = s.find_clip(clip) {
                 // Not clamp: it panics on a zero-length clip.
                 let (a, b) = if fade_in { (c.start, to.max(c.start + 1).min(c.end())) } else { (to.max(c.start).min(c.end() - 1), c.end()) };
-                let _ = app.run("edit.fades_create", json!({"tracks": [track.0], "start": a, "end": b, "shape": "s-curve"}));
+                // Dragged back to the clip edge (under 3 px): no fade.
+                let tiny = (b - a) as f64 <= s.edit.zoom.samples_per_px * 3.0;
+                if tiny {
+                    let side = if fade_in { "fade_in" } else { "fade_out" };
+                    let _ = app.run("clip.set_fades", json!({"clip": clip.0, side: 0}));
+                } else {
+                    let _ = app.run("edit.fades_create", json!({"tracks": [track.0], "start": a, "end": b, "shape": "s-curve"}));
+                }
             }
         }
         Some(Gesture::TrimStart { clip, track, to }) => trim_clip(app, clip, track, to, true),
@@ -2025,6 +2044,24 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
     if ui.button("Match Loudness (−16 LUFS)").on_hover_text("Sets the clip gain so the clip sounds as loud as the episode target").clicked() {
         run_report(app, "clip.normalize", json!({"clips": [c.0], "lufs": -16.0}));
     }
+    ui.menu_button("Fades", |ui| {
+        for secs in [0.5, 1.0, 2.0] {
+            if ui.button(format!("Fade In {secs} s")).clicked() {
+                run_report(app, "clip.set_fades", json!({"clip": c.0, "fade_in": {"seconds": secs}}));
+            }
+        }
+        ui.separator();
+        for secs in [0.5, 1.0, 2.0] {
+            if ui.button(format!("Fade Out {secs} s")).clicked() {
+                run_report(app, "clip.set_fades", json!({"clip": c.0, "fade_out": {"seconds": secs}}));
+            }
+        }
+        ui.separator();
+        if ui.button("Remove Fades").clicked() {
+            run_report(app, "clip.set_fades", json!({"clip": c.0, "fade_in": 0, "fade_out": 0}));
+        }
+        ui.label(egui::RichText::new("Or drag the small handles at the top of the clip").small().color(Tokens::current().text_dim));
+    });
     ui.menu_button(format!("Volume ({gain:+.1} dB)"), |ui| {
         let mut db = gain;
         let r = ui.add(egui::Slider::new(&mut db, -24.0..=24.0).suffix(" dB").step_by(0.5));
@@ -2757,5 +2794,29 @@ mod tests {
         h.run_steps(2);
         let end = h.state().engine.session().content_end() as f64;
         assert!(timeline(&h).width() as f64 * spp(&h) >= end * 0.9, "Shift+Z shows the session");
+    }
+
+    #[test]
+    fn the_selector_drags_a_fade_handle_longer_and_back_to_nothing() {
+        let mut h = harness_with(soundcraft_engine::demo::demo_engine());
+        h.state_mut().run("edit.mode", json!({"mode": "slip"})).unwrap();
+        h.state_mut().run("edit.tool", json!({"tool": "selector"})).unwrap();
+        h.run_steps(3);
+        let tl = timeline(&h);
+        let (c, lane) = clip_on_screen(&h, |a, b| b - a > 120.0 && a > tl.min.x + 10.0 && b < tl.max.x - 10.0);
+        let x0 = x_of(h.state().engine.session(), tl, c.start);
+        let fade = |h: &Harness<SoundApp>| h.state().engine.session().find_clip(c.id).unwrap().1.fade_in.len;
+        drag(&mut h, pos2(x0 + 4.0, lane.min.y + 4.0), pos2(x0 + 60.0, lane.min.y + 4.0));
+        h.run_steps(2);
+        let long = fade(&h);
+        assert!(long > 0, "dragging the corner handle makes a fade-in");
+        let fx = x_of(h.state().engine.session(), tl, c.start + long);
+        drag(&mut h, pos2(fx, lane.min.y + 4.0), pos2(fx + 40.0, lane.min.y + 4.0));
+        h.run_steps(2);
+        assert!(fade(&h) > long, "dragging the fade's handle lengthens it");
+        let fx = x_of(h.state().engine.session(), tl, c.start + fade(&h));
+        drag(&mut h, pos2(fx, lane.min.y + 4.0), pos2(x0, lane.min.y + 4.0));
+        h.run_steps(2);
+        assert_eq!(fade(&h), 0, "dragged back to the edge, the fade is gone");
     }
 }
