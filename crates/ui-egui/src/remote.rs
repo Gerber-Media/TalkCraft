@@ -21,6 +21,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 /// Where guests open their page; the room follows after `#`.
 pub const GUEST_PAGE: &str = "https://gerbermedia.codefloe.page/talkcraft-gast/";
 const HOST_PAGE: &str = include_str!("../../../remote/host/index.html");
+/// The parrot for the studio page (the same files as the guest page's).
+const LOGO: &[u8] = include_bytes!("../../../remote/guest/logo.png");
+const FAVICON: &[u8] = include_bytes!("../../../remote/guest/favicon.ico");
+const FAVICON_32: &[u8] = include_bytes!("../../../remote/guest/favicon-32.png");
 /// Largest upload accepted: three hours of 48 kHz 16-bit mono.
 const MAX_UPLOAD: usize = 3 * 3600 * 48_000 * 2 + 1024;
 /// A guest the host page has not mentioned for this long has left.
@@ -158,6 +162,9 @@ fn route(method: &str, path: &str, body: &[u8], srv: &Server, tx: &Sender<Upload
             let page = HOST_PAGE.replace("{{ROOM}}", &srv.room).replace("{{TOKEN}}", &srv.token).replace("{{GUEST_URL}}", GUEST_PAGE);
             (200, "text/html; charset=utf-8", page.into_bytes())
         }
+        ("GET", "/logo.png") => (200, "image/png", LOGO.to_vec()),
+        ("GET", "/favicon.ico") => (200, "image/x-icon", FAVICON.to_vec()),
+        ("GET", "/favicon-32.png") => (200, "image/png", FAVICON_32.to_vec()),
         ("GET", "/state") => {
             let kick = std::mem::take(&mut sh.kick);
             let state = json!({"recording": sh.recording, "take": sh.take, "room": srv.room, "muted": sh.muted, "kick": kick});
@@ -527,13 +534,14 @@ mod tests {
         let ask = |req: String| {
             let mut s = TcpStream::connect(("127.0.0.1", srv.port)).unwrap();
             s.write_all(req.as_bytes()).unwrap();
-            let mut out = String::new();
-            s.read_to_string(&mut out).unwrap();
-            out
+            let mut out = Vec::new();
+            s.read_to_end(&mut out).unwrap();
+            String::from_utf8_lossy(&out).into_owned()
         };
         assert!(ask(format!("GET /{}/ HTTP/1.1\r\n\r\n", srv.token)).contains(&srv.room), "host page carries the room");
         assert!(ask("GET /state HTTP/1.1\r\n\r\n".into()).starts_with("HTTP/1.1 404"), "nothing without the token");
         assert!(ask(format!("GET /{}/state HTTP/1.1\r\n\r\n", srv.token)).contains("\"recording\":false"));
+        assert!(ask(format!("GET /{}/favicon.ico HTTP/1.1\r\n\r\n", srv.token)).contains("image/x-icon"), "the parrot in the tab");
         let body = "RIFF";
         let r =
             ask(format!("POST /{}/upload?guest=Anna&kind=hq&take=2&started=5 HTTP/1.1\r\nContent-Length: {}\r\n\r\n{body}", srv.token, body.len()));

@@ -4,12 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>TalkCraft – Studio</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="favicon-32.png" type="image/png" sizes="32x32">
 <style>
   :root { --bg: #f4f1ea; --ink: #0b0b0c; --green: #2f9e63; --dim: #6b6b6b; --red: #c0392b; --line: #e3ddd0; }
   * { box-sizing: border-box; }
   body { margin: 0; font: 16px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); }
   main { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
-  h1 { font-size: 26px; margin: 8px 0 4px; }
+  h1 { font-size: 26px; margin: 8px 0 4px; display: flex; align-items: center; gap: 12px; }
+  h1 img { width: 56px; height: 56px; border-radius: 12px; }
   .muted { color: var(--dim); font-size: 14px; }
   .card { background: #fff; border-radius: 12px; padding: 16px; margin-top: 16px; border: 1px solid var(--line); }
   .row { display: flex; gap: 8px; align-items: center; }
@@ -25,7 +28,7 @@
 </head>
 <body>
 <main>
-  <h1>🎙 TalkCraft Studio</h1>
+  <h1><img src="logo.png" alt="" width="56" height="56">TalkCraft Studio</h1>
   <p class="muted">Dieses Fenster offen lassen, solange Gäste zugeschaltet sind. Aufgenommen wird mit dem Record-Knopf in TalkCraft – die Gäste starten und stoppen automatisch mit.</p>
 
   <div class="card">
