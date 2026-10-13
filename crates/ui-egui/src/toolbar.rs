@@ -26,11 +26,19 @@ pub fn show(app: &mut SoundApp, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.add_space(8.0);
         ui.spacing_mut().item_spacing.x = 8.0;
-        edit_modes(app, ui);
+        group(ui, 96.0, 64.0, |ui, _| crate::workspace::toolbar_switch(app, ui));
+        let editing = app.ui.workspace.edits();
+        if editing {
+            edit_modes(app, ui);
+        }
         zoom_group(app, ui);
-        tools(app, ui);
+        if editing {
+            tools(app, ui);
+        }
         counters(app, ui);
-        grid_nudge(app, ui);
+        if editing {
+            grid_nudge(app, ui);
+        }
         transport(app, ui);
         loudness(app, ui);
         output_meter(app, ui);
@@ -286,6 +294,9 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
                 icons::draw(ui.painter(), r.shrink(5.0), "play", if playing { Color32::from_rgb(120, 255, 140) } else { t.counter_text });
                 if resp.on_hover_text("Play (Space)").clicked() {
                     let _ = app.run("transport.play", json!({}));
+                }
+                if !app.ui.workspace.records() {
+                    return;
                 }
                 let (r, resp) = ui.allocate_exact_size(vec2(38.0, 28.0), Sense::click());
                 ui.painter().rect(

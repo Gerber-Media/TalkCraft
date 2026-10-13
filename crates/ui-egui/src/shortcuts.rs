@@ -91,7 +91,7 @@ pub fn handle(app: &mut SoundApp, ctx: &egui::Context) {
 fn command_for(key: Key, mods: Modifiers, mac: bool) -> Option<&'static str> {
     soundcraft_engine::command_specs()
         .iter()
-        .filter(|c| !crate::podcast::HIDDEN_COMMANDS.contains(&c.id))
+        .filter(|c| !crate::podcast::HIDDEN_COMMANDS.contains(&c.id) && !crate::workspace::hidden_command(c.id))
         .find(|c| c.shortcut.and_then(parse).is_some_and(|(m, k)| k == key && mods_match(m, mods, mac)))
         .map(|c| c.id)
 }
@@ -105,6 +105,7 @@ fn fixed(app: &mut SoundApp, key: Key, m: Modifiers, mac: bool) -> bool {
             let _ = app.run(id, json!({}));
             true
         }
+        Key::Space if m.command && crate::workspace::hidden_command("transport.record") => true,
         Key::Space if m.command => {
             let _ = app.run("transport.record", json!({}));
             true
@@ -117,7 +118,7 @@ fn fixed(app: &mut SoundApp, key: Key, m: Modifiers, mac: bool) -> bool {
             let _ = app.run("window.toggle_mix_edit", json!({}));
             true
         }
-        Key::Delete | Key::Backspace if plain && app.ui.window == MainWindow::Edit => {
+        Key::Delete | Key::Backspace if plain && app.ui.window == MainWindow::Edit && app.ui.workspace.edits() => {
             if let Err(e) = app.dialogs.open_delete(&app.engine) {
                 app.ui.status = e;
             }

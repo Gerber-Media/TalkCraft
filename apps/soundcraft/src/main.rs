@@ -46,8 +46,18 @@ impl eframe::App for App {
         }
         self.0.logic(ctx);
         #[cfg(target_os = "macos")]
-        if let Some(menu) = &mut self.2 {
-            menu.sync(&self.0);
+        {
+            // The system menu bar is built for one work mode: rebuild it when the mode changes.
+            if self.2.as_ref().is_some_and(|m| m.workspace != self.0.ui.workspace) {
+                self.2 = None;
+                match native_menu::NativeMenu::new(&self.0, ctx) {
+                    Ok(m) => self.2 = Some(m),
+                    Err(e) => log::warn!("system menu bar could not be rebuilt: {e}"),
+                }
+            }
+            if let Some(menu) = &mut self.2 {
+                menu.sync(&self.0);
+            }
         }
         // Files dropped on the window: sessions open, audio/MIDI import.
         let dropped: Vec<String> =
@@ -254,7 +264,7 @@ fn main() -> eframe::Result {
         e
     };
     // First start: follow the system's language (UiState::default() is English, for tests).
-    let prefs = load_prefs().unwrap_or_else(|| UiState { language: "auto".into(), ..UiState::default() });
+    let prefs = load_prefs().unwrap_or_else(|| UiState { language: "auto".into(), ask_workspace: true, ..UiState::default() });
     let prefs_devices = (prefs.output_device.clone(), prefs.input_device.clone());
     let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

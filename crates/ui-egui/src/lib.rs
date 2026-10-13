@@ -35,6 +35,7 @@ pub mod video_window;
 pub mod widgets;
 pub mod windows;
 pub mod words_window;
+pub mod workspace;
 
 use serde_json::{Value, json};
 use soundcraft_engine::{Engine, TransportRequest};
@@ -74,6 +75,12 @@ pub struct UiState {
     pub language: String,
     /// Audio devices picked in Setup > Audio Interface (`None` = the system default).
     pub input_device: Option<String>,
+    /// Work mode: record, edit or all (the toolbar's switch).
+    #[serde(default)]
+    pub workspace: workspace::Workspace,
+    /// Ask at start what the user wants to do (Setup can turn it off: then All).
+    #[serde(default = "default_true")]
+    pub ask_workspace: bool,
     /// Listening rate that keeps the pitch (1 = normal; the toolbar's 1× button).
     #[serde(default = "default_rate")]
     pub playback_rate: f32,
@@ -126,6 +133,10 @@ pub struct UiState {
     pub ui_scale: f32,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 fn default_rate() -> f32 {
     1.0
 }
@@ -144,6 +155,9 @@ impl Default for UiState {
             // starts with "auto" (main.rs), and older settings files without the field get it too.
             language: "en".into(),
             playback_rate: 1.0,
+            workspace: workspace::Workspace::All,
+            // Tests start without the question; the app asks on a fresh install.
+            ask_workspace: false,
             input_device: None,
             output_device: None,
             show_tracks_list: true,
@@ -738,6 +752,9 @@ impl SoundApp {
             );
         }
         self.ui.status = if looped { format!("Loop-recorded {} take(s)", ids.len() / tracks) } else { format!("Recorded {} clip(s)", ids.len()) };
+        if self.ui.workspace == workspace::Workspace::Record && !ids.is_empty() {
+            self.extra.offer_edit = true;
+        }
         if let Some(p) = problem {
             log::warn!("recording: {p}");
             self.ui.status = format!("{} ({p})", self.ui.status);
@@ -940,6 +957,7 @@ impl SoundApp {
         }
         let playing = self.is_playing();
         crate::i18n::set(&self.ui.language);
+        crate::workspace::set(self.ui.workspace);
         self.watch_devices();
         if let Some(p) = &self.player
             && (p.rate() - self.ui.playback_rate).abs() > 0.001

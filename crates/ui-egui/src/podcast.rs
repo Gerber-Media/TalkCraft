@@ -184,6 +184,7 @@ pub fn hidden_menu(path: &str) -> bool {
         || HIDDEN_PARTS.iter().any(|p| path.contains(p))
         || HIDDEN_EXACT.contains(&path)
         || HIDDEN_PREFIXES.iter().any(|p| path.starts_with(p))
+        || crate::workspace::hidden_menu(path)
 }
 
 /// Neutral names for menu items the clean-room original named after Avid products.

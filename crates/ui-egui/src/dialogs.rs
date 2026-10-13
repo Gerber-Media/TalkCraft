@@ -1085,6 +1085,7 @@ fn preferences_ui(app: &mut SoundApp, ui: &mut egui::Ui, s: &mut soundcraft_mode
             });
         });
         ui.label(egui::RichText::new("The macOS menu bar follows after a restart.").small().color(dim));
+        ui.checkbox(&mut app.ui.ask_workspace, crate::i18n::tr("Ask at start what I want to do (otherwise start with everything)"));
         ui.separator();
         ui.label(egui::RichText::new(crate::i18n::tr("Transcription")).strong());
         use soundcraft_engine::transcribe;

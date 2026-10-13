@@ -28,6 +28,10 @@ podcast does not need.
 
 ## Features
 
+- **Work modes.** At start TalkCraft asks "I want to … record a podcast / edit a podcast / see
+  everything" and shows only the tools for that (switch any time at the left of the toolbar; after
+  a recording it offers to switch to editing). Setup can turn the question off: then it starts with
+  everything.
 - **Podcast template.** New sessions start with a track per speaker (each on its own input, with
   a voice chain: high-pass EQ, gate, compressor, de-esser), a jingle track and a master limited to
   -1 dBTP.
@@ -166,6 +170,10 @@ braucht.
 
 ## Funktionen
 
+- **Arbeitsmodi.** Beim Start fragt TalkCraft „Ich möchte … einen Podcast aufnehmen / bearbeiten /
+  alles sehen“ und zeigt nur die passenden Werkzeuge (umschalten jederzeit links in der
+  Werkzeugleiste; nach einer Aufnahme bietet es den Wechsel zum Schneiden an). In den Einstellungen
+  lässt sich die Frage abschalten, dann startet TalkCraft mit allem.
 - **Podcast-Vorlage.** Neue Sessions beginnen mit einer Spur pro Sprecher (jede an einem eigenen
   Eingang, mit Stimmkette aus Hochpass-EQ, Gate, Kompressor und De-Esser), einer Jingle-Spur und
   einem auf -1 dBTP begrenzten Master.

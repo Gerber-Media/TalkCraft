@@ -1002,7 +1002,7 @@ fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, sele
     child.spacing_mut().item_spacing.x = 4.0;
     let m = &track.mixer;
     let bs = vec2(26.0, 18.0);
-    if track.kind.has_playlist() {
+    if track.kind.has_playlist() && app.ui.workspace.records() {
         crate::podcast::record_buttons(app, &mut child, track, bs);
         if text_toggle(&mut child, bs, "I", m.input_monitor, t.input, "Input monitoring").clicked() {
             let _ = app.run("mix.input_monitor", json!({"track": id.0}));
@@ -1600,7 +1600,10 @@ fn lane_interaction(app: &mut SoundApp, ui: &mut Ui, track: &Track, lane: Rect, 
         }
     };
     // Effective tool under the Smart tool.
+    // Recording: the timeline only places the insertion point and selects, it never edits.
+    let tool = if app.ui.workspace.edits() { tool } else { Tool::Selector };
     let eff = match tool {
+        Tool::Selector if !app.ui.workspace.edits() => Tool::Selector,
         // TalkCraft: at a clip's edge every pointer tool trims (pull a cut back out).
         Tool::Smart | Tool::Selector | Tool::Grabber if hit.as_ref().is_some_and(|c| near_edge(c).is_some()) => Tool::Trim,
         Tool::Smart => match &hit {

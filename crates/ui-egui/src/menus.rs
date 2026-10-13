@@ -20,6 +20,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("window.jingles", "Jingles", "Window > Jingles", None),
     ("window.remote", "Remote Guests", "Window > Remote Guests", None),
     ("transport.rate", "Playback Speed", "", None),
+    ("ui.workspace", "Work Mode", "", None),
     ("window.audiogram", "Audiogram (MP4)...", "File > Export > Audiogram (MP4)...", None),
     ("window.undo_history", "Undo History", "Window > Undo History", None),
     ("window.clip_list", "Clip List", "Window > Clip List", None),

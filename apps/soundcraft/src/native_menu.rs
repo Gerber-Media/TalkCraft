@@ -19,6 +19,8 @@ pub struct NativeMenu {
     events: Receiver<MenuEvent>,
     /// When `sync` last walked the entries; see `SYNC_EVERY`.
     last_sync: Option<std::time::Instant>,
+    /// The work mode the items were chosen for.
+    pub workspace: soundcraft_ui_egui::workspace::Workspace,
 }
 
 /// `sync` walks every menu leaf (~500), so it runs a few times a second rather than every frame,
@@ -30,7 +32,8 @@ impl NativeMenu {
     pub fn new(app: &SoundApp, ctx: &egui::Context) -> muda::Result<Self> {
         let menu = Menu::new();
         let (tx, events) = channel();
-        let mut native = Self { menu, entries: Vec::new(), events, last_sync: None };
+        soundcraft_ui_egui::workspace::set(app.ui.workspace);
+        let mut native = Self { menu, entries: Vec::new(), events, last_sync: None, workspace: app.ui.workspace };
         let app_menu = Submenu::new("TalkCraft", true);
         let tr = soundcraft_ui_egui::i18n::tr;
         native.add_item(app, &app_menu, tr("About TalkCraft"), "", Some("window.about".into()))?;

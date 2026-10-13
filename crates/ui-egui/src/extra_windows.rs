@@ -18,6 +18,10 @@ pub struct ExtraState {
     pub jingles: crate::jingles_window::JinglesWindow,
     pub audio_setup: crate::audio_setup::AudioSetup,
     pub remote: crate::remote::RemoteStudio,
+    /// The start question is open; after a recording, switching to editing is offered.
+    pub ask_workspace: bool,
+    pub offer_edit: bool,
+    workspace_started: bool,
     pub show_ui_customization: bool,
     pub auto_update_config: bool,
     pub ui_scale: f32,
@@ -36,6 +40,9 @@ impl Default for ExtraState {
             jingles: Default::default(),
             audio_setup: Default::default(),
             remote: Default::default(),
+            ask_workspace: false,
+            offer_edit: false,
+            workspace_started: false,
             show_ui_customization: false,
             auto_update_config: false,
             ui_scale: 1.0,
@@ -61,6 +68,7 @@ pub fn run(app: &mut SoundApp, id: &str, p: &Value) -> Option<Value> {
         "window.words" => crate::words_window::toggle(app, p),
         "window.jingles" => crate::jingles_window::toggle(app, p),
         "window.remote" => crate::remote::toggle(app, p),
+        "ui.workspace" => crate::workspace::run(app, p).unwrap_or_else(|e| json!({"error": e})),
         "transport.rate" => {
             let r = p.get("rate").and_then(Value::as_f64).unwrap_or(1.0) as f32;
             app.ui.playback_rate = if r.is_finite() { r.clamp(0.5, 2.0) } else { 1.0 };
@@ -81,6 +89,15 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     crate::words_window::window(app, ctx);
     crate::jingles_window::window(app, ctx);
     crate::remote::window(app, ctx);
+    if !app.extra.workspace_started {
+        app.extra.workspace_started = true;
+        if app.ui.ask_workspace {
+            app.extra.ask_workspace = true;
+        } else {
+            app.ui.workspace = crate::workspace::Workspace::All;
+        }
+    }
+    crate::workspace::window(app, ctx);
     ui_customization(app, ctx);
     apply_customization(app, ctx);
 }
