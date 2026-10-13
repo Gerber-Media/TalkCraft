@@ -49,6 +49,27 @@ pub fn specs() -> Vec<CommandSpec> {
             }),
             |tr| tr.mixer.record_arm
         )),
+        cmd!(
+            "mix.record_lock",
+            "Lock Against Recording",
+            [],
+            None,
+            "{tracks?, value?: bool} — locked tracks are left out when recording",
+            has_selection,
+            |e, p| toggle(
+                e,
+                p,
+                "mix.record_lock",
+                |s, t, v| {
+                    if let Some(tr) = s.track_mut(t)
+                        && tr.kind.has_playlist()
+                    {
+                        tr.mixer.record_lock = v
+                    }
+                },
+                |tr| tr.mixer.record_lock
+            )
+        ),
         cmd!("mix.input_monitor", "Input Monitoring", [], Some("Shift+I"), "{tracks?, value?: bool}", has_selection, |e, p| toggle(
             e,
             p,

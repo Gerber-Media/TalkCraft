@@ -208,7 +208,7 @@ fn transcription_ui(ui: &mut egui::Ui, ed: &mut SubtitleEditor, t: &Tokens, star
         return;
     }
     if transcribe::find_cli().is_none() {
-        ui.label(RichText::new("Automatic transcription needs whisper.cpp: brew install whisper-cpp").color(t.text_dim));
+        ui.label(RichText::new(transcribe::install_hint()).color(t.text_dim));
     } else if transcribe::find_model(None).is_none() {
         if ui.button(format!("Download speech model (~{:.0} MB)", MODEL_BYTES / 1e6)).on_hover_text(transcribe::DEFAULT_MODEL_URL).clicked() {
             match start_download() {

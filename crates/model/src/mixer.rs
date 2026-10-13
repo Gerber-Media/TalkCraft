@@ -504,6 +504,9 @@ pub struct Mixer {
     pub solo_safe: bool,
     #[serde(default)]
     pub record_arm: bool,
+    /// Locked tracks are never recorded (Podcast Studio: the jingle track, a guest who is absent).
+    #[serde(default)]
+    pub record_lock: bool,
     #[serde(default)]
     pub input_monitor: bool,
     #[serde(default)]
@@ -538,6 +541,7 @@ impl Mixer {
             solo: false,
             solo_safe: false,
             record_arm: false,
+            record_lock: false,
             input_monitor: false,
             phase_invert: false,
             input: Route::None,

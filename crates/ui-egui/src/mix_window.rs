@@ -3,8 +3,8 @@
 use crate::SoundApp;
 use crate::theme::{Tokens, bold, regular, rgb};
 use crate::widgets::{
-    PannerEdit, PannerSpeaker, db_text, fader, meter, multi_meter, pan_knob, pan_text, rec_toggle, selector_box, selector_box_with_tooltip,
-    surround_panner, text_toggle,
+    PannerEdit, PannerSpeaker, db_text, fader, meter, multi_meter, pan_knob, pan_text, selector_box, selector_box_with_tooltip, surround_panner,
+    text_toggle,
 };
 use egui::{Align2, Color32, CornerRadius, Rect, Sense, Stroke, StrokeKind, Ui, pos2, vec2};
 use serde_json::json;
@@ -320,9 +320,7 @@ fn strip(app: &mut SoundApp, ui: &mut Ui, id: TrackId, snap: Option<&MeterSnapsh
         if text_toggle(&mut row, vec2(bw, 18.0), "I", track.mixer.input_monitor, t.input, "Input monitoring").clicked() {
             let _ = app.run("mix.input_monitor", json!({"track": id.0}));
         }
-        if rec_toggle(&mut row, vec2(bw, 18.0), track.mixer.record_arm, "Record enable").clicked() {
-            let _ = app.run("mix.record_arm", json!({"track": id.0}));
-        }
+        crate::podcast::record_buttons(app, &mut row, &track, vec2((bw - 6.0) / 2.0, 18.0));
     }
     y += 22.0;
     let mut row = ui.new_child(

@@ -18,6 +18,11 @@ use soundcraft_model::TrackId;
 pub type Takes = (Vec<(TrackId, PathBuf)>, Option<String>);
 
 const RING_SECONDS: usize = 4;
+/// Input frames per live peak (the waveform drawn while recording).
+pub const LIVE_PEAK_FRAMES: usize = 512;
+
+/// Per take, the peak level of every [`LIVE_PEAK_FRAMES`] input frames recorded so far.
+pub type LivePeaks = Arc<Mutex<Vec<(TrackId, Vec<f32>)>>>;
 
 /// Single-producer single-consumer FIFO of samples (input callback → writer thread). The slots
 /// are atomics, so it needs no lock and no `unsafe`.
@@ -85,6 +90,8 @@ pub struct Recorder {
     pub sample_rate: u32,
     pub channels: usize,
     writer: Option<std::thread::JoinHandle<Takes>>,
+    /// What the takes recorded so far look like, for drawing while recording.
+    pub live: LivePeaks,
 }
 
 impl Recorder {
@@ -129,7 +136,16 @@ impl Recorder {
             )
             .map_err(|e| e.to_string())?;
         stream.play().map_err(|e| e.to_string())?;
-        Ok(Recorder { monitor, shared, _stream: Some(stream), device_name: name, sample_rate: config.sample_rate.0, channels, writer: None })
+        Ok(Recorder {
+            monitor,
+            shared,
+            _stream: Some(stream),
+            device_name: name,
+            sample_rate: config.sample_rate.0,
+            channels,
+            writer: None,
+            live: LivePeaks::default(),
+        })
     }
 
     #[cfg(target_os = "freebsd")]
@@ -145,11 +161,14 @@ impl Recorder {
         }
         let takes =
             takes.into_iter().map(|(id, inputs, path)| TakeWriter::create(id, inputs, path, self.sample_rate)).collect::<Result<Vec<_>, _>>()?;
+        if let Ok(mut live) = self.live.lock() {
+            *live = takes.iter().map(|t| (t.id, Vec::new())).collect();
+        }
         let ring = &self.shared.ring;
         ring.tail.store(ring.head.load(Ordering::Acquire), Ordering::Release);
         self.shared.armed.store(true, Ordering::Release);
-        let (shared, channels) = (Arc::clone(&self.shared), self.channels);
-        match std::thread::Builder::new().name("take writer".into()).spawn(move || write_takes(&shared, takes, channels)) {
+        let (shared, channels, live) = (Arc::clone(&self.shared), self.channels, Arc::clone(&self.live));
+        match std::thread::Builder::new().name("take writer".into()).spawn(move || write_takes(&shared, takes, channels, &live)) {
             Ok(w) => self.writer = Some(w),
             Err(e) => {
                 self.shared.armed.store(false, Ordering::Release);
@@ -175,7 +194,7 @@ impl Drop for Recorder {
     }
 }
 
-fn write_takes(shared: &Shared, mut takes: Vec<TakeWriter>, channels: usize) -> Takes {
+fn write_takes(shared: &Shared, mut takes: Vec<TakeWriter>, channels: usize, live: &LivePeaks) -> Takes {
     let (mut block, mut header_written) = (Vec::new(), Instant::now());
     loop {
         let stopping = !shared.armed.load(Ordering::Acquire);
@@ -184,6 +203,11 @@ fn write_takes(shared: &Shared, mut takes: Vec<TakeWriter>, channels: usize) -> 
         shared.ring.pop_all(&mut block);
         let whole = block.len() - block.len() % channels.max(1);
         takes.iter_mut().for_each(|t| t.write(&block[..whole], channels));
+        if let Ok(mut live) = live.lock() {
+            for (t, (_, peaks)) in takes.iter_mut().zip(live.iter_mut()) {
+                peaks.append(&mut t.new_peaks);
+            }
+        }
         block.drain(..whole);
         if stopping {
             break;
@@ -216,13 +240,16 @@ struct TakeWriter {
     rate: u32,
     frames: u64,
     error: Option<String>,
+    /// Live peaks not yet handed to the UI, and the one being built.
+    new_peaks: Vec<f32>,
+    peak: (f32, usize),
 }
 
 impl TakeWriter {
     fn create(id: TrackId, inputs: Vec<usize>, path: PathBuf, rate: u32) -> Result<TakeWriter, String> {
         let file = path.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|()| File::create_new(&path));
         let file = file.map_err(|e| format!("{}: {e}", path.display()))?;
-        let mut take = TakeWriter { id, inputs, path, file, rate, frames: 0, error: None };
+        let mut take = TakeWriter { id, inputs, path, file, rate, frames: 0, error: None, new_peaks: Vec::new(), peak: (0.0, 0) };
         take.write_header();
         take.error.take().map_or(Ok(take), Err)
     }
@@ -232,6 +259,14 @@ impl TakeWriter {
         let channels = channels.max(1);
         if self.error.is_some() {
             return;
+        }
+        for f in block.chunks_exact(channels) {
+            let v = self.inputs.iter().map(|&i| f.get(i).copied().unwrap_or(0.0).abs()).fold(0.0f32, f32::max);
+            self.peak = (self.peak.0.max(v), self.peak.1 + 1);
+            if self.peak.1 >= LIVE_PEAK_FRAMES {
+                self.new_peaks.push(self.peak.0);
+                self.peak = (0.0, 0);
+            }
         }
         let bytes: Vec<u8> = block
             .chunks_exact(channels)
@@ -294,7 +329,9 @@ mod tests {
 
         let shared = Arc::new(Shared { armed: AtomicBool::new(true), ring: CaptureRing::new(1 << 16), dropped: AtomicUsize::new(0) });
         let sh = Arc::clone(&shared);
-        let writer = std::thread::spawn(move || write_takes(&sh, vec![gtr, vox], 3));
+        let live: LivePeaks = Arc::new(Mutex::new(vec![(TrackId(1), Vec::new()), (TrackId(2), Vec::new())]));
+        let lv = Arc::clone(&live);
+        let writer = std::thread::spawn(move || write_takes(&sh, vec![gtr, vox], 3, &lv));
         let input: Vec<f32> = (0..3 * 4_800).map(|i| i as f32 / 20_000.0).collect();
         let mut owed = 0;
         input.chunks(3 * 480).for_each(|block| shared.capture(block, &mut owed));
@@ -302,6 +339,10 @@ mod tests {
         let (done, problem) = writer.join().unwrap();
         let channel = |c: usize| input.iter().skip(c).step_by(3).copied().collect::<Vec<f32>>();
         assert_eq!((done.len(), problem), (2, None));
+        let peaks = live.lock().unwrap();
+        assert_eq!(peaks[0].1.len(), 4_800 / LIVE_PEAK_FRAMES, "one live peak per {LIVE_PEAK_FRAMES} frames");
+        assert!(peaks[0].1.windows(2).all(|w| w[1] >= w[0]), "the test input rises");
+        drop(peaks);
         assert_eq!(decode(&done[0].1), vec![channel(1), channel(2)]);
         assert_eq!(decode(&done[1].1), vec![[vec![0.5; 100], vec![0.25; 50], channel(0)].concat()]);
         let _ = std::fs::remove_dir_all(&dir);

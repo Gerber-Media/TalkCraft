@@ -1,7 +1,10 @@
 //! The podcast studio's slimmer surface: music, notation and picture features stay in the
 //! engine (and the CLI, control channel and MCP) but leave the menus and dialogs.
 
-use soundcraft_model::TrackKind;
+use crate::SoundApp;
+use crate::widgets::{icon_button, rec_toggle};
+use serde_json::json;
+use soundcraft_model::{Track, TrackKind};
 
 /// The product name shown in menus, titles and the About window.
 pub const APP_NAME: &str = "Podcast Studio";
@@ -48,6 +51,36 @@ pub fn hidden_menu(path: &str) -> bool {
 /// Track kinds the New Tracks dialog does not offer.
 pub fn hidden_track_kind(k: TrackKind) -> bool {
     matches!(k, TrackKind::Midi | TrackKind::Instrument | TrackKind::Vca | TrackKind::Video)
+}
+
+/// A track's record button (records this speaker now; lit while it records) and its lock
+/// (left out of recording).
+pub fn record_buttons(app: &mut SoundApp, ui: &mut egui::Ui, track: &Track, size: egui::Vec2) {
+    let id = track.id;
+    let recording = app.engine.transport.recording && track.mixer.record_arm;
+    let locked = track.mixer.record_lock;
+    let tip = if recording {
+        "Recording — click to stop"
+    } else if locked {
+        "Locked against recording (unlock with the lock button)"
+    } else {
+        "Record this track now"
+    };
+    let resp = ui.add_enabled_ui(!locked || recording, |ui| rec_toggle(ui, size, recording, tip)).inner;
+    if resp.clicked() {
+        let r = if app.engine.transport.recording {
+            app.run("transport.record", json!({}))
+        } else {
+            app.run("transport.record_track", json!({"track": id.0}))
+        };
+        if let Err(e) = r {
+            app.ui.status = e;
+        }
+    }
+    let lock_tip = if locked { "Locked: Record leaves this track out (click to unlock)" } else { "Lock: leave this track out when recording" };
+    if icon_button(ui, size, "lock", locked, lock_tip).clicked() {
+        let _ = app.run("mix.record_lock", json!({"track": id.0}));
+    }
 }
 
 #[cfg(test)]

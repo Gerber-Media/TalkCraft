@@ -63,6 +63,8 @@ pub enum TransportRequest {
     Stop,
     TogglePlay,
     Record,
+    /// Record just these tracks (a speaker's own record button).
+    RecordTracks(Vec<soundcraft_model::TrackId>),
     Locate(Samples),
     PlaySelection,
     Pause,

@@ -73,12 +73,12 @@ fn real_drag_float_close_reopen_reload_retains_transport_and_mixer_commands() {
     reloaded.run_steps(4);
     assert_eq!(serde_json::to_value(&reloaded.state().ui.docking).unwrap(), edit);
     assert!(!reloaded.state().ui.mix_docking.layout.contains(&Panel::Clips));
-    let record = reloaded.get_by_label("Record enable");
+    let lock = reloaded.get_by_label("Lock: leave this track out when recording");
     // A real pointer click must remain outside the floating panel's occluding rectangle.
-    assert!(!egui::Rect::from_min_size(egui::pos2(900.0, 70.0), vec2(220.0, 420.0)).contains(record.rect().center()));
-    record.click();
+    assert!(!egui::Rect::from_min_size(egui::pos2(900.0, 70.0), vec2(220.0, 420.0)).contains(lock.rect().center()));
+    lock.click();
     reloaded.run_steps(3);
-    assert!(reloaded.state().engine.session().tracks[0].mixer.record_arm);
+    assert!(reloaded.state().engine.session().tracks[0].mixer.record_lock);
     assert!(!reloaded.state().engine.transport.recording);
 }
 

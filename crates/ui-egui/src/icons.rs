@@ -98,6 +98,18 @@ pub fn draw(painter: &Painter, r: Rect, name: &str, c: Color32) {
             painter.line_segment([p(r, 0.25, 0.75), p(r, 0.72, 0.28)], Stroke::new(s.width * 2.2, c));
             painter.add(Shape::convex_polygon(vec![p(r, 0.18, 0.82), p(r, 0.22, 0.66), p(r, 0.34, 0.78)], c, Stroke::NONE));
         }
+        "lock" => {
+            painter.rect_filled(Rect::from_min_max(p(r, 0.24, 0.46), p(r, 0.76, 0.84)), 1.5, c);
+            let arc: Vec<Pos2> = (0..=12)
+                .map(|i| {
+                    let a = std::f32::consts::PI * (1.0 + i as f32 / 12.0);
+                    pos2(r.center().x + a.cos() * r.width() * 0.17, r.min.y + r.height() * 0.4 + a.sin() * r.height() * 0.2)
+                })
+                .collect();
+            painter.line_segment([p(r, 0.33, 0.4), p(r, 0.33, 0.47)], s);
+            painter.line_segment([p(r, 0.67, 0.4), p(r, 0.67, 0.47)], s);
+            painter.add(Shape::line(arc, s));
+        }
         "speaker" => {
             painter.add(Shape::convex_polygon(
                 vec![p(r, 0.2, 0.4), p(r, 0.34, 0.4), p(r, 0.52, 0.22), p(r, 0.52, 0.78), p(r, 0.34, 0.6), p(r, 0.2, 0.6)],

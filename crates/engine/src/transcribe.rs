@@ -51,28 +51,51 @@ pub fn whisper_language(code: &str) -> &'static str {
     }
 }
 
-/// `whisper-cli` on the PATH, else in Homebrew's usual prefixes.
+/// `whisper-cli` on the PATH, in Homebrew's usual prefixes, or in `whisper` in the app's
+/// settings folder (where Windows users unpack the whisper.cpp release).
 pub fn find_cli() -> Option<PathBuf> {
-    let names = ["whisper-cli", "whisper-cpp"];
+    let names: &[&str] = if cfg!(windows) { &["whisper-cli.exe"] } else { &["whisper-cli", "whisper-cpp"] };
     let mut dirs: Vec<PathBuf> = std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
-    // An app started from the Finder does not get the shell's PATH.
-    dirs.extend(["/opt/homebrew/bin", "/usr/local/bin", "/home/linuxbrew/.linuxbrew/bin"].map(PathBuf::from));
+    // An app started from the Finder or the Start menu does not get the shell's PATH.
+    if !cfg!(windows) {
+        dirs.extend(["/opt/homebrew/bin", "/usr/local/bin", "/home/linuxbrew/.linuxbrew/bin", "/usr/bin"].map(PathBuf::from));
+    }
+    if let Some(settings) = settings_dir() {
+        dirs.push(settings.join("whisper"));
+        dirs.push(settings.join("whisper").join("Release"));
+    }
     dirs.iter().flat_map(|d| names.iter().map(move |n| d.join(n))).find(|p| p.is_file())
 }
 
-/// Where speech models are looked for: `$PODCAST_STUDIO_MODELS`, then `models` in the app's
-/// settings folder.
-pub fn model_dirs() -> Vec<PathBuf> {
+/// How to install whisper.cpp on this platform.
+pub fn install_hint() -> String {
+    if cfg!(target_os = "macos") {
+        "Automatic transcription needs whisper.cpp: brew install whisper-cpp".into()
+    } else if cfg!(windows) {
+        let dir = settings_dir().map(|d| d.join("whisper").display().to_string()).unwrap_or_else(|| "the settings folder".into());
+        format!("Automatic transcription needs whisper.cpp: unpack whisper-bin-x64.zip from github.com/ggml-org/whisper.cpp/releases into {dir}")
+    } else {
+        "Automatic transcription needs whisper.cpp (whisper-cli on the PATH; Homebrew: brew install whisper-cpp)".into()
+    }
+}
+
+/// The app's settings folder (same as the app's own settings).
+fn settings_dir() -> Option<PathBuf> {
     let env = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
-    let mut out: Vec<PathBuf> = env("PODCAST_STUDIO_MODELS").into_iter().collect();
-    let settings = if cfg!(target_os = "macos") {
+    if cfg!(target_os = "macos") {
         env("HOME").map(|h| h.join("Library/Application Support/Podcast Studio"))
     } else if cfg!(windows) {
         env("APPDATA").map(|a| a.join("Podcast Studio"))
     } else {
         env("XDG_CONFIG_HOME").or_else(|| env("HOME").map(|h| h.join(".config"))).map(|c| c.join("podcast-studio"))
-    };
-    out.extend(settings.map(|s| s.join("models")));
+    }
+}
+
+/// Where speech models are looked for: `$PODCAST_STUDIO_MODELS`, then `models` in the app's
+/// settings folder.
+pub fn model_dirs() -> Vec<PathBuf> {
+    let mut out: Vec<PathBuf> = std::env::var_os("PODCAST_STUDIO_MODELS").filter(|v| !v.is_empty()).map(PathBuf::from).into_iter().collect();
+    out.extend(settings_dir().map(|s| s.join("models")));
     out
 }
 
@@ -102,7 +125,7 @@ pub fn find_model(explicit: Option<&str>) -> Option<PathBuf> {
 /// What is missing for transcription, as a message for the user; `None` when ready.
 pub fn missing(model: Option<&str>) -> Option<String> {
     if find_cli().is_none() {
-        return Some("whisper.cpp is not installed (macOS: `brew install whisper-cpp`)".into());
+        return Some(install_hint());
     }
     if find_model(model).is_none() {
         let dir = default_model_dir().map(|d| d.display().to_string()).unwrap_or_else(|| "the models folder".into());

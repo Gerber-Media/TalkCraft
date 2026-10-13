@@ -434,14 +434,27 @@ impl SoundApp {
         self.edit_layout.follow_hold = false;
     }
 
-    fn start_recording(&mut self) {
-        let armed = self.engine.session().tracks.iter().any(|t| t.mixer.record_arm);
-        if !armed {
-            self.ui.status = "Record-enable a track first (the red button in its header).".into();
+    /// Record-enables exactly `tracks` for the take. Not an undo step: the arm state only says
+    /// which tracks are recording right now (Podcast Studio has no separate record-enable).
+    fn set_record_arms(&mut self, tracks: &[TrackId]) {
+        let differs = self.engine.session().tracks.iter().any(|t| t.mixer.record_arm != tracks.contains(&t.id));
+        if differs {
+            for t in &mut self.engine.session_mut().tracks {
+                t.mixer.record_arm = tracks.contains(&t.id);
+            }
+        }
+    }
+
+    /// Records `tracks`: every speaker (the Record button) or one (a track's record button).
+    fn start_recording(&mut self, tracks: Vec<TrackId>) {
+        if tracks.is_empty() {
+            self.ui.status = "Nothing to record: every audio track is locked (the lock button in its header).".into();
             return;
         }
+        self.set_record_arms(&tracks);
         self.ensure_input();
         if let Err(err) = self.arm_recorder() {
+            self.set_record_arms(&[]);
             self.ui.status = format!("Cannot record: {err}");
             return;
         }
@@ -581,6 +594,8 @@ impl SoundApp {
         if let Some(p) = &self.player {
             p.set_recording(false);
         }
+        // Before the take is added, so undoing it never brings the arm state back.
+        self.set_record_arms(&[]);
         let Some(r) = &mut self.recorder else { return };
         let (takes, problem) = r.finish();
         let tracks = takes.len().max(1);
@@ -709,7 +724,15 @@ impl SoundApp {
                     if self.engine.transport.recording {
                         self.stop_play();
                     } else {
-                        self.start_recording();
+                        let all = soundcraft_engine::podcast::record_targets(self.engine.session());
+                        self.start_recording(all);
+                    }
+                }
+                TransportRequest::RecordTracks(tracks) => {
+                    if self.engine.transport.recording {
+                        self.stop_play();
+                    } else {
+                        self.start_recording(tracks);
                     }
                 }
                 TransportRequest::Locate(at) => {

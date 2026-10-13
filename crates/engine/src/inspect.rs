@@ -54,7 +54,7 @@ fn track_json(e: &Engine, t: &Track, full: bool) -> Value {
     let mut v = json!({
         "id": t.id, "name": t.name, "kind": t.kind.id(), "format": t.format.label(),
         "volume_db": t.mixer.volume_db, "pan": t.mixer.pan, "surround": t.mixer.surround, "mute": t.mixer.mute, "solo": t.mixer.solo,
-        "record_arm": t.mixer.record_arm, "input": t.mixer.input, "output": t.mixer.output,
+        "record_arm": t.mixer.record_arm, "record_lock": t.mixer.record_lock, "input": t.mixer.input, "output": t.mixer.output,
         "automation_mode": t.mixer.automation_mode.label(), "inserts": inserts, "sends": sends,
         "clips": t.clips().iter().map(|c| clip_json(e, c)).collect::<Vec<_>>(),
         "playlist": t.playlist().map(|p| p.name.clone()), "playlists": t.playlists.len(),

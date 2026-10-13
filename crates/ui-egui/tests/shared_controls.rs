@@ -133,7 +133,7 @@ fn toolbar_keyboard_activation_changes_tools_without_transport_or_marker_actions
 }
 
 #[test]
-fn track_record_button_arms_the_track_without_starting_transport() {
+fn track_record_button_records_that_track_and_the_lock_leaves_it_out() {
     let mut app = SoundApp::new(soundcraft_engine::Engine::default(), None, Services::default());
     app.run("track.new", serde_json::json!({"name": "Voice"})).unwrap();
     let mut h = Harness::builder().with_size(vec2(1600.0, 1000.0)).build_ui_state(
@@ -144,19 +144,33 @@ fn track_record_button_arms_the_track_without_starting_transport() {
         app,
     );
     h.run_steps(5);
-    h.get_by_label("Record enable").click();
-    h.run_steps(3);
-    assert!(h.state().engine.session().tracks[0].mixer.record_arm);
-    for (key, armed) in [(Key::Enter, false), (Key::Space, true)] {
-        h.get_by_label("Record enable").focus();
-        h.run_steps(2);
-        h.key_press(key);
+    // Without an audio device the take cannot start; the button asks for it and arms nothing.
+    for key in [None, Some(Key::Enter), Some(Key::Space)] {
+        h.state_mut().ui.status.clear();
+        match key {
+            None => h.get_by_label("Record this track now").click(),
+            Some(k) => {
+                h.get_by_label("Record this track now").focus();
+                h.run_steps(2);
+                h.key_press(k);
+            }
+        }
         h.run_steps(3);
-        assert_eq!(h.state().engine.session().tracks[0].mixer.record_arm, armed);
+        assert!(h.state().ui.status.starts_with("Cannot record"), "{key:?}: {}", h.state().ui.status);
+        assert!(!h.state().engine.session().tracks[0].mixer.record_arm, "a failed start leaves no track armed");
         assert!(!h.state().engine.transport.playing);
         assert!(!h.state().engine.transport.recording);
         assert!(h.state().engine.session().markers.is_empty());
     }
+    h.get_by_label("Lock: leave this track out when recording").click();
+    h.run_steps(3);
+    assert!(h.state().engine.session().tracks[0].mixer.record_lock);
+    h.state_mut().ui.status.clear();
+    h.state_mut().run("transport.record", serde_json::json!({})).unwrap();
+    h.run_steps(3);
+    assert!(h.state().ui.status.starts_with("Nothing to record"), "{}", h.state().ui.status);
+    let id = h.state().engine.session().tracks[0].id.0;
+    assert!(h.state_mut().run("transport.record_track", serde_json::json!({"track": id})).is_err(), "a locked track never records");
 }
 
 #[test]

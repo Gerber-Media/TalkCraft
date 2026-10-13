@@ -32,7 +32,6 @@ pub fn show(app: &mut SoundApp, ui: &mut Ui) {
         counters(app, ui);
         grid_nudge(app, ui);
         transport(app, ui);
-        tempo_meter(app, ui);
         output_meter(app, ui);
     });
 }
@@ -149,11 +148,10 @@ fn tools(app: &mut SoundApp, ui: &mut Ui) {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 2.0;
                 let e = app.engine.session().edit.clone();
-                let toggles: [(&str, &str, bool, &str); 5] = [
-                    ("options.tab_to_transient", "selector", e.tab_to_transient, "Tab to Transient"),
+                // Podcast Studio leaves out the music toggles (Tab to Transient, Mirrored MIDI).
+                let toggles: [(&str, &str, bool, &str); 3] = [
                     ("options.link_timeline_edit", "link", e.link_timeline_edit, "Link Timeline and Edit Selection"),
                     ("options.link_track_edit", "link", e.link_track_edit, "Link Track and Edit Selection"),
-                    ("options.mirrored_midi", "note", e.mirrored_midi, "Mirrored MIDI Editing"),
                     ("options.automation_follows_edit", "wave", e.automation_follows_edit, "Automation Follows Edit"),
                 ];
                 for (id, icon, on, tip) in toggles {
@@ -347,35 +345,6 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
             });
         });
     });
-}
-
-fn tempo_meter(app: &mut SoundApp, ui: &mut Ui) {
-    let t = Tokens::current();
-    let (bpm, meter, countoff, click, bars) = {
-        let s = app.engine.session();
-        let tick = s.tempo.samples_to_ticks(app.position(), s.sample_rate);
-        let m = s.tempo.meter_at_tick(tick);
-        (s.tempo.tempo_at_tick(tick), format!("{}/{}", m.numerator, m.denominator), s.edit.countoff, s.edit.click, s.edit.countoff_bars)
-    };
-    let (r, _) = ui.allocate_exact_size(vec2(150.0, 64.0), Sense::hover());
-    ui.painter().rect(r, CornerRadius::same(4), t.counter_bg, Stroke::new(1.0, t.counter_border), StrokeKind::Inside);
-    let co = Rect::from_min_size(pos2(r.min.x + 6.0, r.min.y + 6.0), vec2(64.0, 15.0));
-    ui.painter().rect_filled(co, 1.0, if countoff { t.mode_on } else { t.counter_off });
-    ui.painter().text(co.center(), Align2::CENTER_CENTER, "Count Off", bold(10.0), if countoff { t.mode_on_text } else { t.mode_off_text });
-    if ui.interact(co, ui.id().with("countoff"), Sense::click()).clicked() {
-        let _ = app.run("options.countoff", json!({}));
-    }
-    ui.painter().text(pos2(r.max.x - 8.0, co.center().y), Align2::RIGHT_CENTER, format!("{bars} bars"), mono(11.0), t.counter_text);
-    ui.painter().text(pos2(r.min.x + 70.0, r.min.y + 32.0), Align2::RIGHT_CENTER, "Meter", regular(11.0), t.counter_label);
-    ui.painter().text(pos2(r.max.x - 8.0, r.min.y + 32.0), Align2::RIGHT_CENTER, meter, mono(11.0), t.counter_text);
-    ui.painter().text(pos2(r.min.x + 70.0, r.min.y + 48.0), Align2::RIGHT_CENTER, "Tempo", regular(11.0), t.counter_label);
-    icons::draw(ui.painter(), Rect::from_center_size(pos2(r.min.x + 82.0, r.min.y + 48.0), vec2(13.0, 13.0)), "note", t.counter_text);
-    ui.painter().text(pos2(r.max.x - 8.0, r.min.y + 48.0), Align2::RIGHT_CENTER, format!("{bpm:.4}"), mono(11.0), t.counter_text);
-    let clk = Rect::from_min_size(pos2(r.min.x + 6.0, r.min.y + 40.0), vec2(18.0, 18.0));
-    icons::draw(ui.painter(), clk, "click", if click { t.counter_text } else { t.text_dim });
-    if ui.interact(clk, ui.id().with("click"), Sense::click()).on_hover_text("Click").clicked() {
-        let _ = app.run("options.click", json!({}));
-    }
 }
 
 fn output_meter(app: &mut SoundApp, ui: &mut Ui) {

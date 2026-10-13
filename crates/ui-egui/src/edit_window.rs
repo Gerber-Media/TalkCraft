@@ -1,7 +1,7 @@
 //! The Edit window: toolbar, rulers, track headers and playlists.
 
 use crate::theme::{Tokens, bold, clip_colors, regular, rgb};
-use crate::widgets::{rec_toggle, selector_box, text_toggle};
+use crate::widgets::{selector_box, text_toggle};
 use crate::{Gesture, SoundApp, icons, toolbar};
 use egui::{Align2, Color32, CornerRadius, Pos2, Rect, Sense, Shape, Stroke, StrokeKind, Ui, pos2, vec2};
 use serde_json::json;
@@ -763,6 +763,9 @@ fn track_row(app: &mut SoundApp, ui: &mut Ui, id: TrackId, row: Rect, tl: Rect) 
         draw_clip(app, &painter, &s, &track, clip, tl, lane, auto_view.is_some());
     }
     crate::video_track::draw_lane(app, &painter, &s, &track, tl, lane);
+    if app.engine.transport.recording && track.mixer.record_arm {
+        draw_live_take(app, &painter, &s, &track, tl, lane);
+    }
     if let Some(p) = &auto_view {
         draw_automation(&painter, &s, &track, p, tl, lane);
     }
@@ -783,6 +786,41 @@ fn track_row(app: &mut SoundApp, ui: &mut Ui, id: TrackId, row: Rect, tl: Rect) 
     if track.view == "playlists" {
         playlist_lanes(app, ui, &track, row, main_h, tl);
     }
+}
+
+/// The take being recorded on `track`: a red clip from where recording started to the playhead,
+/// with the waveform recorded so far.
+fn draw_live_take(app: &SoundApp, painter: &egui::Painter, s: &Session, track: &Track, tl: Rect, lane: Rect) {
+    let now = app.position();
+    let start = app.record_start;
+    let x0 = x_of(s, tl, start).max(lane.min.x);
+    let x1 = x_of(s, tl, now).min(lane.max.x);
+    if x1 <= x0 {
+        return;
+    }
+    let body = Rect::from_min_max(pos2(x0, lane.min.y + 1.0), pos2(x1, lane.max.y - 1.0));
+    painter.rect_filled(body, 2.0, Color32::from_rgba_unmultiplied(170, 40, 40, 110));
+    painter.rect_stroke(body, 2.0, Stroke::new(1.0, Color32::from_rgb(230, 70, 70)), egui::StrokeKind::Inside);
+    let Some(rec) = &app.recorder else { return };
+    let Ok(live) = rec.live.lock() else { return };
+    let Some((_, peaks)) = live.iter().find(|(id, _)| *id == track.id) else { return };
+    // Session samples per live peak (the input device may run at another rate).
+    let per_peak = soundcraft_playback::record::LIVE_PEAK_FRAMES as f64 * s.sample_rate.as_f64() / f64::from(rec.sample_rate.max(1));
+    let mid = body.center().y;
+    let half = body.height() * 0.45;
+    let wave = Color32::from_rgb(255, 210, 210);
+    let mut x = x0.floor();
+    while x < x1 {
+        let a = ((sample_at(s, tl, x) - start) as f64 / per_peak).floor().max(0.0) as usize;
+        let b = (((sample_at(s, tl, x + 1.0) - start) as f64 / per_peak).ceil() as usize).max(a + 1);
+        let v = peaks.get(a.min(peaks.len())..b.min(peaks.len())).map_or(0.0, |p| p.iter().copied().fold(0.0f32, f32::max));
+        if v > 0.0 {
+            let h = (v.min(1.0) * half).max(0.5);
+            painter.line_segment([pos2(x + 0.5, mid - h), pos2(x + 0.5, mid + h)], Stroke::new(1.0, wave));
+        }
+        x += 1.0;
+    }
+    painter.text(pos2(x0 + 4.0, body.min.y + 2.0), egui::Align2::LEFT_TOP, "REC", crate::theme::bold(10.0), Color32::WHITE);
 }
 
 /// Alternate playlists as lanes under the main one; clicking a clip promotes it (comping).
@@ -965,9 +1003,7 @@ fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, sele
     let m = &track.mixer;
     let bs = vec2(26.0, 18.0);
     if track.kind.has_playlist() {
-        if rec_toggle(&mut child, bs, m.record_arm, "Record enable").clicked() {
-            let _ = app.run("mix.record_arm", json!({"track": id.0}));
-        }
+        crate::podcast::record_buttons(app, &mut child, track, bs);
         if text_toggle(&mut child, bs, "I", m.input_monitor, t.input, "Input monitoring").clicked() {
             let _ = app.run("mix.input_monitor", json!({"track": id.0}));
         }

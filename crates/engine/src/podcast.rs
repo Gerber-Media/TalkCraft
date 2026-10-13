@@ -54,11 +54,14 @@ pub fn podcast_session(name: &str, sample_rate: SampleRate, speakers: usize) -> 
             for (slot, ins) in tr.mixer.inserts.iter_mut().zip(voice_chain()) {
                 *slot = Some(ins);
             }
+            // Each speaker on their own microphone input.
+            tr.mixer.input = soundcraft_model::Route::Hardware(format!("In {}", n + 1));
         }
     }
     let j = s.add_track(TrackKind::Audio, ChannelFormat::Stereo, Some("Jingles & Musik"));
     if let Some(tr) = s.track_mut(j) {
         tr.mixer.volume_db = -6.0;
+        tr.mixer.record_lock = true;
     }
     let m = s.add_track(TrackKind::Master, ChannelFormat::Stereo, Some("Master"));
     if let Some(tr) = s.track_mut(m) {
@@ -77,6 +80,11 @@ pub fn podcast_session(name: &str, sample_rate: SampleRate, speakers: usize) -> 
     s
 }
 
+/// The tracks the Record button records: every active audio track that is not locked.
+pub fn record_targets(s: &Session) -> Vec<soundcraft_model::TrackId> {
+    s.tracks.iter().filter(|t| t.kind == TrackKind::Audio && !t.inactive && !t.mixer.record_lock).map(|t| t.id).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,6 +100,9 @@ mod tests {
             assert!(soundcraft_dsp::plugin_info(p).is_some(), "{p} is a built-in plugin");
         }
         assert_eq!(s.tracks[3].mixer.inserts[0].as_ref().map(|i| i.plugin.as_str()), Some("maximizer"));
+        let inputs: Vec<_> = s.tracks.iter().take(2).map(|t| t.mixer.input.clone()).collect();
+        assert_eq!(inputs, [soundcraft_model::Route::Hardware("In 1".into()), soundcraft_model::Route::Hardware("In 2".into())]);
+        assert_eq!(record_targets(&s), [s.tracks[0].id, s.tracks[1].id], "the jingle track is locked, the master never records");
     }
 
     #[test]
