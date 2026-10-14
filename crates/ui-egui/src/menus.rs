@@ -20,6 +20,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("window.jingles", "Jingles", "Window > Jingles", None),
     ("window.remote", "Remote Guests", "Window > Remote Guests", None),
     ("window.rundown", "Run Sheet", "Window > Run Sheet", None),
+    ("window.finish", "Finish Episode...", "Edit > Finish Episode...", None),
     ("transport.rate", "Playback Speed", "", None),
     ("ui.workspace", "Work Mode", "", None),
     ("window.audiogram", "Audiogram (MP4)...", "File > Export > Audiogram (MP4)...", None),
@@ -410,6 +411,7 @@ const MENU_WINDOWS: &[(&str, &str)] = &[
     ("Window > Jingles", "window.jingles"),
     ("Window > Remote Guests", "window.remote"),
     ("Window > Run Sheet", "window.rundown"),
+    ("Edit > Finish Episode...", "window.finish"),
     // The one option still switched often; the rest moved to the Settings.
     ("View > Loop Playback", "options.loop_playback"),
     ("File > Export > Audiogram (MP4)...", "window.audiogram"),

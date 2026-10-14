@@ -125,7 +125,7 @@ fn app_follow(ui: &egui::Ui) -> bool {
 }
 
 /// Cuts the selected words (padded a little into the pauses around them) from every track.
-fn cut_selected(app: &mut SoundApp) {
+pub(crate) fn cut_selected(app: &mut SoundApp) {
     let sr = app.engine.session().sample_rate;
     let pad = sr.samples(0.02);
     let mut ranges: Vec<(Samples, Samples)> =

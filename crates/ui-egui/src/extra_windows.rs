@@ -20,6 +20,7 @@ pub struct ExtraState {
     pub remote: crate::remote::RemoteStudio,
     pub readiness: crate::readiness::Readiness,
     pub rundown: crate::rundown_window::RundownWindow,
+    pub finish: crate::finish_window::FinishWindow,
     /// The listening rate before L sped playback up (K returns to it).
     pub shuttle_rate: Option<f32>,
     /// The start question is open; after a recording, switching to editing is offered.
@@ -46,6 +47,7 @@ impl Default for ExtraState {
             remote: Default::default(),
             readiness: Default::default(),
             rundown: Default::default(),
+            finish: Default::default(),
             shuttle_rate: None,
             ask_workspace: false,
             offer_edit: false,
@@ -76,6 +78,7 @@ pub fn run(app: &mut SoundApp, id: &str, p: &Value) -> Option<Value> {
         "window.jingles" => crate::jingles_window::toggle(app, p),
         "window.remote" => crate::remote::toggle(app, p),
         "window.rundown" => crate::rundown_window::toggle(app, p),
+        "window.finish" => crate::finish_window::toggle(app, p),
         "ui.workspace" => crate::workspace::run(app, p).unwrap_or_else(|e| json!({"error": e})),
         "transport.rate" => {
             let r = p.get("rate").and_then(Value::as_f64).unwrap_or(1.0) as f32;
@@ -98,6 +101,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     crate::jingles_window::window(app, ctx);
     crate::remote::window(app, ctx);
     crate::rundown_window::window(app, ctx);
+    crate::finish_window::window(app, ctx);
     if !app.extra.workspace_started {
         app.extra.workspace_started = true;
         crate::docking::move_history_under_clips(app);

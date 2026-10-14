@@ -12,6 +12,7 @@ pub mod dialogs;
 pub mod docking;
 pub mod edit_window;
 pub mod extra_windows;
+pub mod finish_window;
 pub mod fonts;
 pub mod i18n;
 pub mod icons;
