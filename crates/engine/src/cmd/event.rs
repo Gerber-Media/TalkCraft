@@ -97,6 +97,26 @@ pub fn specs() -> Vec<CommandSpec> {
         cmd!("markers.edit", "Edit Memory Location", [], None, "{number | id, name?, comments?, at?, color?}", always, edit_marker),
         cmd!(noundo "markers.recall", "Recall Memory Location", [], Some("Period + n + Period"), "{number}", always, recall_marker),
         cmd!(noundo "markers.next", "Go to Next Marker", [], None, "{}", always, |e, _| step_marker(e, 1)),
+        cmd!(
+            "markers.add_cut",
+            "Mark a Mistake",
+            [],
+            Some("Shift+Enter"),
+            "{at?} — a red \"cut here\" marker at the playhead (while recording or playing) or the insertion point; never a chapter",
+            always,
+            add_cut_marker
+        ),
+        cmd!(noundo "markers.next_cut", "Next Mistake", [], None, "{}", always, |e, _| step_cut(e, 1)),
+        cmd!(noundo "markers.previous_cut", "Previous Mistake", [], None, "{}", always, |e, _| step_cut(e, -1)),
+        cmd!(
+            "markers.done_cut",
+            "Mistake Fixed",
+            [],
+            None,
+            "{at?} — removes the cut marker at (or within half a second of) the insertion point",
+            always,
+            done_cut
+        ),
         cmd!(noundo "markers.previous", "Go to Previous Marker", [], None, "{}", always, |e, _| step_marker(e, -1)),
     ]
 }
@@ -329,6 +349,52 @@ fn recall_marker(e: &mut Engine, p: &Value) -> Result<Value> {
     s.edit.playhead = m.start;
     e.transport_requests.push(crate::TransportRequest::Locate(m.start));
     Ok(json!({"at": m.start}))
+}
+
+fn add_cut_marker(e: &mut Engine, p: &Value) -> Result<Value> {
+    let at = match position_param(e, "markers.add_cut", p, "at")? {
+        Some(a) => a,
+        None if e.transport.playing => e.transport.position,
+        None => e.session().edit.selection.start,
+    };
+    let s = e.session_mut();
+    let id = s.add_marker(crate::podcast::CUT_MARKER, MarkerKind::Marker, at.max(0), at.max(0));
+    if let Some(m) = s.markers.iter_mut().find(|m| m.id == id) {
+        m.color = Some(crate::podcast::CUT_MARKER_COLOR);
+    }
+    let left = s.markers.iter().filter(|m| crate::podcast::is_cut_marker(m)).count();
+    Ok(json!({"id": id, "at": at, "cut_markers": left}))
+}
+
+/// To the next (or previous) "cut here" marker.
+fn step_cut(e: &mut Engine, dir: i64) -> Result<Value> {
+    let cur = e.session().edit.selection.start;
+    let s = e.session();
+    let cuts = s.markers.iter().filter(|m| crate::podcast::is_cut_marker(m)).map(|m| m.start);
+    let target = if dir > 0 { cuts.filter(|t| *t > cur).min() } else { cuts.filter(|t| *t < cur).max() };
+    let Some(t) = target else { return Ok(json!({"moved": false})) };
+    let s = e.session_mut();
+    s.edit.selection = soundcraft_time::Range::point(t);
+    s.edit.playhead = t;
+    e.transport_requests.push(crate::TransportRequest::Locate(t));
+    Ok(json!({"at": t}))
+}
+
+fn done_cut(e: &mut Engine, p: &Value) -> Result<Value> {
+    let at = position_param(e, "markers.done_cut", p, "at")?.unwrap_or(e.session().edit.selection.start);
+    let s = e.session_mut();
+    let near = s.sample_rate.samples(0.5);
+    let hit = s
+        .markers
+        .iter()
+        .filter(|m| crate::podcast::is_cut_marker(m))
+        .min_by_key(|m| (m.start - at).abs())
+        .filter(|m| (m.start - at).abs() <= near)
+        .map(|m| m.id);
+    let Some(id) = hit else { return Err(bad("markers.done_cut", "no cut marker here")) };
+    s.markers.retain(|m| m.id != id);
+    let left = s.markers.iter().filter(|m| crate::podcast::is_cut_marker(m)).count();
+    Ok(json!({"removed": id, "cut_markers": left}))
 }
 
 fn step_marker(e: &mut Engine, dir: i64) -> Result<Value> {

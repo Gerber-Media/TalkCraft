@@ -23,6 +23,14 @@ pub fn show(app: &mut SoundApp, ui: &mut Ui) {
     let full = ui.max_rect();
     ui.painter().rect_filled(full, 0.0, t.toolbar_bg);
     ui.add_space(4.0);
+    // On a narrow window the toolbar scrolls sideways (trackpad or Shift+wheel) instead of cutting off.
+    egui::ScrollArea::horizontal()
+        .id_salt("toolbar_scroll")
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
+        .show(ui, |ui| toolbar_row(app, ui));
+}
+
+fn toolbar_row(app: &mut SoundApp, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.add_space(8.0);
         ui.spacing_mut().item_spacing.x = 8.0;
@@ -40,6 +48,7 @@ pub fn show(app: &mut SoundApp, ui: &mut Ui) {
             grid_nudge(app, ui);
         }
         transport(app, ui);
+        marker_group(app, ui);
         loudness(app, ui);
         output_meter(app, ui);
     });
@@ -350,6 +359,75 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
             });
         });
     });
+}
+
+/// Recording: set a chapter (Enter) or mark a mistake (Shift+Enter) without looking.
+/// Editing: step from mistake to mistake and tick each one off once it is cut.
+fn marker_group(app: &mut SoundApp, ui: &mut Ui) {
+    let tr = crate::i18n::tr;
+    let (rec, edit) = (app.ui.workspace.records(), app.ui.workspace.edits());
+    let cuts = app.engine.session().markers.iter().filter(|m| soundcraft_engine::podcast::is_cut_marker(m)).count();
+    let mistake_fill = egui::Color32::from_rgb(190, 55, 55);
+    let mut run: Option<&str> = None;
+    // Recording only: two big buttons. Editing (and All): one narrow block, record row on top.
+    let width = if rec && !edit { 120.0 } else { 112.0 };
+    group(ui, width, 64.0, |ui, _| {
+        ui.spacing_mut().button_padding = vec2(4.0, 1.0);
+        ui.vertical(|ui| {
+            ui.spacing_mut().item_spacing = vec2(3.0, 4.0);
+            if rec && !edit {
+                if ui
+                    .add(egui::Button::new(tr("+ Chapter")).min_size(vec2(104.0, 24.0)))
+                    .on_hover_text(tr("Chapter marker at the playhead (Enter)"))
+                    .clicked()
+                {
+                    run = Some("markers.add");
+                }
+                let b = egui::Button::new(egui::RichText::new(tr("✂ Mistake")).color(egui::Color32::WHITE)).fill(mistake_fill);
+                if ui.add(b.min_size(vec2(104.0, 24.0))).on_hover_text(tr("Mark a mistake to cut later (Shift+Enter)")).clicked() {
+                    run = Some("markers.add_cut");
+                }
+                return;
+            }
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 3.0;
+                if rec {
+                    if ui.add(egui::Button::new("+").min_size(vec2(24.0, 22.0))).on_hover_text(tr("Chapter marker at the playhead (Enter)")).clicked()
+                    {
+                        run = Some("markers.add");
+                    }
+                    let b = egui::Button::new(egui::RichText::new("✂").color(egui::Color32::WHITE)).fill(mistake_fill).min_size(vec2(24.0, 22.0));
+                    if ui.add(b).on_hover_text(tr("Mark a mistake to cut later (Shift+Enter)")).clicked() {
+                        run = Some("markers.add_cut");
+                    }
+                }
+                ui.label(egui::RichText::new(crate::i18n::trf("{} ✂", &[&cuts])).size(11.0))
+                    .on_hover_text(crate::i18n::trf("{} mistake(s) to cut", &[&cuts]));
+            });
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 3.0;
+                let size = vec2(32.0, 22.0);
+                if ui.add_enabled(cuts > 0, egui::Button::new("◀").min_size(size)).on_hover_text(tr("Previous mistake")).clicked() {
+                    run = Some("markers.previous_cut");
+                }
+                if ui.add_enabled(cuts > 0, egui::Button::new("▶").min_size(size)).on_hover_text(tr("Next mistake")).clicked() {
+                    run = Some("markers.next_cut");
+                }
+                if ui
+                    .add_enabled(cuts > 0, egui::Button::new("✓").min_size(size))
+                    .on_hover_text(tr("Fixed: remove the mistake marker here"))
+                    .clicked()
+                {
+                    run = Some("markers.done_cut");
+                }
+            });
+        });
+    });
+    if let Some(cmd) = run
+        && let Err(e) = app.run(cmd, json!({}))
+    {
+        app.ui.status = e;
+    }
 }
 
 /// Listening rates offered; the pitch stays the same.

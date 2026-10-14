@@ -60,6 +60,15 @@ pub fn is_speaker(t: &soundcraft_model::Track) -> bool {
     t.kind == TrackKind::Audio && t.mixer.inserts.first().and_then(Option::as_ref).is_some_and(|i| i.plugin == voice_chain()[0].plugin)
 }
 
+/// Name of the "cut here" markers set while recording (they never become chapters).
+pub const CUT_MARKER: &str = "✂ Schneiden";
+/// Their colour on the marker ruler.
+pub const CUT_MARKER_COLOR: [u8; 3] = [220, 60, 60];
+
+pub fn is_cut_marker(m: &soundcraft_model::MemoryLocation) -> bool {
+    m.name.starts_with('✂')
+}
+
 pub fn podcast_session(name: &str, sample_rate: SampleRate, speakers: usize) -> Session {
     let mut s = Session::new(name, sample_rate);
     let speakers = speakers.clamp(1, 8);

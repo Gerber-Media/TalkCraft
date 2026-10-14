@@ -588,7 +588,12 @@ fn chapters(e: &Engine, r: soundcraft_time::Range) -> Vec<Chapter> {
     let s = e.session();
     let sr = s.sample_rate.as_f64().max(1.0);
     let ms = |at: i64| ((at.saturating_sub(r.start)).max(0) as f64 * 1000.0 / sr).min(f64::from(u32::MAX)) as u32;
-    let mut marks: Vec<_> = s.markers.iter().filter(|m| m.kind == MarkerKind::Marker && m.start >= r.start && m.start < r.end).collect();
+    // "Cut here" markers are notes for the edit, not chapters.
+    let mut marks: Vec<_> = s
+        .markers
+        .iter()
+        .filter(|m| m.kind == MarkerKind::Marker && !crate::podcast::is_cut_marker(m) && m.start >= r.start && m.start < r.end)
+        .collect();
     marks.sort_by_key(|m| m.start);
     let starts: Vec<i64> = marks.iter().map(|m| m.start).chain(std::iter::once(r.end)).collect();
     marks
@@ -1018,6 +1023,27 @@ mod tests {
         e.execute("edit.undo", &json!({})).unwrap();
         e.execute("edit.undo", &json!({})).unwrap();
         assert_eq!(e.session().tracks.len(), 4, "each addition is one undo step");
+    }
+
+    #[test]
+    fn mistakes_are_marked_found_and_ticked_off_and_never_become_chapters() {
+        let mut e = Engine::default();
+        e.execute("session.new", &json!({"name": "S", "template": "podcast", "speakers": 1})).unwrap();
+        for at in [5.0, 2.0] {
+            e.execute("markers.add_cut", &json!({"at": {"seconds": at}})).unwrap();
+        }
+        e.execute("markers.add", &json!({"at": {"seconds": 3.0}, "name": "Thema"})).unwrap();
+        let titles: Vec<String> = chapters(&e, soundcraft_time::Range::new(0, 48_000 * 10)).iter().map(|c| c.title.clone()).collect();
+        assert!(!titles.iter().any(|t| t.starts_with('✂')), "no cut marker among the chapters: {titles:?}");
+        e.execute("markers.next_cut", &json!({})).unwrap();
+        assert_eq!(e.session().edit.selection.start, 2 * 48_000);
+        e.execute("markers.next_cut", &json!({})).unwrap();
+        assert_eq!(e.session().edit.selection.start, 5 * 48_000, "skips the chapter marker");
+        let v = e.execute("markers.done_cut", &json!({})).unwrap();
+        assert_eq!(v["cut_markers"], 1);
+        e.execute("markers.previous_cut", &json!({})).unwrap();
+        assert_eq!(e.session().edit.selection.start, 2 * 48_000);
+        assert!(e.execute("markers.done_cut", &json!({"at": {"seconds": 8.0}})).is_err(), "nothing there");
     }
 
     #[test]
