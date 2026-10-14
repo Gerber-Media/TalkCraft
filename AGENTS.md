@@ -4,6 +4,9 @@ SoundCraft is a clean-room, open-source, pure-Rust digital audio workstation tar
 
 Standards and learnings shared across the crafting apps live in `../../craftrules` (checked out next to the craft-apps folder, or `storytold/craftrules`). Read its `AGENTS.md` at the start of a session, follow its standards, and contribute reusable learnings back there. Never code: repos don't share code.
 
+## TalkCraft (this fork)
+This repository is TalkCraft, a podcast fork of SoundCraft. Read [`docs/talkcraft.md`](docs/talkcraft.md) first: what the fork adds, the decisions behind it, the traps already found (muda menu handler, memory with long episodes, device watching, browser quirks) and how to test what unit tests cannot see.
+
 ## Start every session here
 1. Read `plan/STATUS.md` (current milestone, next task) and `plan/execution-plan.md`. `plan/` is gitignored (local only). Behaviour reference: `plan/protools/` (observed menu tree `menus-clean.txt` and screenshots; never committed).
 2. Read `ROADMAP.md` (committed) for stage, status and the parity numbers; pick work from `docs/gaps.md`. The progress docs follow craftrules `standards/progress-docs.md`: `docs/target-app-parity.md` (assessment), `docs/gaps.md`, `docs/roadmap.md`, `docs/ui-parity.md`, `docs/file-format-parity.md`, `docs/hardware-parity.md`, `docs/plugin-parity.md`, `docs/localization-parity.md`; `docs/parity-checklist.md` is generated. Update their timestamps and revision history when you change them.
