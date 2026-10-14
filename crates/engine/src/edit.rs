@@ -437,6 +437,31 @@ pub fn cut_time(s: &mut Session, r: Range, keep_markers: bool) {
         }
     }
     crate::subtitles::cut_time(s, r);
+    micro_fades_at(s, r.start);
+}
+
+/// Length of the fades a cut leaves on both sides, so a hard edit never clicks.
+pub const MICRO_FADE_S: f64 = 0.005;
+
+/// Short fades where audio was cut out at `at`: the clip ending there fades out, the one starting
+/// there fades in (an existing longer fade stays).
+pub fn micro_fades_at(s: &mut Session, at: Samples) {
+    let len = s.sample_rate.samples(MICRO_FADE_S).max(1);
+    for t in &mut s.tracks {
+        let Some(pl) = t.playlist_mut() else { continue };
+        for c in &mut pl.clips {
+            if !matches!(c.content, ClipContent::Audio { .. }) {
+                continue;
+            }
+            if c.end() == at && c.fade_out.len < len {
+                c.fade_out.len = len;
+            }
+            if c.start == at && c.fade_in.len < len {
+                c.fade_in.len = len;
+            }
+            c.clamp_fades();
+        }
+    }
 }
 
 /// The empty stretch around `at` on `track`: from the end of the clip before it to the start of
@@ -453,6 +478,21 @@ pub fn gap_at(s: &soundcraft_model::Session, track: soundcraft_model::TrackId, a
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_cut_leaves_short_fades_on_both_sides() {
+        use soundcraft_model::{ChannelFormat, Clip, SourceId, TrackKind};
+        let mut s = Session::default();
+        let t = s.add_track(TrackKind::Audio, ChannelFormat::Mono, Some("A"));
+        let id = s.new_clip_id();
+        place_clip(&mut s, t, Clip::audio(id, "a", SourceId(1), 0, 0, 10 * 48_000));
+        cut_time(&mut s, soundcraft_time::Range::new(2 * 48_000, 3 * 48_000), true);
+        let clips = s.track(t).unwrap().clips().to_vec();
+        assert_eq!(clips.len(), 2);
+        let fade = s.sample_rate.samples(MICRO_FADE_S);
+        assert_eq!((clips[0].fade_out.len, clips[1].fade_in.len), (fade, fade), "both sides of the cut");
+        assert_eq!((clips[0].fade_in.len, clips[1].fade_out.len), (0, 0), "nothing elsewhere");
+    }
+
     #[test]
     fn cutting_time_shortens_a_range_marker_across_the_cut() {
         use soundcraft_model::MarkerKind;
