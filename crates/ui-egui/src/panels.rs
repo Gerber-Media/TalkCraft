@@ -343,8 +343,8 @@ pub(crate) fn memory_locations(app: &mut SoundApp, ui: &mut Ui) {
 /// The History (like Photoshop's): every step since the session was opened. Clicking a row
 /// brings the session back to just after that step; the later rows stay (greyed) and can be
 /// clicked again until a new edit replaces them.
-/// + adds a speaker (voice chain, next microphone input); − deletes the selected tracks (the master
-/// stays). Both are one undo step.
+/// The buttons under the track list: plus adds a speaker (voice chain, next microphone input),
+/// minus deletes the selected tracks (the master stays). Both are one undo step.
 fn track_buttons(app: &mut SoundApp, ui: &mut Ui) {
     let tr = crate::i18n::tr;
     let s = app.engine.session();
