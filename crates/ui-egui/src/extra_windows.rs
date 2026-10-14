@@ -20,6 +20,8 @@ pub struct ExtraState {
     pub remote: crate::remote::RemoteStudio,
     pub readiness: crate::readiness::Readiness,
     pub rundown: crate::rundown_window::RundownWindow,
+    /// The listening rate before L sped playback up (K returns to it).
+    pub shuttle_rate: Option<f32>,
     /// The start question is open; after a recording, switching to editing is offered.
     pub ask_workspace: bool,
     pub offer_edit: bool,
@@ -44,6 +46,7 @@ impl Default for ExtraState {
             remote: Default::default(),
             readiness: Default::default(),
             rundown: Default::default(),
+            shuttle_rate: None,
             ask_workspace: false,
             offer_edit: false,
             workspace_started: false,

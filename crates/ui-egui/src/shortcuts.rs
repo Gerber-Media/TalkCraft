@@ -231,6 +231,12 @@ fn fixed(app: &mut SoundApp, key: Key, m: Modifiers, mac: bool) -> bool {
             let _ = app.run(id, json!({}));
             true
         }
+        // Editing by ear (TalkCraft): J back 5 s, K stop, L play (again: faster), I / O the
+        // selection's start / end at the playhead.
+        Key::J | Key::K | Key::L | Key::I | Key::O if plain && app.ui.window == MainWindow::Edit && app.ui.workspace.edits() => {
+            shuttle(app, key);
+            true
+        }
         // Commands Keyboard Focus: single-key editing (Edit window only).
         k if plain && app.ui.window == MainWindow::Edit && app.engine.session().edit.keyboard_focus == "commands" && commands_focus(app, k) => true,
         Key::R | Key::T if plain => {
@@ -272,6 +278,50 @@ fn commands_focus(app: &mut SoundApp, key: Key) -> bool {
     };
     let _ = app.run(id, json!({}));
     true
+}
+
+/// J / K / L and I / O.
+fn shuttle(app: &mut SoundApp, key: Key) {
+    let playing = app.is_playing();
+    let pos = if playing { app.position() } else { app.engine.session().edit.selection.start };
+    let sel = app.engine.session().edit.selection;
+    let sr = app.engine.session().sample_rate;
+    match key {
+        Key::L if !playing => {
+            app.extra.shuttle_rate = Some(app.ui.playback_rate);
+            let _ = app.run("transport.play", json!({}));
+        }
+        Key::L => {
+            // 1× → 1.5× → 2× (the pitch stays).
+            let next = if app.ui.playback_rate < 1.5 { 1.5 } else { 2.0 };
+            let _ = app.run("transport.rate", json!({"rate": next}));
+        }
+        Key::K => {
+            let _ = app.run("transport.stop", json!({}));
+            if let Some(r) = app.extra.shuttle_rate.take() {
+                let _ = app.run("transport.rate", json!({"rate": r}));
+            }
+        }
+        Key::J => {
+            let back = (pos - sr.samples(5.0)).max(0);
+            if playing {
+                let _ = app.run("transport.stop", json!({}));
+            }
+            let _ = app.run("edit.select", json!({"start": back}));
+            if playing {
+                let _ = app.run("transport.play", json!({}));
+            }
+        }
+        Key::I => {
+            let end = if sel.end > pos { sel.end } else { pos };
+            let _ = app.run("edit.select", json!({"start": pos, "end": end}));
+        }
+        _ => {
+            // O: the end; the start stays unless it lies after the playhead.
+            let start = if sel.start < pos { sel.start } else { pos };
+            let _ = app.run("edit.select", json!({"start": start, "end": pos}));
+        }
+    }
 }
 
 /// Move the edit selection to the track above/below (P / ;).
@@ -337,6 +387,50 @@ mod label_tests {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn j_k_l_and_i_o_edit_by_ear() {
+        use crate::SoundApp;
+        use serde_json::json;
+        let shuttle = super::shuttle;
+        let mut app = SoundApp::new(soundcraft_engine::Engine::default(), None, crate::Services::default());
+        app.engine.execute("session.new", &json!({"name": "S", "template": "podcast", "speakers": 1})).unwrap();
+        let sec = 48_000;
+        let ctx = egui::Context::default();
+        let frame = |app: &mut SoundApp| ctx.run_ui(egui::RawInput::default(), |ui| app.logic(ui.ctx())).textures_delta.clear();
+        // J while stopped: the insertion point five seconds back.
+        app.engine.execute("edit.select", &json!({"start": 20 * sec})).unwrap();
+        shuttle(&mut app, Key::J);
+        assert_eq!(app.engine.session().edit.selection.start, 15 * sec);
+        // L plays; I and O take the playhead as the selection's start and end.
+        app.ui.playback_rate = 1.0;
+        shuttle(&mut app, Key::L);
+        frame(&mut app);
+        assert!(app.is_playing());
+        let at = |app: &mut SoundApp, t: i64| {
+            if let Some((pos, _, _)) = &mut app.sim {
+                *pos = t;
+            }
+        };
+        at(&mut app, 16 * sec);
+        frame(&mut app);
+        let i_at = app.position();
+        shuttle(&mut app, Key::I);
+        at(&mut app, 19 * sec);
+        frame(&mut app);
+        let o_at = app.position();
+        shuttle(&mut app, Key::O);
+        let sel = app.engine.session().edit.selection;
+        assert!((i_at - 16 * sec).abs() < sec / 10 && (o_at - 19 * sec).abs() < sec / 10, "{i_at} {o_at}");
+        assert_eq!((sel.start, sel.end), (i_at, o_at), "I at 16 s, O at 19 s");
+        // L again speeds up, K stops and restores the rate.
+        shuttle(&mut app, Key::L);
+        assert_eq!(app.ui.playback_rate, 1.5);
+        shuttle(&mut app, Key::L);
+        assert_eq!(app.ui.playback_rate, 2.0);
+        shuttle(&mut app, Key::K);
+        assert_eq!(app.ui.playback_rate, 1.0, "back to the rate before L");
+    }
+
     use super::{command_for, mods_match, parse, search_chord};
     use egui::{Key, Modifiers};
 
