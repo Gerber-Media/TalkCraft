@@ -139,7 +139,7 @@ fn dock_tabs(app: &mut SoundApp, ui: &mut Ui) {
         ("MEMORY LOCATIONS", app.ui.show_memory_locations, "window.memory_locations"),
         ("UNDO HISTORY", app.ui.show_undo_history, "window.undo_history"),
     ] {
-        let g = ui.painter().layout_no_wrap(label.to_string(), bold(10.5), if on { Color32::WHITE } else { t.text_dim });
+        let g = ui.painter().layout_no_wrap(crate::i18n::tr(label).to_string(), bold(10.5), if on { Color32::WHITE } else { t.text_dim });
         let tr = Rect::from_min_size(pos2(x, r.min.y + 2.0), vec2(g.size().x + 16.0, r.height() - 4.0));
         if on {
             ui.painter().rect_filled(tr, 3.0, t.accent_dark);
@@ -156,20 +156,18 @@ fn status_bar(app: &mut SoundApp, ui: &mut Ui) {
     let t = Tokens::current();
     let r = ui.max_rect();
     let s = app.engine.session();
-    let left = format!(
+    let depth = match s.bit_depth {
+        soundcraft_model::BitDepthSetting::Int16 => "16-bit",
+        soundcraft_model::BitDepthSetting::Int24 => "24-bit",
+        soundcraft_model::BitDepthSetting::Float32 => "32-bit float",
+    };
+    // Fixed status messages are translated here; composed ones are translated where they are made.
+    let left = crate::i18n::trf(
         "{} · {} Hz · {} · {} tracks · {}",
-        s.name,
-        s.sample_rate.hz(),
-        match s.bit_depth {
-            soundcraft_model::BitDepthSetting::Int16 => "16-bit",
-            soundcraft_model::BitDepthSetting::Int24 => "24-bit",
-            soundcraft_model::BitDepthSetting::Float32 => "32-bit float",
-        },
-        s.tracks.len(),
-        app.ui.status
+        &[&s.name, &s.sample_rate.hz(), &crate::i18n::tr(depth), &s.tracks.len(), &crate::i18n::tr(&app.ui.status)],
     );
     ui.painter().text(pos2(r.min.x + 10.0, r.center().y), Align2::LEFT_CENTER, left, regular(11.0), t.text_dim);
-    let undo = app.engine.undo_label().map_or(String::new(), |l| format!("Undo {l}"));
+    let undo = app.engine.undo_label().map_or(String::new(), |l| crate::i18n::trf("Undo {}", &[&crate::i18n::tr(l.trim_end_matches("..."))]));
     ui.painter().text(
         pos2(r.max.x - 10.0, r.center().y),
         Align2::RIGHT_CENTER,
@@ -481,7 +479,7 @@ fn draw_rulers(app: &mut SoundApp, ui: &mut Ui, area: Rect, tl: Rect, rulers: &[
         let lab = Rect::from_min_max(pos2(area.min.x, y0), pos2(tl.min.x, y0 + h));
         y0 += h;
         let painter = ui.painter().with_clip_rect(row);
-        ui.painter().text(pos2(lab.max.x - 12.0, lab.center().y), Align2::RIGHT_CENTER, ruler_label(id), bold(11.0), t.ruler_text);
+        ui.painter().text(pos2(lab.max.x - 12.0, lab.center().y), Align2::RIGHT_CENTER, crate::i18n::tr(ruler_label(id)), bold(11.0), t.ruler_text);
         let fmt = TimeFormat::from_id(id);
         match id.as_str() {
             "tempo" => {
@@ -857,7 +855,7 @@ fn playlist_lanes(app: &mut SoundApp, ui: &mut Ui, track: &Track, row: Rect, mai
                 let _ = app.run("track.playlist_promote", json!({"track": track.id.0, "playlist": i, "start": a, "end": b}));
             }
         }
-        resp.on_hover_text("Click a take (or the selection) to promote it to the main playlist");
+        resp.on_hover_text(crate::i18n::tr("Click a take (or the selection) to promote it to the main playlist"));
         y += LANE_H;
     }
 }
@@ -952,7 +950,7 @@ fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, sele
         if ui.button(crate::i18n::tr("Duplicate...")).clicked() {
             let _ = app.run("track.playlist_duplicate", json!({"track": id.0}));
         }
-        if ui.button("Delete Unused...").clicked() {
+        if ui.button(crate::i18n::tr("Delete Unused...")).clicked() {
             let _ = app.run("track.playlist_delete_unused", json!({"track": id.0}));
         }
         ui.separator();
@@ -986,7 +984,7 @@ fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, sele
             let name = track.instrument.as_ref().and_then(|i| crate::mix_window::plugin_info(&i.plugin)).map_or("none", |p| p.name);
             let resp = ui
                 .interact(kr.expand(3.0), ui.id().with(("instrument", id.0)), Sense::click())
-                .on_hover_text(format!("Instrument: {name} (click to change or open its editor)"));
+                .on_hover_text(crate::i18n::trf("Instrument: {} (click to change or open its editor)", &[&name]));
             egui::Popup::menu(&resp).show(|ui| crate::mix_window::instrument_menu(app, ui, id));
         }
     }
@@ -1158,7 +1156,7 @@ fn track_context_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
         }
     }
     ui.separator();
-    ui.menu_button("Track Height", |ui| {
+    ui.menu_button(crate::i18n::tr("Track Height"), |ui| {
         for h in TrackHeight::ALL {
             if ui.button(h.label()).clicked() {
                 let _ = app.run("track.height", json!({"tracks": [tid], "height": h.label()}));
@@ -1288,7 +1286,13 @@ fn draw_clip(app: &SoundApp, painter: &egui::Painter, s: &Session, track: &Track
                     }
                 }
             } else {
-                painter.text(body_r.center(), Align2::CENTER_CENTER, "media offline", regular(10.0), Color32::from_rgb(220, 120, 120));
+                painter.text(
+                    body_r.center(),
+                    Align2::CENTER_CENTER,
+                    crate::i18n::tr("media offline"),
+                    regular(10.0),
+                    Color32::from_rgb(220, 120, 120),
+                );
             }
         }
         ClipContent::Video { .. } => {} // thumbnails: video_track::draw_lane
@@ -1472,7 +1476,7 @@ fn draw_automation(painter: &egui::Painter, s: &Session, track: &Track, p: &Auto
             }
         }
     }
-    painter.text(pos2(lane.min.x + 6.0, lane.min.y + 9.0), Align2::LEFT_CENTER, p.label(), regular(10.0), t.text_dim);
+    painter.text(pos2(lane.min.x + 6.0, lane.min.y + 9.0), Align2::LEFT_CENTER, crate::i18n::tr(&p.label()), regular(10.0), t.text_dim);
 }
 
 fn plugin_range(track: &Track, p: &AutoParam) -> (f32, f32) {
@@ -1780,7 +1784,7 @@ fn blade_cut(app: &mut SoundApp, s: &Session, track: &Track, at: Samples, all: b
         Ok(_) => {
             // The insertion point goes to the cut, so Play continues from there.
             app.engine.session_mut().edit.selection = Range::point(at);
-            app.ui.status = format!("Split {} clip(s)", tracks.len());
+            app.ui.status = crate::i18n::trf("Split {} clip(s)", &[&tracks.len()]);
         }
         Err(e) => app.ui.status = e,
     }
@@ -1957,7 +1961,7 @@ fn automation_id(p: &AutoParam) -> String {
         AutoParam::SendLevel(i) => format!("send_{}_level", (b'a' + i) as char),
         AutoParam::SendPan(i) => format!("send_{}_pan", (b'a' + i) as char),
         AutoParam::SendMute(i) => format!("send_{}_mute", (b'a' + i) as char),
-        AutoParam::Plugin { slot, param } => format!("plugin:{}:{param}", (b'a' + slot) as char),
+        AutoParam::Plugin { slot, param } => format!("plugin:{}:{}", (b'a' + slot) as char, param),
     }
 }
 
@@ -1989,13 +1993,17 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
             let s = app.engine.session();
             let secs = s.sample_rate.seconds(g.len());
             let others_busy = s.tracks.iter().any(|t| t.clips().iter().any(|c| c.start < g.end && c.end() > g.start));
-            if ui.button(format!("Close Gap on This Track ({secs:.1} s)")).on_hover_text("Moves the later clips on this track back").clicked() {
+            if ui
+                .button(crate::i18n::trf("Close Gap on This Track ({} s)", &[&format!("{:.1}", secs)]))
+                .on_hover_text(crate::i18n::tr("Moves the later clips on this track back"))
+                .clicked()
+            {
                 run_report(app, "edit.close_gap", json!({"track": track.0, "at": at}));
             }
             let all = ui
                 .add_enabled(!others_busy, egui::Button::new(crate::i18n::tr("Close Gap on All Tracks")))
-                .on_hover_text("Cuts this time from every track, markers and subtitles (only where all tracks are empty)")
-                .on_disabled_hover_text("Other tracks have audio in this gap");
+                .on_hover_text(crate::i18n::tr("Cuts this time from every track, markers and subtitles (only where all tracks are empty)"))
+                .on_disabled_hover_text(crate::i18n::tr("Other tracks have audio in this gap"));
             if all.clicked() {
                 run_report(app, "edit.close_gap", json!({"track": track.0, "at": at, "all_tracks": true}));
             }
@@ -2012,16 +2020,16 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
     }
     if ui
         .button(crate::i18n::tr("Match Loudness (−16 LUFS)"))
-        .on_hover_text("Sets the clip gain so the clip sounds as loud as the episode target")
+        .on_hover_text(crate::i18n::tr("Sets the clip gain so the clip sounds as loud as the episode target"))
         .clicked()
     {
         run_report(app, "clip.normalize", json!({"clips": [c.0], "lufs": -16.0}));
     }
     ui.menu_button(crate::i18n::tr("Reduce Noise"), |ui| {
         for (label, db) in [("Light (6 dB)", 6.0), ("Medium (12 dB)", 12.0), ("Strong (18 dB)", 18.0)] {
-            if ui.button(label).on_hover_text("Learns the background from the quietest moments and lowers it; undoable").clicked() {
+            if ui.button(label).on_hover_text(crate::i18n::tr("Learns the background from the quietest moments and lowers it; undoable")).clicked() {
                 match app.run("clip.denoise", json!({"clips": [c.0], "reduction_db": db})) {
-                    Ok(_) => app.ui.status = format!("Noise reduced by up to {db} dB"),
+                    Ok(_) => app.ui.status = crate::i18n::trf("Noise reduced by up to {} dB", &[&db]),
                     Err(e) => app.ui.status = e,
                 }
             }
@@ -2029,15 +2037,14 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
     });
     if ui
         .button(crate::i18n::tr("Sync to Other Tracks"))
-        .on_hover_text("Moves this clip so its audio lines up with the rest (e.g. a guest's own recording against the call)")
+        .on_hover_text(crate::i18n::tr("Moves this clip so its audio lines up with the rest (e.g. a guest's own recording against the call)"))
         .clicked()
     {
         match app.run("podcast.sync_clip", json!({"clip": c.0})) {
             Ok(v) => {
-                app.ui.status = format!(
-                    "Synced: moved {:+.3} s (match {:.0} %)",
-                    v["moved_s"].as_f64().unwrap_or(0.0),
-                    v["correlation"].as_f64().unwrap_or(0.0) * 100.0
+                app.ui.status = crate::i18n::trf(
+                    "Synced: moved {} s (match {} %)",
+                    &[&format!("{:+.3}", v["moved_s"].as_f64().unwrap_or(0.0)), &format!("{:.0}", v["correlation"].as_f64().unwrap_or(0.0) * 100.0)],
                 )
             }
             Err(e) => app.ui.status = e,
@@ -2045,13 +2052,13 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
     }
     ui.menu_button(crate::i18n::tr("Fades"), |ui| {
         for secs in [0.5, 1.0, 2.0] {
-            if ui.button(format!("Fade In {secs} s")).clicked() {
+            if ui.button(crate::i18n::trf("Fade In {} s", &[&secs])).clicked() {
                 run_report(app, "clip.set_fades", json!({"clip": c.0, "fade_in": {"seconds": secs}}));
             }
         }
         ui.separator();
         for secs in [0.5, 1.0, 2.0] {
-            if ui.button(format!("Fade Out {secs} s")).clicked() {
+            if ui.button(crate::i18n::trf("Fade Out {} s", &[&secs])).clicked() {
                 run_report(app, "clip.set_fades", json!({"clip": c.0, "fade_out": {"seconds": secs}}));
             }
         }
@@ -2059,7 +2066,7 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
         if ui.button(crate::i18n::tr("Remove Fades")).clicked() {
             run_report(app, "clip.set_fades", json!({"clip": c.0, "fade_in": 0, "fade_out": 0}));
         }
-        ui.label(egui::RichText::new("Or drag the small handles at the top of the clip").small().color(Tokens::current().text_dim));
+        ui.label(egui::RichText::new(crate::i18n::tr("Or drag the small handles at the top of the clip")).small().color(Tokens::current().text_dim));
     });
     ui.menu_button(format!("Volume ({gain:+.1} dB)"), |ui| {
         let mut db = gain;

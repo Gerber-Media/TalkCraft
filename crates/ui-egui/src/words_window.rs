@@ -109,7 +109,7 @@ fn poll(app: &mut SoundApp, ctx: &egui::Context) {
         Ok(v) => {
             app.extra.words.words = parse_words(&v);
             let n = app.extra.words.words.iter().filter(|w| w.filler).count();
-            app.ui.status = format!("Found {} words, {n} filler(s) selected", app.extra.words.words.len());
+            app.ui.status = crate::i18n::trf("Found {} words, {} filler(s) selected", &[&app.extra.words.words.len(), &n]);
         }
         Err(e) => app.ui.status = e,
     }
@@ -136,8 +136,10 @@ fn cut_selected(app: &mut SoundApp) {
     match app.run("edit.cut_ranges", params) {
         Ok(v) => {
             app.extra.words.words = after_cut(&app.extra.words.words, &merged);
-            app.ui.status =
-                format!("Cut {} word(s), {:.1} s removed (undo with Cmd+Z)", merged.len(), sr.seconds(v["removed"].as_i64().unwrap_or(0)));
+            app.ui.status = crate::i18n::trf(
+                "Cut {} word(s), {} s removed (undo with Cmd+Z)",
+                &[&merged.len(), &format!("{:.1}", sr.seconds(v["removed"].as_i64().unwrap_or(0)))],
+            );
         }
         Err(e) => app.ui.status = e,
     }
@@ -174,11 +176,11 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                     }
                 } else if transcribe::missing(None).is_some() {
                     ui.label(RichText::new(transcribe::missing(None).unwrap_or_default()).color(t.text_dim));
-                } else if ui.button(crate::i18n::tr("Find Words")).on_hover_text("Transcribes the episode word by word, keeping the ähms and uhs").clicked() {
+                } else if ui.button(crate::i18n::tr("Find Words")).on_hover_text(crate::i18n::tr("Transcribes the episode word by word, keeping the ähms and uhs")).clicked() {
                     find = true;
                 }
                 let fillers = w.words.iter().filter(|x| x.filler).count();
-                if ui.add_enabled(fillers > 0, egui::Button::new(format!("Select all fillers ({fillers})"))).clicked() {
+                if ui.add_enabled(fillers > 0, egui::Button::new(crate::i18n::trf("Select all fillers ({})", &[&fillers]))).clicked() {
                     w.words.iter_mut().for_each(|x| x.selected = x.filler);
                 }
                 if ui.add_enabled(w.words.iter().any(|x| x.selected), egui::Button::new(crate::i18n::tr("Select none"))).clicked() {
@@ -186,8 +188,8 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 }
                 let n = w.words.iter().filter(|x| x.selected).count();
                 let secs: f64 = w.words.iter().filter(|x| x.selected).map(|x| sr.seconds(x.end - x.start)).sum();
-                let label = RichText::new(format!("Cut {n} word(s) · {secs:.1} s")).strong();
-                if ui.add_enabled(n > 0, egui::Button::new(label).fill(t.accent)).on_hover_text("Removes them from every track at once; one undo step").clicked() {
+                let label = RichText::new(crate::i18n::trf("Cut {} word(s) · {} s", &[&n, &format!("{:.1}", secs)])).strong();
+                if ui.add_enabled(n > 0, egui::Button::new(label).fill(t.accent)).on_hover_text(crate::i18n::tr("Removes them from every track at once; one undo step")).clicked() {
                     cut = true;
                 }
             });
@@ -196,7 +198,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 ui.add_space(20.0);
                 ui.vertical_centered(|ui| {
                     ui.label(RichText::new(crate::i18n::tr("No words yet")).strong());
-                    ui.label(RichText::new("Find Words writes down every word with its time. Hesitations are marked and preselected; click a word to change that, right-click to hear it.").color(t.text_dim));
+                    ui.label(RichText::new(crate::i18n::tr("Find Words writes down every word with its time. Hesitations are marked and preselected; click a word to change that, right-click to hear it.")).color(t.text_dim));
                 });
                 return;
             }
@@ -218,7 +220,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                         if r.secondary_clicked() {
                             locate = Some(word.start);
                         }
-                        r.on_hover_text(format!("{:.2} s · click: select for cutting · right-click: listen", sr.seconds(word.start)));
+                        r.on_hover_text(crate::i18n::trf("{} s · click: select for cutting · right-click: listen", &[&format!("{:.2}", sr.seconds(word.start))]));
                     }
                 });
             });

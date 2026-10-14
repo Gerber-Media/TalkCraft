@@ -512,7 +512,7 @@ impl SoundApp {
         self.ensure_input();
         if let Err(err) = self.arm_recorder() {
             self.set_record_arms(&[]);
-            self.ui.status = format!("Cannot record: {err}");
+            self.ui.status = crate::i18n::trf("Cannot record: {}", &[&err]);
             return;
         }
         if let Some(p) = &self.player {
@@ -660,7 +660,7 @@ impl SoundApp {
             }
             Err(e) => {
                 self.recorder_failed = true;
-                self.ui.status = format!("No audio input: {e}");
+                self.ui.status = crate::i18n::trf("No audio input: {}", &[&e]);
             }
         }
     }
@@ -992,7 +992,7 @@ impl SoundApp {
         if let Some(job) = &self.audiogram {
             match job.done.try_recv() {
                 Ok(Ok(path)) => {
-                    self.ui.status = format!("Audiogram written: {path}");
+                    self.ui.status = crate::i18n::trf("Audiogram written: {}", &[&path]);
                     self.audiogram = None;
                 }
                 Ok(Err(e)) => {
@@ -1001,7 +1001,7 @@ impl SoundApp {
                 }
                 Err(_) => {
                     let p = job.progress.load(std::sync::atomic::Ordering::Relaxed);
-                    self.ui.status = format!("Rendering audiogram… {}%", p / 10);
+                    self.ui.status = crate::i18n::trf("Rendering audiogram… {}%", &[&(p / 10)]);
                     ctx.request_repaint_after(std::time::Duration::from_millis(250));
                 }
             }

@@ -403,11 +403,11 @@ fn clear_message(s: &Session, clips: &[ClipId], sources: &[SourceId]) -> Option<
     let count = |n: usize, what: &str| if n == 1 { format!("1 {what}") } else { format!("{n} {what}s") };
     let what = match (names.as_slice(), files.as_slice()) {
         ([], []) => return None,
-        ([name], []) => format!("the clip \"{name}\""),
-        ([], [f]) => format!("the file \"{}\"", f.name),
+        ([name], []) => crate::i18n::trf("the clip \"{}\"", &[&name]),
+        ([], [f]) => crate::i18n::trf("the file \"{}\"", &[&f.name]),
         (c, []) => count(c.len(), "clip"),
         ([], f) => count(f.len(), "file"),
-        (c, f) => format!("{} and {}", count(c.len(), "clip"), count(f.len(), "file")),
+        (c, f) => crate::i18n::trf("{} and {}", &[&(count(c.len(), "clip")), &(count(f.len(), "file"))]),
     };
     let mut text = format!("Remove {what} from the session?");
     let used: Vec<(&str, usize)> =
@@ -481,7 +481,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     .to_string();
     let enter = ctx.input(|i| i.key_pressed(egui::Key::Enter));
     let esc = ctx.input(|i| i.key_pressed(egui::Key::Escape));
-    egui::Window::new(egui::RichText::new(crate::i18n::tr(&title)).font(bold(13.0)))
+    egui::Window::new(egui::RichText::new(title.split(" — ").map(crate::i18n::tr).collect::<Vec<_>>().join(" — ")).font(bold(13.0)))
         .collapsible(false)
         .resizable(false)
         .anchor(Align2::CENTER_CENTER, vec2(0.0, -80.0))
@@ -490,9 +490,9 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
             match &mut d {
                 Dialog::NewTracks { count, format, kind, timebase, name } => {
                     ui.horizontal(|ui| {
-                        ui.label("Create");
+                        ui.label(crate::i18n::tr("Create"));
                         ui.add(egui::DragValue::new(count).range(1..=128));
-                        ui.label("new");
+                        ui.label(crate::i18n::tr("new"));
                         egui::ComboBox::from_id_salt("nt_fmt").selected_text(format.as_str()).show_ui(ui, |ui| {
                             for f in soundcraft_model::ChannelFormat::ALL {
                                 ui.selectable_value(format, f.label().to_string(), f.label());
@@ -512,11 +512,11 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         egui::ComboBox::from_id_salt("nt_tb").selected_text(if timebase == "ticks" { "Ticks" } else { "Samples" }).show_ui(
                             ui,
                             |ui| {
-                                ui.selectable_value(timebase, "samples".to_string(), "Samples");
-                                ui.selectable_value(timebase, "ticks".to_string(), "Ticks");
+                                ui.selectable_value(timebase, "samples".to_string(), crate::i18n::tr("Samples"));
+                                ui.selectable_value(timebase, "ticks".to_string(), crate::i18n::tr("Ticks"));
                             },
                         );
-                        ui.label("Name:");
+                        ui.label(crate::i18n::tr("Name:"));
                         ui.add(egui::TextEdit::singleline(name).desired_width(140.0));
                     });
                     if buttons(ui, "Create", enter) {
@@ -529,22 +529,22 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         ui.label(crate::i18n::tr("Name"));
                         ui.text_edit_singleline(name);
                     });
-                    egui::ComboBox::from_label("Sample Rate").selected_text(format!("{sample_rate} Hz")).show_ui(ui, |ui| {
+                    egui::ComboBox::from_label(crate::i18n::tr("Sample Rate")).selected_text(format!("{sample_rate} Hz")).show_ui(ui, |ui| {
                         for r in soundcraft_time::SampleRate::COMMON {
                             ui.selectable_value(sample_rate, r, format!("{r} Hz"));
                         }
                     });
                     ui.horizontal(|ui| {
-                        ui.radio_value(template, "podcast".to_string(), "Podcast episode");
-                        ui.radio_value(template, "blank".to_string(), "Empty session");
+                        ui.radio_value(template, "podcast".to_string(), crate::i18n::tr("Podcast episode"));
+                        ui.radio_value(template, "blank".to_string(), crate::i18n::tr("Empty session"));
                     });
                     if template == "podcast" {
                         ui.horizontal(|ui| {
-                            ui.label("Speakers");
+                            ui.label(crate::i18n::tr("Speakers"));
                             ui.add(egui::DragValue::new(speakers).range(1..=8));
                         });
                         ui.label(
-                            egui::RichText::new("One mono track per speaker with a voice chain (EQ, gate, compressor, de-esser), a jingle track and a limited master.")
+                            egui::RichText::new(crate::i18n::tr("One mono track per speaker with a voice chain (EQ, gate, compressor, de-esser), a jingle track and a limited master."))
                                 .small()
                                 .color(Tokens::current().text_dim),
                         );
@@ -562,21 +562,21 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         path_field(ui, &app.services, path, 450.0, Pick::Save("file.bounce_mix"), "");
                     });
                     ui.horizontal(|ui| {
-                        egui::ComboBox::from_label("Format").selected_text(format.to_uppercase()).show_ui(ui, |ui| {
+                        egui::ComboBox::from_label(crate::i18n::tr("Format")).selected_text(format.to_uppercase()).show_ui(ui, |ui| {
                             for f in ["wav", "aiff", "flac"] {
                                 ui.selectable_value(format, f.to_string(), f.to_uppercase());
                             }
                         });
-                        egui::ComboBox::from_label("Bit Depth").selected_text(format!("{bit_depth}-bit")).show_ui(ui, |ui| {
+                        egui::ComboBox::from_label(crate::i18n::tr("Bit Depth")).selected_text(format!("{bit_depth}-bit")).show_ui(ui, |ui| {
                             for b in ["16", "24", "32f"] {
                                 ui.selectable_value(bit_depth, b.to_string(), format!("{b}-bit"));
                             }
                         });
                     });
-                    ui.checkbox(loudness, "Podcast loudness: -16 LUFS, -1 dBTP");
-                    ui.add_enabled(!*loudness, egui::Checkbox::new(normalize, "Normalize to -0.1 dBFS"));
+                    ui.checkbox(loudness, crate::i18n::tr("Podcast loudness: -16 LUFS, -1 dBTP"));
+                    ui.add_enabled(!*loudness, egui::Checkbox::new(normalize, crate::i18n::tr("Normalize to -0.1 dBFS")));
                     ui.label(
-                        egui::RichText::new("Bounces the edit selection, or the whole session when nothing is selected.")
+                        egui::RichText::new(crate::i18n::tr("Bounces the edit selection, or the whole session when nothing is selected."))
                             .small()
                             .color(Tokens::current().text_dim),
                     );
@@ -619,7 +619,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                     let file = soundcraft_engine::io::session_file(path);
                     let replaces = soundcraft_engine::io::replaces(&app.engine, cmd, &file);
                     if replaces {
-                        ui.label(format!("“{}” already exists. Do you want to replace it?", file.file_name().unwrap_or_default().to_string_lossy()));
+                        ui.label(crate::i18n::trf("“{}” already exists. Do you want to replace it?", &[&file.file_name().unwrap_or_default().to_string_lossy()]));
                     }
                     if buttons(ui, if replaces { "Replace" } else { "OK" }, enter && !replaces) {
                         let mut v = json!({});
@@ -665,7 +665,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                     ui.add(egui::Slider::new(keep_ms, 0.0..=*longer_ms).text("Shorten them to ms"));
                     let params = json!({"threshold_db": threshold, "longer_than_ms": longer_ms, "keep_ms": keep_ms});
                     ui.horizontal(|ui| {
-                        if ui.button("Preview").clicked() {
+                        if ui.button(crate::i18n::tr("Preview")).clicked() {
                             let mut p = params.clone();
                             p["dry_run"] = json!(true);
                             dry_run = Some(p);
@@ -675,7 +675,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         }
                     });
                     ui.label(
-                        egui::RichText::new("Works on all tracks at once (markers and subtitles move along). Applies to the edit selection, or the whole session; one undo step.")
+                        egui::RichText::new(crate::i18n::tr("Works on all tracks at once (markers and subtitles move along). Applies to the edit selection, or the whole session; one undo step."))
                             .small()
                             .color(Tokens::current().text_dim),
                     );
@@ -702,16 +702,12 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                     let s = app.engine.session();
                     let r = crate::audiogram::range(s);
                     ui.label(
-                        egui::RichText::new(format!(
-                            "{:.0} s from {} — the edit selection, else the first minute. Cover, title and subtitles come from the episode.",
-                            s.sample_rate.seconds(r.len()),
-                            clock(s.sample_rate.seconds(r.start))
-                        ))
+                        egui::RichText::new(crate::i18n::trf("{} s from {} — the edit selection, else the first minute. Cover, title and subtitles come from the episode.", &[&format!("{:.0}", s.sample_rate.seconds(r.len())), &clock(s.sample_rate.seconds(r.start))]))
                         .small()
                         .color(Tokens::current().text_dim),
                     );
                     if !crate::audiogram::available() {
-                        ui.label(egui::RichText::new("Needs ffmpeg (macOS: brew install ffmpeg)").color(Tokens::current().text_dim));
+                        ui.label(egui::RichText::new(crate::i18n::tr("Needs ffmpeg (macOS: brew install ffmpeg)")).color(Tokens::current().text_dim));
                     }
                     if buttons(ui, "Render", enter) && crate::audiogram::available() {
                         let p = std::path::Path::new(path.as_str()).with_extension("mp4").to_string_lossy().to_string();
@@ -757,10 +753,10 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         ui.text_edit_singleline(name);
                     });
                     ui.horizontal(|ui| {
-                        ui.checkbox(edit, "Edit group");
-                        ui.checkbox(mix, "Mix group");
+                        ui.checkbox(edit, crate::i18n::tr("Edit group"));
+                        ui.checkbox(mix, crate::i18n::tr("Mix group"));
                     });
-                    ui.label("Tracks");
+                    ui.label(crate::i18n::tr("Tracks"));
                     egui::ScrollArea::vertical().max_height(180.0).show(ui, |ui| {
                         for (_, n, on) in members.iter_mut() {
                             ui.checkbox(on, n.as_str());
@@ -772,12 +768,12 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                     }
                 }
                 Dialog::Session { frame_rate, bit_depth } => {
-                    egui::ComboBox::from_label("Timecode Rate").selected_text(frame_rate.as_str()).show_ui(ui, |ui| {
+                    egui::ComboBox::from_label(crate::i18n::tr("Timecode Rate")).selected_text(frame_rate.as_str()).show_ui(ui, |ui| {
                         for r in soundcraft_time::FrameRate::ALL {
                             ui.selectable_value(frame_rate, r.label().to_string(), r.label());
                         }
                     });
-                    egui::ComboBox::from_label("Bit Depth").selected_text(bit_depth.as_str()).show_ui(ui, |ui| {
+                    egui::ComboBox::from_label(crate::i18n::tr("Bit Depth")).selected_text(bit_depth.as_str()).show_ui(ui, |ui| {
                         for b in ["16", "24", "32f"] {
                             ui.selectable_value(bit_depth, b.to_string(), b);
                         }
@@ -803,14 +799,14 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         ui.label(crate::i18n::tr("Title"));
                         ui.text_edit_singleline(title);
                         ui.end_row();
-                        ui.label("Composer");
+                        ui.label(crate::i18n::tr("Composer"));
                         ui.text_edit_singleline(composer);
                         ui.end_row();
-                        ui.label("Bars per system");
+                        ui.label(crate::i18n::tr("Bars per system"));
                         ui.add(egui::DragValue::new(bars_per_system).range(1..=16));
                         ui.end_row();
                     });
-                    ui.checkbox(show_track_names, "Show track names");
+                    ui.checkbox(show_track_names, crate::i18n::tr("Show track names"));
                     if buttons(ui, "OK", enter) {
                         action = Some((
                             "file.score_setup".into(),
@@ -827,12 +823,12 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                         } else {
                             (format!("Close “{name}” without saving?"), "Don't Save")
                         };
-                        ui.label(format!("{question} Your changes will be lost."));
+                        ui.label(crate::i18n::trf("{} Your changes will be lost.", &[&question]));
                         if buttons(ui, ok, false) {
                             action = Some(then.clone());
                         }
                     } else {
-                        ui.label(format!("Save changes to “{name}” before closing?"));
+                        ui.label(crate::i18n::trf("Save changes to “{}” before closing?", &[&name]));
                         ui.separator();
                         ui.horizontal(|ui| {
                             if ui.button(crate::i18n::tr("Don't Save")).clicked() {
@@ -877,19 +873,24 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
         keep = false;
         match app.run(&cmd, params) {
             Ok(v) if cmd == "edit.truncate_silence" => {
-                app.ui.status = format!("Shortened {} pause(s), {:.1} s removed", v["count"], v["removed_s"].as_f64().unwrap_or(0.0));
+                app.ui.status = crate::i18n::trf(
+                    "Shortened {} pause(s), {} s removed",
+                    &[&(v["count"]), &format!("{:.1}", v["removed_s"].as_f64().unwrap_or(0.0))],
+                );
             }
             Ok(v) if cmd == "file.export_podcast" => {
-                app.ui.status = format!(
-                    "Exported {} ({:.1} LUFS, {:.1} dBTP, {} chapter(s))",
-                    v["path"].as_str().unwrap_or_default(),
-                    v["lufs"].as_f64().unwrap_or(0.0),
-                    v["true_peak_db"].as_f64().unwrap_or(0.0),
-                    v["chapters"]
+                app.ui.status = crate::i18n::trf(
+                    "Exported {} ({} LUFS, {} dBTP, {} chapter(s))",
+                    &[
+                        &(v["path"].as_str().unwrap_or_default()),
+                        &format!("{:.1}", v["lufs"].as_f64().unwrap_or(0.0)),
+                        &format!("{:.1}", v["true_peak_db"].as_f64().unwrap_or(0.0)),
+                        &(v["chapters"]),
+                    ],
                 );
             }
             Ok(v) if cmd == "file.export_clips" => {
-                app.ui.status = format!("Exported {} clip(s) to {}", v["written"], v["dir"].as_str().unwrap_or_default());
+                app.ui.status = crate::i18n::trf("Exported {} clip(s) to {}", &[&(v["written"]), &(v["dir"].as_str().unwrap_or_default())]);
             }
             Ok(_) if cmd == "edit.clear" && matches!(d, Dialog::DeleteSection { .. }) => {
                 // Silence left in place: play on from the start of it rather than stopping at its end.
@@ -911,7 +912,9 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
         && let Dialog::ShortenPauses { preview, .. } = &mut d
     {
         *preview = Some(match app.run("edit.truncate_silence", p) {
-            Ok(v) => format!("{} pause(s), {:.1} s would be removed", v["count"], v["removed_s"].as_f64().unwrap_or(0.0)),
+            Ok(v) => {
+                crate::i18n::trf("{} pause(s), {} s would be removed", &[&(v["count"]), &format!("{:.1}", v["removed_s"].as_f64().unwrap_or(0.0))])
+            }
             Err(e) => e,
         });
     }
@@ -984,7 +987,7 @@ fn audiosuite_window(app: &mut SoundApp, ctx: &egui::Context) {
     let Some(process) = app.ui.audiosuite.clone() else { return };
     let mut open = true;
     let title = soundcraft_dsp::plugin_info(&process).map_or_else(|| process.replace('_', " "), |p| p.name.to_string());
-    egui::Window::new(format!("AudioSuite · {title}")).open(&mut open).default_width(360.0).show(ctx, |ui| {
+    egui::Window::new(crate::i18n::trf("AudioSuite · {}", &[&title])).open(&mut open).default_width(360.0).show(ctx, |ui| {
         let key = egui::Id::new(("as_params", process.clone()));
         let mut params: std::collections::BTreeMap<String, f32> = ui.ctx().memory(|m| m.data.get_temp(key)).unwrap_or_default();
         if let Some(info) = soundcraft_dsp::plugin_info(&process) {
@@ -1011,12 +1014,12 @@ fn audiosuite_window(app: &mut SoundApp, ctx: &egui::Context) {
                     ui.add(egui::Slider::new(v, 0.25..=4.0).text("Speed"));
                 }
                 _ => {
-                    ui.label("No parameters.");
+                    ui.label(crate::i18n::tr("No parameters."));
                 }
             }
         }
         ui.ctx().memory_mut(|m| m.data.insert_temp(key, params.clone()));
-        ui.label(egui::RichText::new("Processes the selected clips and replaces them with rendered audio.").small());
+        ui.label(egui::RichText::new(crate::i18n::tr("Processes the selected clips and replaces them with rendered audio.")).small());
         if ui.button(egui::RichText::new(crate::i18n::tr("Render")).strong()).clicked() {
             let p: serde_json::Map<String, Value> = params.iter().map(|(k, v)| (k.clone(), json!(v))).collect();
             let _ = app.run("audiosuite.process", json!({"process": process, "params": p}));
@@ -1047,7 +1050,11 @@ fn export_episode_ui(
 ) -> bool {
     let dim = Tokens::current().text_dim;
     export_settings_ui(ui, services, path, s, false);
-    ui.label(egui::RichText::new("Exports the edit selection, or the whole session. Settings are saved with the session.").small().color(dim));
+    ui.label(
+        egui::RichText::new(crate::i18n::tr("Exports the edit selection, or the whole session. Settings are saved with the session."))
+            .small()
+            .color(dim),
+    );
     buttons(ui, "Export", enter && !ui.ctx().egui_wants_keyboard_input())
 }
 
@@ -1322,7 +1329,7 @@ fn transcription_prefs(ui: &mut egui::Ui) {
     {
         use soundcraft_engine::transcribe;
         match transcribe::find_cli() {
-            Some(cli) => ui.label(format!("whisper.cpp: {}", cli.display())),
+            Some(cli) => ui.label(crate::i18n::trf("whisper.cpp: {}", &[&cli.display()])),
             None => ui.label(egui::RichText::new(transcribe::install_hint()).color(dim)),
         };
         match transcribe::find_model(None) {
@@ -1390,7 +1397,7 @@ fn export_settings_ui(
                 }
             });
         } else {
-            ui.label("Bit depth");
+            ui.label(crate::i18n::tr("Bit depth"));
             egui::ComboBox::from_id_salt("ep_bits").selected_text(format!("{}-bit", x.bit_depth)).show_ui(ui, |ui| {
                 for b in ["16", "24", "32f"] {
                     ui.selectable_value(&mut x.bit_depth, b.to_string(), format!("{b}-bit"));

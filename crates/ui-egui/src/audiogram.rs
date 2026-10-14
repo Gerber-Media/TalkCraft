@@ -180,9 +180,9 @@ fn render(ff: &std::path::Path, codec: &str, font: &fontdue::Font, req: &Request
     let _ = std::fs::remove_dir_all(&dir);
     if !out.status.success() {
         let err = String::from_utf8_lossy(&out.stderr);
-        return Err(format!(
+        return Err(crate::i18n::trf(
             "ffmpeg failed: {}",
-            err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or(write_err.as_deref().unwrap_or("?")).trim()
+            &[&(err.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or(write_err.as_deref().unwrap_or("?")).trim())],
         ));
     }
     Ok(req.out.clone())

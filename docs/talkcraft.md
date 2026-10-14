@@ -62,6 +62,20 @@ simple. Only the apps are called `talkcraft`.
 - **Version:** `TALKCRAFT_MINOR.<commits since TALKCRAFT_FORK_BASE>` (`packaging/version.env`).
   Raise `TALKCRAFT_MINOR` by hand for bigger steps; the last number counts itself.
 
+## German interface
+
+`crates/ui-egui/src/i18n.rs` holds the table (the English text is the key). `tr("…")` for fixed
+text, `trf("… {} …", &[&a, &b])` for text with values (the German template keeps the same `{}`
+in the same order). Widgets that take a tooltip or title (`icon_button`, `text_toggle`,
+`rec_toggle`, `panel_header`, `windows::win`, dialog titles) translate it themselves, so callers
+pass English. Do not run names (tracks, clips, plugins) through `tr`: a track called "Record"
+would turn into "Aufnahme". Pro Tools terms the German Pro Tools also keeps (Shuffle, Slip, Grid,
+Nudge) stay.
+
+`crates/ui-egui/tests/german_complete.rs` keeps it complete: one test opens every menu, window,
+dialog and work mode in German and fails on any string without a German entry; the other checks
+every `tr`/`trf` string in the code, including tooltips and messages the walk never shows.
+
 ## Traps we stepped in
 
 ### macOS menu bar (muda)

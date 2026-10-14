@@ -152,7 +152,7 @@ fn poll(app: &mut SoundApp, ctx: &egui::Context) {
             });
             job.cleanup();
             app.ui.status = match result {
-                Ok(v) => format!("Transcribed {} cue(s), {} with a speaker", v["created"], v["named"]),
+                Ok(v) => crate::i18n::trf("Transcribed {} cue(s), {} with a speaker", &[&(v["created"]), &(v["named"])]),
                 Err(e) => e,
             };
         }
@@ -210,16 +210,16 @@ fn transcription_ui(ui: &mut egui::Ui, ed: &mut SubtitleEditor, t: &Tokens, star
     if transcribe::find_cli().is_none() {
         ui.label(RichText::new(transcribe::install_hint()).color(t.text_dim));
     } else if transcribe::find_model(None).is_none() {
-        if ui.button(format!("Download speech model (~{:.0} MB)", MODEL_BYTES / 1e6)).on_hover_text(transcribe::DEFAULT_MODEL_URL).clicked() {
+        if ui.button(crate::i18n::trf("Download speech model (~{} MB)", &[&format!("{:.0}", MODEL_BYTES / 1e6)])).on_hover_text(transcribe::DEFAULT_MODEL_URL).clicked() {
             match start_download() {
                 Ok(task) => ed.task = Some(task),
                 Err(e) => *error = Some(e),
             }
         }
-        ui.label(RichText::new("needed once for automatic transcription").color(t.text_dim));
+        ui.label(RichText::new(crate::i18n::tr("needed once for automatic transcription")).color(t.text_dim));
     } else if ui
         .button(crate::i18n::tr("Transcribe"))
-        .on_hover_text("Fill in subtitles from the speech with whisper.cpp — the edit selection, or the whole episode. Replaces the cues there (undoable); speakers come from the tracks.")
+        .on_hover_text(crate::i18n::tr("Fill in subtitles from the speech with whisper.cpp — the edit selection, or the whole episode. Replaces the cues there (undoable); speakers come from the tracks."))
         .clicked()
     {
         *start = true;
@@ -252,14 +252,14 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             ui.horizontal_wrapped(|ui| {
                 if ui
                     .button(crate::i18n::tr("+ Add at playhead"))
-                    .on_hover_text("A 3 s cue at the playhead, or over the edit selection (Cmd+Ctrl+U)")
+                    .on_hover_text(crate::i18n::tr("A 3 s cue at the playhead, or over the edit selection (Cmd+Ctrl+U)"))
                     .clicked()
                 {
                     run.push(("subtitle.add".into(), json!({})));
                 }
                 if ui
                     .button(crate::i18n::tr("Create cues from speech"))
-                    .on_hover_text("Empty cues along the speech in the mix, ready to type into")
+                    .on_hover_text(crate::i18n::tr("Empty cues along the speech in the mix, ready to type into"))
                     .clicked()
                 {
                     run.push(("subtitle.segment".into(), json!({})));
@@ -272,15 +272,15 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 }
                 if ui
                     .add_enabled(!cues.is_empty(), egui::Button::new(crate::i18n::tr("Export Text…")))
-                    .on_hover_text("The transcript as readable text (.txt) or Markdown (.md)")
+                    .on_hover_text(crate::i18n::tr("The transcript as readable text (.txt) or Markdown (.md)"))
                     .clicked()
                 {
                     dialog = Some("subtitle.export_text");
                 }
                 ui.separator();
                 ui.checkbox(&mut ed.follow, crate::i18n::tr("Follow playhead"));
-                ui.add(egui::TextEdit::singleline(&mut ed.filter).hint_text("Search").desired_width(140.0));
-                ui.label(RichText::new(format!("{} cue(s)", cues.len())).color(t.text_dim));
+                ui.add(egui::TextEdit::singleline(&mut ed.filter).hint_text(crate::i18n::tr("Search")).desired_width(140.0));
+                ui.label(RichText::new(crate::i18n::trf("{} cue(s)", &[&cues.len()])).color(t.text_dim));
             });
             ui.horizontal(|ui| transcription_ui(ui, ed, &t, &mut transcribe_now, &mut error));
             ui.separator();
@@ -289,8 +289,10 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 ui.vertical_centered(|ui| {
                     ui.label(RichText::new(crate::i18n::tr("No subtitles yet")).strong());
                     ui.label(
-                        RichText::new("Add a cue at the playhead, create empty cues from the speech, or import an .srt / .vtt file.")
-                            .color(t.text_dim),
+                        RichText::new(crate::i18n::tr(
+                            "Add a cue at the playhead, create empty cues from the speech, or import an .srt / .vtt file.",
+                        ))
+                        .color(t.text_dim),
                     );
                 });
                 return;
@@ -346,7 +348,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                             for (at, key) in [(c.start, "start"), (c.end, "end")] {
                                 let b = ui
                                     .add_sized([TIME_W, 22.0], egui::Button::new(RichText::new(short_time(sr.seconds(at))).font(mono(11.0))))
-                                    .on_hover_text(format!("Click: go here. Shift-click: set the {key} to the playhead"));
+                                    .on_hover_text(crate::i18n::trf("Click: go here. Shift-click: set the {} to the playhead", &[&key]));
                                 if b.clicked() {
                                     if ui.input(|i| i.modifiers.shift) {
                                         run.push(("subtitle.set".into(), json!({"id": c.id, key: now})));
@@ -362,14 +364,14 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                             let sp = ui.add(
                                 egui::TextEdit::singleline(&mut draft.speaker)
                                     .id_salt(("sub_speaker", c.id))
-                                    .hint_text("Speaker")
+                                    .hint_text(crate::i18n::tr("Speaker"))
                                     .desired_width(SPEAKER_W),
                             );
                             let text_w = (ui.available_width() - DEL_W - 8.0).max(120.0);
                             let tx = ui.add(
                                 egui::TextEdit::multiline(&mut draft.text)
                                     .id_salt(("sub_text", c.id))
-                                    .hint_text("Type what is said…")
+                                    .hint_text(crate::i18n::tr("Type what is said…"))
                                     .desired_rows(1)
                                     .desired_width(text_w),
                             );
@@ -379,7 +381,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                             if tx.gained_focus() {
                                 ed.selected = Some(c.id);
                             }
-                            if ui.add_sized([DEL_W, 22.0], egui::Button::new("🗑")).on_hover_text("Delete this cue").clicked() {
+                            if ui.add_sized([DEL_W, 22.0], egui::Button::new("🗑")).on_hover_text(crate::i18n::tr("Delete this cue")).clicked() {
                                 run.push(("subtitle.delete".into(), json!({"id": c.id})));
                             }
                         });
@@ -387,9 +389,9 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 }
             });
             ui.label(
-                RichText::new(
+                RichText::new(crate::i18n::tr(
                     "Text is saved when you leave the field. Shift-click a time to set it to the playhead. Space plays when no field is focused.",
-                )
+                ))
                 .small()
                 .color(t.text_dim),
             );
@@ -399,7 +401,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     app.extra.subtitles.drafts.retain(|id, d| cues.iter().any(|c| c.id == *id) && (d.speaker != d.base.0 || d.text != d.base.1));
     for (id, params) in run {
         match app.run(&id, params) {
-            Ok(v) if id == "subtitle.segment" => app.ui.status = format!("Created {} empty cue(s) along the speech", v["created"]),
+            Ok(v) if id == "subtitle.segment" => app.ui.status = crate::i18n::trf("Created {} empty cue(s) along the speech", &[&(v["created"])]),
             Ok(v) if id == "subtitle.add" => app.extra.subtitles.selected = v["id"].as_u64(),
             Ok(_) => {}
             Err(e) => app.ui.status = e,

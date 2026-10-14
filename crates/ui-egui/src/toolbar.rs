@@ -71,7 +71,7 @@ fn edit_modes(app: &mut SoundApp, ui: &mut Ui) {
                 };
                 let _ = app.run("edit.mode", json!({"mode": id}));
             }
-            resp.on_hover_text(format!("{} mode ({key})", label.to_lowercase()));
+            resp.on_hover_text(crate::i18n::trf("{} mode ({})", &[&label.to_lowercase(), &key]));
         }
     });
 }
@@ -131,7 +131,7 @@ fn tools(app: &mut SoundApp, ui: &mut Ui) {
             let bracket = Rect::from_min_max(pos2(bx0 - 2.0, r.min.y + 1.0), pos2(bx1 + 2.0, r.min.y + 5.0));
             let resp = ui.interact(bracket.expand2(vec2(0.0, 2.0)), ui.id().with("smart"), Sense::click());
             ui.painter().rect_filled(bracket, 1.0, if cur == Tool::Smart { t.accent } else { t.tool_bracket_off });
-            if resp.on_hover_text("Smart Tool (F6+F7 / F7+F8)").clicked() {
+            if resp.on_hover_text(crate::i18n::tr("Smart Tool (F6+F7 / F7+F8)")).clicked() {
                 let _ = app.run("edit.tool", json!({"tool": "smart"}));
             }
             ui.horizontal(|ui| {
@@ -188,17 +188,22 @@ fn counters(app: &mut SoundApp, ui: &mut Ui) {
     ];
     for (i, (label, val)) in rows.iter().enumerate() {
         let y = r.min.y + 10.0 + i as f32 * 13.0;
-        ui.painter().text(pos2(r.min.x + 214.0, y), Align2::RIGHT_CENTER, *label, regular(11.0), t.counter_label);
+        ui.painter().text(pos2(r.min.x + 214.0, y), Align2::RIGHT_CENTER, crate::i18n::tr(label), regular(11.0), t.counter_label);
         ui.painter().text(pos2(r.max.x - 8.0, y), Align2::RIGHT_CENTER, val, mono(11.0), t.counter_text);
     }
     // Sub counter row.
     let y = r.max.y - 11.0;
     ui.painter().line_segment([pos2(r.min.x + 6.0, r.max.y - 21.0), pos2(r.max.x - 6.0, r.max.y - 21.0)], Stroke::new(1.0, t.counter_rule));
-    ui.painter().text(pos2(r.min.x + 10.0, y), Align2::LEFT_CENTER, "Sub", regular(11.0), t.counter_label);
+    ui.painter().text(pos2(r.min.x + 10.0, y), Align2::LEFT_CENTER, crate::i18n::tr("Sub"), regular(11.0), t.counter_label);
     ui.painter().text(pos2(r.min.x + 150.0, y), Align2::RIGHT_CENTER, fmt_pos(app, pos, sub_fmt), mono(11.0), t.counter_text);
-    let st = if app.engine.is_dirty() { "modified" } else { "saved" };
-    let dev = app.player.as_ref().map_or("no audio engine", |p| if p.silent { "silent clock" } else { "audio on" });
+    let st = crate::i18n::tr(if app.engine.is_dirty() { "modified" } else { "saved" });
+    let dev = crate::i18n::tr(app.player.as_ref().map_or("no audio engine", |p| if p.silent { "silent clock" } else { "audio on" }));
     ui.painter().text(pos2(r.max.x - 8.0, y), Align2::RIGHT_CENTER, format!("{st} · {dev}"), regular(10.0), t.text_dim);
+}
+
+/// A grid or nudge value in the interface language ("1/16 note" → "1/16 Note").
+fn value_label(v: &str) -> String {
+    if crate::i18n::german() { v.replace(" notes", " Noten").replace(" note", " Note") } else { v.to_string() }
 }
 
 fn grid_nudge(app: &mut SoundApp, ui: &mut Ui) {
@@ -211,17 +216,17 @@ fn grid_nudge(app: &mut SoundApp, ui: &mut Ui) {
     ui.painter().rect(r, CornerRadius::same(4), t.counter_bg, Stroke::new(1.0, t.counter_border), StrokeKind::Inside);
     let gl = Rect::from_min_size(pos2(r.min.x + 6.0, r.min.y + 8.0), vec2(48.0, 16.0));
     ui.painter().rect_filled(gl, 1.0, if lines { t.mode_on } else { t.counter_off });
-    ui.painter().text(gl.center(), Align2::CENTER_CENTER, "Grid", bold(11.0), if lines { t.mode_on_text } else { t.mode_off_text });
-    if ui.interact(gl, ui.id().with("grid_lines"), Sense::click()).on_hover_text("Show grid lines").clicked() {
+    ui.painter().text(gl.center(), Align2::CENTER_CENTER, crate::i18n::tr("Grid"), bold(11.0), if lines { t.mode_on_text } else { t.mode_off_text });
+    if ui.interact(gl, ui.id().with("grid_lines"), Sense::click()).on_hover_text(crate::i18n::tr("Show grid lines")).clicked() {
         let _ = app.run("view.grid_lines", json!({}));
     }
     let gr = Rect::from_min_max(pos2(r.min.x + 60.0, r.min.y + 6.0), pos2(r.max.x - 4.0, r.min.y + 26.0));
-    ui.painter().text(pos2(gr.max.x - 14.0, gr.center().y), Align2::RIGHT_CENTER, grid.label(), mono(11.0), t.counter_text);
+    ui.painter().text(pos2(gr.max.x - 14.0, gr.center().y), Align2::RIGHT_CENTER, value_label(&grid.label()), mono(11.0), t.counter_text);
     let gresp = ui.interact(gr, ui.id().with("grid_value"), Sense::click());
     value_menu(app, &gresp, "view.grid");
-    ui.painter().text(pos2(r.min.x + 10.0, r.min.y + 44.0), Align2::LEFT_CENTER, "Nudge", regular(11.0), t.counter_label);
+    ui.painter().text(pos2(r.min.x + 10.0, r.min.y + 44.0), Align2::LEFT_CENTER, crate::i18n::tr("Nudge"), regular(11.0), t.counter_label);
     let nr = Rect::from_min_max(pos2(r.min.x + 60.0, r.min.y + 34.0), pos2(r.max.x - 4.0, r.min.y + 54.0));
-    ui.painter().text(pos2(nr.max.x - 14.0, nr.center().y), Align2::RIGHT_CENTER, nudge.label(), mono(11.0), t.counter_text);
+    ui.painter().text(pos2(nr.max.x - 14.0, nr.center().y), Align2::RIGHT_CENTER, value_label(&nudge.label()), mono(11.0), t.counter_text);
     let nresp = ui.interact(nr, ui.id().with("nudge_value"), Sense::click());
     value_menu(app, &nresp, "view.nudge");
     for rr in [gr, nr] {
@@ -274,7 +279,7 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
                     StrokeKind::Inside,
                 );
                 icons::draw(ui.painter(), r.shrink(5.0), "stop", if playing { t.text } else { t.accent });
-                if resp.on_hover_text("Stop (Space)").clicked() {
+                if resp.on_hover_text(crate::i18n::tr("Stop (Space)")).clicked() {
                     let _ = app.run("transport.stop", json!({}));
                 }
                 let (r, resp) = ui.allocate_exact_size(vec2(38.0, 28.0), Sense::click());
@@ -292,7 +297,7 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
                     StrokeKind::Inside,
                 );
                 icons::draw(ui.painter(), r.shrink(5.0), "play", if playing { Color32::from_rgb(120, 255, 140) } else { t.counter_text });
-                if resp.on_hover_text("Play (Space)").clicked() {
+                if resp.on_hover_text(crate::i18n::tr("Play (Space)")).clicked() {
                     let _ = app.run("transport.play", json!({}));
                 }
                 if !app.ui.workspace.records() {
@@ -313,7 +318,7 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
                     StrokeKind::Inside,
                 );
                 icons::draw(ui.painter(), r.shrink(5.0), "record", t.rec);
-                if resp.on_hover_text("Record (Cmd+Space)").clicked() {
+                if resp.on_hover_text(crate::i18n::tr("Record (Cmd+Space)")).clicked() {
                     let _ = app.run("transport.record", json!({}));
                 }
             });
@@ -383,14 +388,12 @@ fn loudness(app: &mut SoundApp, ui: &mut Ui) {
             };
             (format!("{lufs:.1} LUFS"), format!("TP {tp:.1} dBTP"), col)
         }
-        None => ("– LUFS".to_string(), if stale { "measuring…".to_string() } else { "no audio".to_string() }, t.text_dim),
+        None => ("– LUFS".to_string(), crate::i18n::tr(if stale { "measuring…" } else { "no audio" }).to_string(), t.text_dim),
     };
     ui.painter().text(pos2(r.min.x + 8.0, r.min.y + 33.0), Align2::LEFT_CENTER, main, mono(15.0), col);
     ui.painter().text(pos2(r.min.x + 8.0, r.min.y + 52.0), Align2::LEFT_CENTER, sub, mono(10.5), t.counter_text);
     let goal = target.map_or_else(|| "no loudness target set".to_string(), |g| format!("export target {g:.0} LUFS"));
-    resp.on_hover_text(format!(
-        "Loudness of the whole mix (ITU BS.1770), measured a moment after each change. Green: within 1 LU of the {goal} and true peak at or below -1 dBTP. The episode export normalises to the target anyway; this shows how far the mix is from it."
-    ));
+    resp.on_hover_text(crate::i18n::trf("Loudness of the whole mix (ITU BS.1770), measured a moment after each change. Green: within 1 LU of the {} and true peak at or below -1 dBTP. The episode export normalises to the target anyway; this shows how far the mix is from it.", &[&goal]));
 }
 
 fn output_meter(app: &mut SoundApp, ui: &mut Ui) {

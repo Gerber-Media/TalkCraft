@@ -147,10 +147,12 @@ fn renderer(app: &mut SoundApp, ctx: &egui::Context) {
             (tr.name.clone(), sp.x, sp.y, sp.z)
         })
         .collect();
-    egui::Window::new(egui::RichText::new("Renderer").font(bold(13.0))).open(&mut open).default_size(vec2(380.0, 440.0)).resizable(true).show(
-        ctx,
-        |ui| {
-            ui.label(egui::RichText::new(format!("Main output: {}", fmt.label())).font(regular(11.0)).color(t.text));
+    egui::Window::new(egui::RichText::new(crate::i18n::tr("Renderer")).font(bold(13.0)))
+        .open(&mut open)
+        .default_size(vec2(380.0, 440.0))
+        .resizable(true)
+        .show(ctx, |ui| {
+            ui.label(egui::RichText::new(crate::i18n::trf("Main output: {}", &[&fmt.label()])).font(regular(11.0)).color(t.text));
             let side = ui.available_width().min(360.0);
             let (r, _) = ui.allocate_exact_size(vec2(side, side), Sense::hover());
             let p = ui.painter_at(r);
@@ -178,15 +180,14 @@ fn renderer(app: &mut SoundApp, ctx: &egui::Context) {
             ui.add_space(4.0);
             if objects.is_empty() {
                 ui.label(
-                    egui::RichText::new("No object tracks. Use the Object view in the Mix window to route tracks as objects.")
+                    egui::RichText::new(crate::i18n::tr("No object tracks. Use the Object view in the Mix window to route tracks as objects."))
                         .small()
                         .color(t.text_dim),
                 );
             } else {
-                ui.label(egui::RichText::new(format!("{} object track(s)", objects.len())).small().color(t.text_dim));
+                ui.label(egui::RichText::new(crate::i18n::trf("{} object track(s)", &[&objects.len()])).small().color(t.text_dim));
             }
-        },
-    );
+        });
     app.extra.show_renderer = open;
 }
 
@@ -195,7 +196,7 @@ fn ui_customization(app: &mut SoundApp, ctx: &egui::Context) {
     if !open {
         return;
     }
-    egui::Window::new(egui::RichText::new("Appearance").font(bold(13.0)))
+    egui::Window::new(egui::RichText::new(crate::i18n::tr("Appearance")).font(bold(13.0)))
         .open(&mut open)
         .default_size(vec2(320.0, 180.0))
         .resizable(false)

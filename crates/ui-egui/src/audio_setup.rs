@@ -423,7 +423,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
         for (name, input, peak) in &st.results {
             let (text, col) = advice_text(&advice(*peak));
             ui.horizontal(|ui| {
-                ui.label(format!("{name} (In {}): {peak:.0} dBFS", input.map_or(0, |i| i + 1)));
+                ui.label(crate::i18n::trf("{} (In {}): {} dBFS", &[&name, &(input.map_or(0, |i| i + 1)), &format!("{:.0}", peak)]));
                 ui.label(RichText::new(text).color(col));
             });
         }

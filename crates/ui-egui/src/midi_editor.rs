@@ -66,7 +66,13 @@ pub fn show(app: &mut SoundApp, ui: &mut Ui) {
     ui.painter().rect_filled(header, 0.0, t.panel_bg2);
     ui.painter().text(pos2(header.min.x + 8.0, header.center().y), Align2::LEFT_CENTER, "MIDI EDITOR", bold(11.5), t.header_text);
     let Some(cid) = target_clip(app) else {
-        ui.painter().text(full.center(), Align2::CENTER_CENTER, "Select a MIDI clip (or a MIDI track) to edit its notes.", regular(13.0), t.text_dim);
+        ui.painter().text(
+            full.center(),
+            Align2::CENTER_CENTER,
+            crate::i18n::tr("Select a MIDI clip (or a MIDI track) to edit its notes."),
+            regular(13.0),
+            t.text_dim,
+        );
         return;
     };
     let Some((track, clip)) = app.engine.session().find_clip(cid).map(|(t, c)| (t, c.clone())) else { return };
@@ -89,16 +95,16 @@ pub fn show(app: &mut SoundApp, ui: &mut Ui) {
     let mut tb = ui.new_child(egui::UiBuilder::new().max_rect(bar).layout(egui::Layout::right_to_left(egui::Align::Center)));
     tb.spacing_mut().item_spacing.x = 4.0;
     let mut op: Option<(&str, serde_json::Value)> = None;
-    if tb.small_button("Legato").clicked() {
+    if tb.small_button(crate::i18n::tr("Legato")).clicked() {
         op = Some(("event.change_duration", json!({"legato": 0})));
     }
-    if tb.small_button("Vel −10").clicked() {
+    if tb.small_button(crate::i18n::tr("Vel −10")).clicked() {
         op = Some(("event.change_velocity", json!({"add": -10})));
     }
-    if tb.small_button("Vel +10").clicked() {
+    if tb.small_button(crate::i18n::tr("Vel +10")).clicked() {
         op = Some(("event.change_velocity", json!({"add": 10})));
     }
-    if tb.small_button("Quantize").on_hover_text("Quantize to the grid").clicked() {
+    if tb.small_button(crate::i18n::tr("Quantize")).on_hover_text(crate::i18n::tr("Quantize to the grid")).clicked() {
         op = Some(("event.quantize", json!({"grid": "1/16", "strength": 100})));
     }
     if let Some((id, mut p)) = op {

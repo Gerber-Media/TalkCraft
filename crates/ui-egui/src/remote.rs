@@ -389,8 +389,8 @@ fn file_take(app: &mut SoundApp, hq: Upload) {
         Ok(v) if live.is_some() => {
             format!("{}: take {} placed and synced ({:+.3} s)", hq.guest, hq.take, v["sync"]["moved_s"].as_f64().unwrap_or(0.0))
         }
-        Ok(_) => format!("{}: take {} placed", hq.guest, hq.take),
-        Err(e) => format!("{}: take {} failed: {e}", hq.guest, hq.take),
+        Ok(_) => crate::i18n::trf("{}: take {} placed", &[&hq.guest, &hq.take]),
+        Err(e) => crate::i18n::trf("{}: take {} failed: {}", &[&hq.guest, &hq.take, &e]),
     };
     app.ui.status = msg.clone();
     app.extra.remote.log.push(msg);
@@ -402,7 +402,7 @@ fn open_studio(app: &mut SoundApp) {
         match start_server(upload_dir(app)) {
             Ok(s) => app.extra.remote.server = Some(s),
             Err(e) => {
-                app.ui.status = format!("Remote guests: {e}");
+                app.ui.status = crate::i18n::trf("Remote guests: {}", &[&e]);
                 return;
             }
         }

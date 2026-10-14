@@ -63,13 +63,15 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 let path = pads.get(i).cloned().unwrap_or_default();
                 ui.vertical(|ui| {
                     let label = if path.is_empty() {
-                        RichText::new(format!("Pad {}\nempty", i + 1)).color(t.text_dim)
+                        RichText::new(crate::i18n::trf("Pad {}\nempty", &[&(i + 1)])).color(t.text_dim)
                     } else {
                         RichText::new(format!("{}\n{}", i + 1, file_name(&path))).strong()
                     };
                     let r = ui
                         .add_enabled(!path.is_empty() && !recording, egui::Button::new(label).min_size(vec2(112.0, 54.0)))
-                        .on_hover_text("Click: place on the jingle track at the insertion point · drop an audio file here to load the pad")
+                        .on_hover_text(crate::i18n::tr(
+                            "Click: place on the jingle track at the insertion point · drop an audio file here to load the pad",
+                        ))
                         .on_disabled_hover_text(if recording { "Not while recording" } else { "Drop an audio file here, or set a path" });
                     if r.clicked() {
                         place = Some(i);
@@ -81,7 +83,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                     }
                     match &mut w.editing {
                         Some((e, text)) if *e == i => {
-                            let te = ui.add(egui::TextEdit::singleline(text).desired_width(112.0).hint_text("/path/to/jingle.wav"));
+                            let te = ui.add(egui::TextEdit::singleline(text).desired_width(112.0).hint_text(crate::i18n::tr("/path/to/jingle.wav")));
                             if te.lost_focus() {
                                 store = Some((i, text.clone()));
                             }
@@ -89,12 +91,12 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                         _ => {
                             ui.horizontal(|ui| {
                                 if let Some(pick) = &app.services.pick_open
-                                    && ui.small_button(crate::i18n::tr("Browse…")).on_hover_text("Choose an audio file").clicked()
+                                    && ui.small_button(crate::i18n::tr("Browse…")).on_hover_text(crate::i18n::tr("Choose an audio file")).clicked()
                                     && let Some(p) = pick("jingle", &[])
                                 {
                                     store = Some((i, p));
                                 }
-                                if ui.small_button("✎").on_hover_text("Type or paste a path").clicked() {
+                                if ui.small_button("✎").on_hover_text(crate::i18n::tr("Type or paste a path")).clicked() {
                                     w.editing = Some((i, path.clone()));
                                 }
                             });
@@ -106,7 +108,11 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 }
             }
         });
-        ui.label(RichText::new("Pads are saved with the session. The jingle track is the one locked against recording.").small().color(t.text_dim));
+        ui.label(
+            RichText::new(crate::i18n::tr("Pads are saved with the session. The jingle track is the one locked against recording."))
+                .small()
+                .color(t.text_dim),
+        );
     });
     app.extra.jingles.show = open;
     if let Some((i, path)) = store {
@@ -115,7 +121,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     }
     if let Some(i) = place {
         match app.run("podcast.place_jingle", json!({"pad": i + 1})) {
-            Ok(_) => app.ui.status = format!("Placed {}", file_name(pads.get(i).map(String::as_str).unwrap_or(""))),
+            Ok(_) => app.ui.status = crate::i18n::trf("Placed {}", &[&(file_name(pads.get(i).map(String::as_str).unwrap_or("")))]),
             Err(e) => app.ui.status = e,
         }
     }

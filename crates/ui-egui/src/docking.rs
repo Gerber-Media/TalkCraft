@@ -414,7 +414,7 @@ pub fn show(app: &mut crate::SoundApp, ui: &mut egui::Ui, window: crate::MainWin
     let mut workspace = if edit { std::mem::take(&mut app.ui.docking) } else { std::mem::replace(&mut app.ui.mix_docking, mix_default()) };
     let before_sync = workspace.clone();
     if let Err(error) = (if edit { workspace.validate() } else { workspace.validate_mix() }).and_then(|()| sync(&mut workspace, app, edit)) {
-        app.ui.status = format!("Panel layout could not be restored: {error}");
+        app.ui.status = crate::i18n::trf("Panel layout could not be restored: {}", &[&error]);
         workspace = if edit { Workspace::default() } else { mix_default() };
         let _ = sync(&mut workspace, app, edit);
     }
@@ -464,7 +464,7 @@ pub fn show(app: &mut crate::SoundApp, ui: &mut egui::Ui, window: crate::MainWin
             .map_err(|error| error.to_string())
             .and_then(|action| command_for(app, false, &json!({"action": action}), edit))
         {
-            app.ui.status = format!("Panel move was not applied: {error}");
+            app.ui.status = crate::i18n::trf("Panel move was not applied: {}", &[&error]);
         }
     }
 }

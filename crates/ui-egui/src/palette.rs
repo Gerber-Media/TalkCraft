@@ -65,15 +65,19 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     let t = Tokens::current();
     let mut run: Option<String> = None;
     let mut close = ctx.input(|i| i.key_pressed(Key::Escape));
-    egui::Window::new("Search")
+    egui::Window::new(crate::i18n::tr("Search"))
         .collapsible(false)
         .resizable(false)
         .title_bar(false)
         .anchor(Align2::CENTER_TOP, vec2(0.0, 90.0))
         .fixed_size(vec2(560.0, 380.0))
         .show(ctx, |ui| {
-            let r = ui
-                .add(egui::TextEdit::singleline(&mut app.palette.query).hint_text("Search commands…").desired_width(f32::INFINITY).font(mono(15.0)));
+            let r = ui.add(
+                egui::TextEdit::singleline(&mut app.palette.query)
+                    .hint_text(crate::i18n::tr("Search commands…"))
+                    .desired_width(f32::INFINITY)
+                    .font(mono(15.0)),
+            );
             r.request_focus();
             let q = app.palette.query.trim().to_string();
             let mut hits: Vec<(i32, Entry)> =

@@ -224,7 +224,7 @@ pub fn menu_bar(app: &mut SoundApp, ui: &mut egui::Ui) {
         |ui| {
             egui::MenuBar::new().ui(ui, |ui| {
                 ui.menu_button(crate::podcast::APP_NAME, |ui| {
-                    if ui.button(format!("About {}", crate::podcast::APP_NAME)).clicked() {
+                    if ui.button(crate::i18n::trf("About {}", &[&(crate::podcast::APP_NAME)])).clicked() {
                         app.ui.show_about = true;
                     }
                     if ui.button(crate::i18n::tr("Session Info")).clicked() {
@@ -246,7 +246,7 @@ pub fn menu_bar(app: &mut SoundApp, ui: &mut egui::Ui) {
                         }
                         if root.label == "AudioSuite" {
                             ui.separator();
-                            ui.label(egui::RichText::new("Processes selected clips offline").small().color(t.text_dim));
+                            ui.label(egui::RichText::new(crate::i18n::tr("Processes selected clips offline")).small().color(t.text_dim));
                         }
                     });
                 }
@@ -484,10 +484,13 @@ pub fn invoke_menu(app: &mut SoundApp, id: &str, path: &str) {
                     a.iter().map(|t| format!("{} {:+.1} dB", t["track"].as_str().unwrap_or("?"), t["change_db"].as_f64().unwrap_or(0.0))).collect()
                 })
                 .unwrap_or_default();
-            app.ui.status = format!("Speakers matched: {}", parts.join(", "));
+            app.ui.status = crate::i18n::trf("Speakers matched: {}", &[&(parts.join(", "))]);
         }
         Ok(v) if id == "podcast.auto_duck" => {
-            app.ui.status = format!("Music ducked by {} dB under {} stretch(es) of speech (volume automation)", v["ducked_db"], v["speech_ranges"]);
+            app.ui.status = crate::i18n::trf(
+                "Music ducked by {} dB under {} stretch(es) of speech (volume automation)",
+                &[&(v["ducked_db"]), &(v["speech_ranges"])],
+            );
         }
         Ok(_) => {}
         Err(e) => app.ui.status = e,
@@ -618,7 +621,7 @@ pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<
         }
         "window.arrange_tile" | "window.arrange_tile_h" | "window.arrange_tile_v" | "window.arrange_cascade" => {
             if let Err(error) = crate::docking::arrange(app) {
-                app.ui.status = format!("Panel windows could not be arranged: {error}");
+                app.ui.status = crate::i18n::trf("Panel windows could not be arranged: {}", &[&error]);
             }
             app.arrange_request = true;
             json!({})
@@ -667,7 +670,7 @@ pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<
                 return Some(Ok(json!({"mode": app.ui.theme.id()})));
             };
             let Some(mode) = crate::theme::ThemeMode::parse(mode) else {
-                return Some(Err(format!("unknown theme `{mode}` (system, light or dark)")));
+                return Some(Err(crate::i18n::trf("unknown theme `{}` (system, light or dark)", &[&mode])));
             };
             app.ui.theme = mode;
             json!({"mode": mode.id()})
@@ -688,7 +691,7 @@ pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<
                         app.ui = ns;
                         json!({"ui": app.ui})
                     }
-                    Err(e) => return Some(Err(format!("bad ui state: {e}"))),
+                    Err(e) => return Some(Err(crate::i18n::trf("bad ui state: {}", &[&e]))),
                 }
             }
             Err(e) => return Some(Err(e.to_string())),
