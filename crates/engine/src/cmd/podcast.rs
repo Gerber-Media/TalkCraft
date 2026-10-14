@@ -84,6 +84,15 @@ pub fn specs() -> Vec<CommandSpec> {
             sync_clip
         ),
         cmd!(
+            "podcast.add_speaker",
+            "Add Speaker",
+            [],
+            None,
+            "{name?} — a mono speaker track with the voice chain on the next free microphone input, named \"Gast N\" unless `name` is given, placed after the other speakers",
+            always,
+            add_speaker
+        ),
+        cmd!(
             "edit.extend_clip",
             "Extend Clip Edge",
             [],
@@ -406,6 +415,29 @@ fn extend_clip(e: &mut Engine, p: &Value) -> Result<Value> {
         }
     }
     Ok(json!({"extended": delta, "extended_s": s.sample_rate.seconds(delta)}))
+}
+
+fn add_speaker(e: &mut Engine, p: &Value) -> Result<Value> {
+    let s = e.session_mut();
+    let speakers: Vec<usize> = s.tracks.iter().enumerate().filter(|(_, t)| crate::podcast::is_speaker(t)).map(|(i, _)| i).collect();
+    // The next input after the highest one a speaker uses.
+    let used = |t: &soundcraft_model::Track| match &t.mixer.input {
+        soundcraft_model::Route::Hardware(h) => h.trim_start_matches("In ").split(['-', ' ']).next().and_then(|n| n.parse::<usize>().ok()),
+        _ => None,
+    };
+    let input = s.tracks.iter().filter(|t| crate::podcast::is_speaker(t)).filter_map(used).max().unwrap_or(0) + 1;
+    let name = match str_param(p, "name").map(str::trim).filter(|n| !n.is_empty()) {
+        Some(n) => n.to_string(),
+        None => (1..).map(|n| format!("Gast {n}")).find(|n| s.track_by_name(n).is_none()).unwrap_or_else(|| "Gast".into()),
+    };
+    let id = s.add_track(soundcraft_model::TrackKind::Audio, soundcraft_model::ChannelFormat::Mono, Some(&name));
+    crate::podcast::make_speaker(s, id, input);
+    // After the last speaker (before the jingle track and the master).
+    if let (Some(last), Some(from)) = (speakers.last(), s.tracks.iter().position(|t| t.id == id)) {
+        let t = s.tracks.remove(from);
+        s.tracks.insert((last + 1).min(s.tracks.len()), t);
+    }
+    Ok(json!({"track": id, "name": name, "input": input}))
 }
 
 /// Track named `name`, made as a mono audio track when there is none.
@@ -968,6 +1000,24 @@ mod tests {
         assert_eq!(clips(&e, "Gast 1")[0], (0, 2 * sec + sec / 2));
         assert_eq!(clips(&e, "Moderation"), vec![(0, 2 * sec), (2 * sec, 4 * sec)], "no overlap on the other track");
         assert!(std::fs::remove_dir_all(&dir).is_ok());
+    }
+
+    #[test]
+    fn a_new_speaker_gets_the_voice_chain_and_the_next_input_after_the_others() {
+        let mut e = Engine::default();
+        e.execute("session.new", &json!({"name": "S", "template": "podcast", "speakers": 2})).unwrap();
+        let v = e.execute("podcast.add_speaker", &json!({})).unwrap();
+        assert_eq!(v["name"], "Gast 2");
+        assert_eq!(v["input"], 3);
+        let names: Vec<String> = e.session().tracks.iter().map(|t| t.name.clone()).collect();
+        assert_eq!(names, ["Moderation", "Gast 1", "Gast 2", "Jingles & Musik", "Master"]);
+        let t = e.session().track_by_name("Gast 2").unwrap();
+        assert!(crate::podcast::is_speaker(t), "voice chain on the new track");
+        e.execute("podcast.add_speaker", &json!({"name": "Anna"})).unwrap();
+        assert_eq!(e.session().tracks[3].name, "Anna");
+        e.execute("edit.undo", &json!({})).unwrap();
+        e.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(e.session().tracks.len(), 4, "each addition is one undo step");
     }
 
     #[test]

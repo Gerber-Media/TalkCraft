@@ -34,7 +34,8 @@ podcast does not need.
   everything.
 - **Podcast template.** New sessions start with a track per speaker (each on its own input, with
   a voice chain: high-pass EQ, gate, compressor, de-esser), a jingle track and a master limited to
-  -1 dBTP.
+  -1 dBTP. + and − under the track list add a speaker (voice chain, next microphone input) or
+  delete the selected tracks.
 - **Audio interface.** Setup > Audio Interface picks the input and output device, finds each
   speaker's microphone (they talk for 3 s) and runs a soundcheck that says per microphone whether
   to turn the gain up or down. Known podcast interfaces are recognised; unplugging one mid-session
@@ -183,7 +184,8 @@ braucht.
   lässt sich die Frage abschalten, dann startet TalkCraft mit allem.
 - **Podcast-Vorlage.** Neue Sessions beginnen mit einer Spur pro Sprecher (jede an einem eigenen
   Eingang, mit Stimmkette aus Hochpass-EQ, Gate, Kompressor und De-Esser), einer Jingle-Spur und
-  einem auf -1 dBTP begrenzten Master.
+  einem auf -1 dBTP begrenzten Master. + und − unter der Spurliste fügen einen Sprecher hinzu
+  (Stimmkette, nächster Mikrofoneingang) oder löschen die ausgewählten Spuren.
 - **Audio-Interface.** Einstellungen > Audio-Interface wählt Ein- und Ausgabegerät, findet das
   Mikrofon jedes Sprechers (er spricht 3 Sekunden) und macht einen Soundcheck, der pro Mikrofon sagt,
   ob der Gain hoch oder runter muss. Bekannte Podcast-Interfaces werden erkannt; wird eines

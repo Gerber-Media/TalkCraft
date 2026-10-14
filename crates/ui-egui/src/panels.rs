@@ -25,7 +25,8 @@ pub fn tracks_and_groups(app: &mut SoundApp, ui: &mut Ui) {
     };
     // TalkCraft has no track groups; the list appears only for sessions that already have some.
     let has_groups = !app.engine.session().groups.is_empty();
-    let height = if has_groups { total * 0.62 } else { f32::INFINITY };
+    // Room at the bottom for the + / − buttons.
+    let height = if has_groups { total * 0.62 } else { (total - 64.0).max(60.0) };
     egui::ScrollArea::vertical().id_salt("tracks_scroll").max_height(height).auto_shrink([false, false]).show(ui, |ui| {
         for (id, name, shown, color, sel) in tracks {
             let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 17.0), Sense::click());
@@ -45,6 +46,7 @@ pub fn tracks_and_groups(app: &mut SoundApp, ui: &mut Ui) {
             }
         }
     });
+    track_buttons(app, ui);
     if !has_groups {
         return;
     }
@@ -341,6 +343,42 @@ pub(crate) fn memory_locations(app: &mut SoundApp, ui: &mut Ui) {
 /// The History (like Photoshop's): every step since the session was opened. Clicking a row
 /// brings the session back to just after that step; the later rows stay (greyed) and can be
 /// clicked again until a new edit replaces them.
+/// + adds a speaker (voice chain, next microphone input); − deletes the selected tracks (the master
+/// stays). Both are one undo step.
+fn track_buttons(app: &mut SoundApp, ui: &mut Ui) {
+    let tr = crate::i18n::tr;
+    let s = app.engine.session();
+    let doomed: Vec<u64> = s
+        .edit
+        .selected_tracks
+        .iter()
+        .filter(|id| s.track(**id).is_some_and(|t| t.kind != soundcraft_model::TrackKind::Master))
+        .map(|t| t.0)
+        .collect();
+    ui.separator();
+    ui.horizontal(|ui| {
+        ui.spacing_mut().button_padding = vec2(8.0, 2.0);
+        if ui.button(egui::RichText::new("+").strong()).on_hover_text(tr("Add a speaker track (voice chain, next microphone input)")).clicked() {
+            match app.run("podcast.add_speaker", json!({})) {
+                Ok(v) => {
+                    let name = v["name"].as_str().unwrap_or_default().to_string();
+                    let _ = app.run("edit.select", json!({"tracks": [v["track"]]}));
+                    app.ui.status = crate::i18n::trf("Added {}", &[&name]);
+                }
+                Err(e) => app.ui.status = e,
+            }
+        }
+        let tip = if doomed.is_empty() { tr("Select the tracks to delete first") } else { tr("Delete the selected tracks (Cmd+Z brings them back)") };
+        let minus = ui.add_enabled(!doomed.is_empty(), egui::Button::new(egui::RichText::new("−").strong()));
+        if minus.on_hover_text(tip).on_disabled_hover_text(tip).clicked() {
+            match app.run("track.delete", json!({"tracks": doomed})) {
+                Ok(_) => app.ui.status = crate::i18n::trf("Deleted {} track(s); Cmd+Z brings them back", &[&doomed.len()]),
+                Err(e) => app.ui.status = e,
+            }
+        }
+    });
+}
+
 pub(crate) fn undo_history(app: &mut SoundApp, ui: &mut Ui) {
     let t = Tokens::current();
     let done = app.engine.undo_history();

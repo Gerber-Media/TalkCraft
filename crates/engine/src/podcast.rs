@@ -44,19 +44,29 @@ fn voice_chain() -> [Insert; 4] {
 }
 
 /// A new podcast session: `speakers` mono voice tracks (1..=8), a stereo jingle track and a master.
+/// Gives `track` a speaker's setup: the voice chain and microphone input `input` (1-based).
+pub fn make_speaker(s: &mut Session, track: soundcraft_model::TrackId, input: usize) {
+    if let Some(tr) = s.track_mut(track) {
+        for (slot, ins) in tr.mixer.inserts.iter_mut().zip(voice_chain()) {
+            *slot = Some(ins);
+        }
+        // Each speaker on their own microphone input.
+        tr.mixer.input = soundcraft_model::Route::Hardware(format!("In {input}"));
+    }
+}
+
+/// Whether a track is set up as a speaker (mono audio with the voice chain's first insert).
+pub fn is_speaker(t: &soundcraft_model::Track) -> bool {
+    t.kind == TrackKind::Audio && t.mixer.inserts.first().and_then(Option::as_ref).is_some_and(|i| i.plugin == voice_chain()[0].plugin)
+}
+
 pub fn podcast_session(name: &str, sample_rate: SampleRate, speakers: usize) -> Session {
     let mut s = Session::new(name, sample_rate);
     let speakers = speakers.clamp(1, 8);
     for n in 0..speakers {
         let label = if n == 0 { "Moderation".to_string() } else { format!("Gast {n}") };
         let t = s.add_track(TrackKind::Audio, ChannelFormat::Mono, Some(&label));
-        if let Some(tr) = s.track_mut(t) {
-            for (slot, ins) in tr.mixer.inserts.iter_mut().zip(voice_chain()) {
-                *slot = Some(ins);
-            }
-            // Each speaker on their own microphone input.
-            tr.mixer.input = soundcraft_model::Route::Hardware(format!("In {}", n + 1));
-        }
+        make_speaker(&mut s, t, n + 1);
     }
     let j = s.add_track(TrackKind::Audio, ChannelFormat::Stereo, Some("Jingles & Musik"));
     if let Some(tr) = s.track_mut(j) {

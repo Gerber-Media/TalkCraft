@@ -569,6 +569,11 @@ const DE: &[(&str, &str)] = &[
     ("Quit TalkCraft", "TalkCraft beenden"),
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
+    ("Add a speaker track (voice chain, next microphone input)", "Sprecherspur hinzufügen (Stimmkette, nächster Mikrofoneingang)"),
+    ("Added {}", "{} hinzugefügt"),
+    ("Select the tracks to delete first", "Erst die zu löschenden Spuren auswählen"),
+    ("Delete the selected tracks (Cmd+Z brings them back)", "Ausgewählte Spuren löschen (Cmd+Z holt sie zurück)"),
+    ("Deleted {} track(s); Cmd+Z brings them back", "{} Spur(en) gelöscht; Cmd+Z holt sie zurück"),
     (
         "Step for the + and − keys: moves the selected clips (or the selection) by this much",
         "Schrittweite für die Tasten + und −: verschiebt die ausgewählten Clips (oder die Auswahl) um diesen Wert",
