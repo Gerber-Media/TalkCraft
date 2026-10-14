@@ -19,6 +19,7 @@ pub mod edit;
 pub mod inspect;
 pub mod io;
 pub mod podcast;
+pub mod publish;
 pub mod score;
 pub mod subtitles;
 pub mod transcribe;

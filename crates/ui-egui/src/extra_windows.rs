@@ -21,6 +21,7 @@ pub struct ExtraState {
     pub readiness: crate::readiness::Readiness,
     pub rundown: crate::rundown_window::RundownWindow,
     pub finish: crate::finish_window::FinishWindow,
+    pub publish: crate::publish_window::PublishWindow,
     /// The listening rate before L sped playback up (K returns to it).
     pub shuttle_rate: Option<f32>,
     /// The start question is open; after a recording, switching to editing is offered.
@@ -48,6 +49,7 @@ impl Default for ExtraState {
             readiness: Default::default(),
             rundown: Default::default(),
             finish: Default::default(),
+            publish: Default::default(),
             shuttle_rate: None,
             ask_workspace: false,
             offer_edit: false,
@@ -102,6 +104,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     crate::remote::window(app, ctx);
     crate::rundown_window::window(app, ctx);
     crate::finish_window::window(app, ctx);
+    crate::publish_window::window(app, ctx);
     if !app.extra.workspace_started {
         app.extra.workspace_started = true;
         crate::docking::move_history_under_clips(app);

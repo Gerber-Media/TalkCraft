@@ -1,6 +1,6 @@
 //! Work modes: "I want to … record a podcast / edit a podcast". Recording shows what a session
 //! needs (Record, inputs, remote guests, jingles, markers); editing shows the cutting tools,
-//! subtitles and export; All shows both. Only menus, shortcuts, toolbar and track headers
+//! subtitles and export; Publish shows the editing tools with the Publish window open; All shows both. Only menus, shortcuts, toolbar and track headers
 //! follow the mode: the session and every command stay the same, so switching never loses
 //! anything. TalkCraft asks at start (Setup can turn that off: then it starts with All).
 
@@ -18,16 +18,18 @@ pub enum Workspace {
     All,
     Record,
     Edit,
+    Publish,
 }
 
 impl Workspace {
-    pub const ALL: [Workspace; 3] = [Workspace::Record, Workspace::Edit, Workspace::All];
+    pub const ALL: [Workspace; 4] = [Workspace::Record, Workspace::Edit, Workspace::Publish, Workspace::All];
 
     pub fn id(self) -> &'static str {
         match self {
             Workspace::All => "all",
             Workspace::Record => "record",
             Workspace::Edit => "edit",
+            Workspace::Publish => "publish",
         }
     }
 
@@ -45,11 +47,13 @@ impl Workspace {
             Workspace::Record => "Record",
             Workspace::Edit if de => "Schneiden",
             Workspace::Edit => "Edit",
+            Workspace::Publish if de => "Veröffentlichen",
+            Workspace::Publish => "Publish",
         }
     }
 
     pub fn records(self) -> bool {
-        self != Workspace::Edit
+        matches!(self, Workspace::Record | Workspace::All)
     }
 
     pub fn edits(self) -> bool {
@@ -68,6 +72,7 @@ pub fn current() -> Workspace {
     match CURRENT.load(Ordering::Relaxed) {
         1 => Workspace::Record,
         2 => Workspace::Edit,
+        3 => Workspace::Publish,
         _ => Workspace::All,
     }
 }
@@ -104,7 +109,7 @@ pub fn hidden_menu_in(w: Workspace, path: &str) -> bool {
         Workspace::Record => {
             EDIT_ONLY_PREFIXES.iter().any(|p| path.starts_with(p)) || (path.starts_with("Edit >") && !EDIT_KEPT_WHILE_RECORDING.contains(&path))
         }
-        Workspace::Edit => RECORD_ONLY.contains(&path),
+        Workspace::Edit | Workspace::Publish => RECORD_ONLY.contains(&path),
     }
 }
 
@@ -122,14 +127,14 @@ pub fn hidden_command_in(w: Workspace, id: &str) -> bool {
                 || id.starts_with("audiosuite.")
                 || id == "file.export_podcast"
         }
-        Workspace::Edit => matches!(id, "transport.record" | "transport.record_track"),
+        Workspace::Edit | Workspace::Publish => matches!(id, "transport.record" | "transport.record_track"),
     }
 }
 
 /// `ui.workspace {mode: record|edit|all}`: switches the mode (no value: report it).
 pub fn run(app: &mut SoundApp, p: &Value) -> Result<Value, String> {
     if let Some(m) = p.get("mode").and_then(Value::as_str) {
-        let w = Workspace::from_id(m).ok_or_else(|| format!("unknown mode `{m}` (record, edit or all)"))?;
+        let w = Workspace::from_id(m).ok_or_else(|| format!("unknown mode `{m}` (record, edit, publish or all)"))?;
         switch(app, w);
     }
     Ok(json!({"mode": app.ui.workspace.id()}))
@@ -144,21 +149,27 @@ fn switch(app: &mut SoundApp, w: Workspace) {
     if w == Workspace::Record {
         let _ = app.run("edit.tool", json!({"tool": "selector"}));
     }
+    if w == Workspace::Publish {
+        let _ = app.run("window.publish", json!({"value": true}));
+    }
 }
 
 /// Mode switch at the start of the toolbar.
 pub fn toolbar_switch(app: &mut SoundApp, ui: &mut egui::Ui) {
     let t = Tokens::current();
     let now = app.ui.workspace;
-    ui.vertical(|ui| {
-        ui.spacing_mut().item_spacing.y = 2.0;
+    // Two by two: Record | Edit, Publish | All.
+    egui::Grid::new("workspace_switch").num_columns(2).spacing(vec2(4.0, 4.0)).show(ui, |ui| {
         ui.spacing_mut().button_padding = vec2(6.0, 1.0);
-        for w in Workspace::ALL {
+        for (i, w) in Workspace::ALL.into_iter().enumerate() {
             let on = now == w;
             // On the accent: the theme's text colour for selections (white).
             let text = RichText::new(w.label()).size(11.0).color(if on { ui.visuals().selection.stroke.color } else { t.text_dim });
-            if ui.add(egui::Button::selectable(on, text).min_size(vec2(84.0, 18.0))).clicked() && !on {
+            if ui.add(egui::Button::selectable(on, text).min_size(vec2(84.0, 22.0))).clicked() && !on {
                 switch(app, w);
+            }
+            if i % 2 == 1 {
+                ui.end_row();
             }
         }
     });
@@ -176,6 +187,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             for (w, text, hint) in [
                 (Workspace::Record, "record a podcast", "Record, microphones, remote guests, jingles and markers"),
                 (Workspace::Edit, "edit a podcast", "Cutting, pauses, filler words, subtitles, levels and export"),
+                (Workspace::Publish, "publish a podcast", "Checklist, own RSS feed or podcast host, social media"),
                 (Workspace::All, "see everything", "Recording and editing tools together"),
             ] {
                 let b = egui::Button::new(RichText::new(tr(text)).size(16.0)).min_size(vec2(360.0, 34.0));
@@ -235,5 +247,8 @@ mod tests {
         assert!(hidden_command_in(edit, "transport.record") && !hidden_command_in(edit, "edit.delete"));
         assert!(!hidden_menu_in(all, "Clip > Normalize...") && !hidden_command_in(all, "transport.record"));
         assert_eq!(Workspace::from_id("edit"), Some(Workspace::Edit));
+        let publish = Workspace::Publish;
+        assert!(publish.edits() && !publish.records());
+        assert!(hidden_menu_in(publish, "Window > Remote Guests") && !hidden_menu_in(publish, "File > Export Episode..."));
     }
 }

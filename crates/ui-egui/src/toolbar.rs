@@ -34,7 +34,7 @@ fn toolbar_row(app: &mut SoundApp, ui: &mut Ui) {
     ui.horizontal(|ui| {
         ui.add_space(8.0);
         ui.spacing_mut().item_spacing.x = 8.0;
-        group(ui, 96.0, 64.0, |ui, _| crate::workspace::toolbar_switch(app, ui));
+        group(ui, 186.0, 64.0, |ui, _| crate::workspace::toolbar_switch(app, ui));
         let editing = app.ui.workspace.edits();
         if editing {
             edit_modes(app, ui);
@@ -417,7 +417,7 @@ fn marker_group(app: &mut SoundApp, ui: &mut Ui) {
                     run = Some("markers.next_cut");
                 }
                 if ui
-                    .add_enabled(cuts > 0, egui::Button::new("✓").min_size(size))
+                    .add_enabled(cuts > 0, egui::Button::new("✔").min_size(size))
                     .on_hover_text(tr("Fixed: remove the mistake marker here"))
                     .clicked()
                 {

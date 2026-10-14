@@ -121,7 +121,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
         if !w.report.is_empty() {
             ui.separator();
             for (ok, line) in &w.report {
-                ui.label(RichText::new(format!("{} {line}", if *ok { "✓" } else { "–" })).color(if *ok { t.text } else { t.text_dim }));
+                ui.label(RichText::new(format!("{} {line}", if *ok { "✔" } else { "–" })).color(if *ok { t.text } else { t.text_dim }));
             }
         }
         if let Some((before, after)) = w.before_after {

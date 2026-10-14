@@ -28,8 +28,8 @@ podcast does not need.
 
 ## Features
 
-- **Work modes.** At start TalkCraft asks "I want to … record a podcast / edit a podcast / see
-  everything" and shows only the tools for that (switch any time at the left of the toolbar; after
+- **Work modes.** At start TalkCraft asks "I want to … record a podcast / edit a podcast / publish a
+  podcast / see everything" and shows only the tools for that (switch any time at the left of the toolbar; after
   a recording it offers to switch to editing). Setup can turn the question off: then it starts with
   everything.
 - **Podcast template.** New sessions start with a track per speaker (each on its own input, with
@@ -77,6 +77,29 @@ podcast does not need.
   (Markdown with a chapter list) and Podcasting 2.0 `chapters.json` alongside.
 - **Audiogram.** A square or portrait video with cover, title, waveform and subtitles for social
   media (needs ffmpeg).
+- **Live production.** A readiness light (microphone signal and clipping, guests connected and
+  their connection quality, disk space), an optional 3-2-1 countdown before Record and an On Air
+  display. Keys 1–8 fire the jingle pads live (guests hear them too). Enter sets a chapter marker,
+  Shift+Enter a red "✂ Cut" mistake marker to find later in the toolbar. Window > Run Sheet holds the
+  episode's topics with planned minutes; Tab while recording moves to the next topic and sets a
+  chapter.
+- **Fast editing.** Every cut gets 5 ms fades so it never clicks. J/K/L shuttle (back 5 s, stop,
+  play, again for 1.5×/2×), I/O set the selection at the playhead. Window > Edit by Text: select
+  words (Shift-click a range) and Delete cuts them from every track; the current word lights up
+  during playback. Chapter suggestions from pauses and speaker changes in the Subtitles window.
+- **Finish Episode.** Edit > Finish Episode… runs the usual steps (match speakers, cut selected
+  fillers, shorten pauses, duck music, optionally reduce noise) with Before/After to compare and
+  Undo All. The history is kept with the session (`.history.json`), so undo survives a restart.
+- **Publishing.** File > Publish Episode… (or the Publish work mode): a checklist (title,
+  description, square cover 1400–3000 px, chapters, open mistake markers, loudness, length,
+  transcript), then one button exports and publishes in the background. Targets: your own RSS feed
+  (feed.xml with chapters and transcript, uploaded with the audio to a Git repository served as a
+  website, SFTP, FTP/FTPS or WebDAV; submit the feed once to Apple Podcasts and Spotify) or a host's
+  API: Buzzsprout, Transistor, Podigee, Podbean, Spreaker, Captivate and RSS.com, plus Castos and
+  Megaphone (format from secondary sources, marked untested; they take the audio as a URL from your
+  storage). Each user enters their own keys; they are stored only in `publish/publish.json` in the
+  settings folder, readable only by the user. A social package (post text, chapters, cover,
+  shownotes) and the audiogram for social media.
 - **Languages.** English and German interface (Automatic follows the system).
 - **Settings.** Setup > Preferences has tabs: Episode (saved with the session), General (language,
   start question, scrolling and editing behaviour), Appearance (size, motion, theme, waveform and
@@ -98,6 +121,20 @@ podcast does not need.
    details.
 7. File > Export Episode (Cmd+Alt+E). Optionally File > Export Shownotes and
    File > Export > Audiogram (MP4).
+
+### Publish an episode
+
+1. Fill in title, podcast name, description and cover in the Episode tab of Setup > Preferences.
+2. File > Publish Episode… (or switch to Publish at the left of the toolbar). Fix what the
+   checklist marks red.
+3. Choose where to: "Own RSS feed" needs a storage (for example a Codefloe or GitHub repository
+   with Pages: repository URL, branch `pages`, the public address of the folder). For a host, enter
+   your API key and show ID from the host's account settings.
+4. Export and Publish. The log shows each step; at the end you get the feed's or the episode's
+   address. For your own feed, submit that address once to Apple Podcasts, Spotify and the others.
+
+Nothing here has been tried against the hosts' live services (no accounts); the request formats
+follow their API documentation. SFTP uses your SSH key, Git your system's saved login.
 
 ### Remote guests
 
@@ -179,7 +216,7 @@ braucht.
 ## Funktionen
 
 - **Arbeitsmodi.** Beim Start fragt TalkCraft „Ich möchte … einen Podcast aufnehmen / bearbeiten /
-  alles sehen“ und zeigt nur die passenden Werkzeuge (umschalten jederzeit links in der
+  veröffentlichen / alles sehen“ und zeigt nur die passenden Werkzeuge (umschalten jederzeit links in der
   Werkzeugleiste; nach einer Aufnahme bietet es den Wechsel zum Schneiden an). In den Einstellungen
   lässt sich die Frage abschalten, dann startet TalkCraft mit allem.
 - **Podcast-Vorlage.** Neue Sessions beginnen mit einer Spur pro Sprecher (jede an einem eigenen
@@ -231,6 +268,32 @@ braucht.
   (Markdown mit Kapitelliste) und `chapters.json` nach Podcasting 2.0.
 - **Audiogramm.** Ein quadratisches oder hochkantes Video mit Cover, Titel, Wellenform und
   Untertiteln für Social Media (braucht ffmpeg).
+- **Live-Produktion.** Eine Startklar-Ampel (Mikrofonsignal und Übersteuerung, verbundene Gäste
+  und ihre Verbindungsqualität, freier Speicher), auf Wunsch ein 3-2-1-Countdown vor der Aufnahme
+  und eine On-Air-Anzeige. Die Tasten 1–8 spielen die Jingle-Pads live (auch für die Gäste hörbar).
+  Enter setzt einen Kapitelmarker, Umschalt+Enter einen roten Fehler-Marker „✂ Schneiden“, den man
+  später über die Werkzeugleiste wiederfindet. Fenster > Ablaufplan enthält die Themen der Folge mit
+  geplanten Minuten; Tab springt während der Aufnahme zum nächsten Thema und setzt ein Kapitel.
+- **Schneller Schnitt.** Jeder Schnitt bekommt 5-ms-Blenden und knackt nie. J/K/L zum Spulen (5 s
+  zurück, Stopp, Abspielen, nochmal für 1,5×/2×), I/O setzen die Auswahl an der Abspielposition.
+  Fenster > Schnitt am Text: Wörter auswählen (Umschalt-Klick für einen Bereich), Entf schneidet sie
+  aus allen Spuren; das gerade gesprochene Wort leuchtet beim Abspielen. Kapitelvorschläge aus Pausen
+  und Sprecherwechseln im Untertitel-Fenster.
+- **Folge fertig machen.** Bearbeiten > Folge fertig machen … erledigt die üblichen Schritte
+  (Sprecher angleichen, ausgewählte Füllwörter schneiden, Pausen kürzen, Musik absenken, auf Wunsch
+  Rauschen mindern) mit Vorher/Nachher zum Vergleichen und „Alles rückgängig“. Der Verlauf wird mit
+  der Session gesichert (`.history.json`), Rückgängig klappt also auch nach einem Neustart.
+- **Veröffentlichen.** Ablage > Folge veröffentlichen … (oder der Arbeitsmodus „Veröffentlichen“):
+  eine Checkliste (Titel, Beschreibung, quadratisches Cover 1400–3000 px, Kapitel, offene
+  Fehler-Marker, Lautheit, Länge, Transkript), dann exportiert und veröffentlicht ein Knopf im
+  Hintergrund. Ziele: der eigene RSS-Feed (feed.xml mit Kapiteln und Transkript, mit dem Audio
+  hochgeladen in ein als Website ausgeliefertes Git-Repository, per SFTP, FTP/FTPS oder WebDAV; den
+  Feed einmal bei Apple Podcasts und Spotify einreichen) oder die API eines Hosters: Buzzsprout,
+  Transistor, Podigee, Podbean, Spreaker, Captivate und RSS.com, dazu Castos und Megaphone (Format
+  aus Sekundärquellen, als ungetestet markiert; sie nehmen das Audio als Adresse von deinem
+  Speicherort). Jede Nutzerin und jeder Nutzer trägt die eigenen Schlüssel ein; sie liegen nur in
+  `publish/publish.json` im Einstellungsordner, nur für den eigenen Benutzer lesbar. Dazu ein
+  Social-Paket (Beitragstext, Kapitel, Cover, Shownotes) und das Audiogramm für Social Media.
 - **Sprachen.** Deutsche und englische Oberfläche („Automatisch“ folgt dem System).
 - **Einstellungen.** Einstellungen > Einstellungen … hat Reiter: Folge (in der Session gespeichert),
   Allgemein (Sprache, Startfrage, Scrollen und Bearbeitungsverhalten), Erscheinungsbild (Größe,
@@ -255,6 +318,24 @@ braucht.
    Folgendaten.
 7. Ablage > Folge exportieren (Cmd+Alt+E). Wahlweise Ablage > Shownotes exportieren und
    Ablage > Exportieren > Audiogramm (MP4).
+
+### Eine Folge veröffentlichen
+
+1. Titel, Podcast-Name, Beschreibung und Cover im Reiter Folge unter Einstellungen > Einstellungen …
+   eintragen.
+2. Ablage > Folge veröffentlichen … (oder links in der Werkzeugleiste auf „Veröffentlichen“
+   umschalten). Was die Checkliste rot markiert, nachholen.
+3. Ziel wählen: „Eigener RSS-Feed“ braucht einen Speicherort (z. B. ein Codefloe- oder
+   GitHub-Repository mit Pages: Repository-Adresse, Branch `pages`, öffentliche Adresse des
+   Ordners). Für einen Hoster den eigenen API-Schlüssel und die Show-ID aus den Kontoeinstellungen
+   des Hosters eintragen.
+4. „Exportieren und veröffentlichen“. Das Protokoll zeigt jeden Schritt; am Ende steht die Adresse
+   des Feeds oder der Folge. Beim eigenen Feed diese Adresse einmal bei Apple Podcasts, Spotify und
+   den anderen einreichen.
+
+Gegen die echten Dienste der Hoster ist das noch nicht ausprobiert (keine Konten); die Anfragen
+folgen deren API-Dokumentation. SFTP nutzt deinen SSH-Schlüssel, Git die gespeicherte Anmeldung des
+Systems.
 
 ### Ferngäste
 

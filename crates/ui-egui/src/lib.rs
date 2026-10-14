@@ -25,6 +25,7 @@ pub mod ops_windows;
 pub mod palette;
 pub mod panels;
 pub mod podcast;
+pub mod publish_window;
 pub mod readiness;
 pub mod remote;
 pub mod rundown_window;

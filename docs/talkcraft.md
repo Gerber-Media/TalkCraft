@@ -170,3 +170,23 @@ change) need a real interface to confirm.
 
 Open: the denoiser still runs on the UI thread (the app pauses during long clips); moving it to a
 background job is a separate step.
+
+## Publishing (`crates/engine/src/publish/`)
+
+- No HTTP stack in the app: requests go through the system's `curl` (macOS, Linux, Windows 10+)
+  behind a `Transport` trait, so tests check what would be sent with a fake. Pre-signed upload URLs
+  carry secrets in the query: error messages strip it.
+- macOS `curl` has no sftp/scp: SFTP runs the system `sftp -b -` with `BatchMode=yes` (key login
+  only, never a hidden password prompt). Git runs with `GIT_TERMINAL_PROMPT=0` for the same reason.
+- Keys live in `<settings>/publish/publish.json` (mode 0600), never in the session or `ui.json`:
+  sessions get shared. TalkCraft ships no keys.
+- Own feed: the list of episodes is kept in `<settings>/publish/feeds/<show>.json` and the whole
+  `feed.xml` is rewritten each time; a re-publish of the same episode (same guid) keeps its date.
+- Hosts checked against their own docs or OpenAPI: Buzzsprout, Transistor, Podigee, Podbean,
+  Spreaker, Captivate (via its official npm client), RSS.com. Castos and Megaphone come from
+  secondary sources and take audio only as a URL, so the file goes to the user's storage first;
+  the UI marks them untested. Simplecast, Blubrry and Libsyn have no public upload API.
+- None of it has run against a live service (no accounts). When a user reports a failure, the log
+  in the window shows the HTTP status and the start of the answer.
+- The interface font has no ✓ (U+2713): it renders as a box. Use ✔ (U+2714, in egui's emoji
+  font) or draw a shape.

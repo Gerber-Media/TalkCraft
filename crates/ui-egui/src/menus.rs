@@ -21,6 +21,10 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("window.remote", "Remote Guests", "Window > Remote Guests", None),
     ("window.rundown", "Run Sheet", "Window > Run Sheet", None),
     ("window.finish", "Finish Episode...", "Edit > Finish Episode...", None),
+    ("window.publish", "Publish Episode...", "File > Publish Episode...", None),
+    ("publish.checklist", "Publishing Checklist", "", None),
+    ("publish.start", "Export and Publish", "", None),
+    ("publish.status", "Publishing Status", "", None),
     ("transport.rate", "Playback Speed", "", None),
     ("ui.workspace", "Work Mode", "", None),
     ("window.audiogram", "Audiogram (MP4)...", "File > Export > Audiogram (MP4)...", None),
@@ -412,6 +416,7 @@ const MENU_WINDOWS: &[(&str, &str)] = &[
     ("Window > Remote Guests", "window.remote"),
     ("Window > Run Sheet", "window.rundown"),
     ("Edit > Finish Episode...", "window.finish"),
+    ("File > Publish Episode...", "window.publish"),
     // The one option still switched often; the rest moved to the Settings.
     ("View > Loop Playback", "options.loop_playback"),
     ("File > Export > Audiogram (MP4)...", "window.audiogram"),
@@ -539,6 +544,9 @@ fn wants_dialog(id: &str) -> bool {
 pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<Value, String>> {
     if matches!(id, "ui.dock" | "ui.dock.reset") {
         return Some(crate::docking::command(app, id == "ui.dock.reset", p));
+    }
+    if id == "window.publish" || id.starts_with("publish.") {
+        return Some(crate::publish_window::command(app, id, p));
     }
     if let Some(v) = crate::extra_windows::run(app, id, p) {
         return Some(Ok(v));

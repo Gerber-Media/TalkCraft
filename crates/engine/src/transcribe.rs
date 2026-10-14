@@ -80,7 +80,7 @@ pub fn install_hint() -> String {
 }
 
 /// The app's settings folder (same as the app's own settings).
-fn settings_dir() -> Option<PathBuf> {
+pub fn settings_dir() -> Option<PathBuf> {
     let env = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
     if cfg!(target_os = "macos") {
         env("HOME").map(|h| h.join("Library/Application Support/TalkCraft"))
