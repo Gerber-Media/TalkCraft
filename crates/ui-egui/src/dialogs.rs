@@ -1094,26 +1094,199 @@ fn preferences_ui(app: &mut SoundApp, ui: &mut egui::Ui, s: &mut soundcraft_mode
             ui.label(egui::RichText::new(tr("Saved with the session.")).small().color(dim));
         }
         PrefTab::General => general_prefs(app, ui),
-        PrefTab::Appearance => crate::extra_windows::appearance_ui(app, ui),
+        PrefTab::Appearance => {
+            crate::extra_windows::appearance_ui(app, ui);
+            ui.separator();
+            option_groups(app, ui, APPEARANCE_OPTIONS);
+            session_note(ui);
+        }
         PrefTab::Audio => audio_prefs(app, ui),
         PrefTab::Transcription => transcription_prefs(ui),
     });
     buttons(ui, "Save", enter && !ui.ctx().egui_wants_keyboard_input())
 }
 
+/// How a former menu option's state is read.
+#[derive(Clone, Copy)]
+enum Opt {
+    /// The menu's own check state (the `options.*` switches).
+    Menu,
+    /// An on/off view flag of the session.
+    Flag(&'static str),
+    /// One of the Edit window scrolling modes.
+    Scroll(&'static str),
+    /// One of two styles: chosen while the flag is on (`true`) or off (`false`).
+    Radio(&'static str, bool),
+    /// A flag whose menu item only turns it on; `off` is the menu item that turns it off.
+    Switch(&'static str, &'static str),
+}
+
+type OptGroup = (&'static str, &'static [(&'static str, Opt)]);
+
+/// Menu options that moved to the Settings. Only the ones that change something are listed; the
+/// rest of the incumbent's switches (they only stored a value nothing read) are just hidden.
+const GENERAL_OPTIONS: &[OptGroup] = &[
+    (
+        "Edit Window Scrolling",
+        &[
+            ("Options > Edit Window Scrolling > No Scrolling", Opt::Scroll("none")),
+            ("Options > Edit Window Scrolling > After Playback", Opt::Scroll("after_playback")),
+            ("Options > Edit Window Scrolling > Page", Opt::Scroll("page")),
+            ("Options > Edit Window Scrolling > Continuous", Opt::Scroll("continuous")),
+            ("Options > Edit Window Scrolling > Center Playhead", Opt::Scroll("center")),
+        ],
+    ),
+    (
+        "Editing",
+        &[
+            ("Options > Insertion Follows Playback", Opt::Menu),
+            ("Options > Link Timeline and Edit Selection", Opt::Menu),
+            ("Options > Automation Follows Edit", Opt::Menu),
+        ],
+    ),
+];
+const APPEARANCE_OPTIONS: &[OptGroup] = &[
+    (
+        "Waveforms",
+        &[
+            ("View > Waveforms > Peak", Opt::Radio("waveform.power", false)),
+            ("View > Waveforms > Power", Opt::Radio("waveform.power", true)),
+            ("View > Waveforms > Rectified", Opt::Flag("waveform.rectified")),
+            ("View > Waveforms > Outlines", Opt::Flag("waveform.outlines")),
+        ],
+    ),
+    (
+        "Clip",
+        &[
+            ("View > Clip > Name", Opt::Flag("view.clip.name")),
+            ("View > Clip > Clip Gain Line", Opt::Flag("view.clip.gain_line")),
+            ("View > Clip > Clip Gain Info", Opt::Flag("view.clip.gain_info")),
+            ("View > Clip > Overlap Shadows", Opt::Flag("view.clip.overlap_shadows")),
+            ("View > Clip > Transparency", Opt::Flag("view.clip.transparency")),
+            ("View > Clip > Clip Effects Status", Opt::Flag("view.clip.effects_status")),
+            ("View > Clip > Rating", Opt::Flag("view.clip.rating")),
+            ("View > Clip > Current Time", Opt::Switch("view.clip.time.current", "View > Clip > No Time")),
+        ],
+    ),
+    ("Tracks", &[("View > Track Number", Opt::Flag("edit_view.track_number"))]),
+    ("Marker Displays", &[("View > Marker Displays > Ruler Lines", Opt::Flag("view.marker.ruler_lines"))]),
+    (
+        "Transport",
+        &[
+            ("View > Transport > Counters", Opt::Flag("view.transport.counters")),
+            ("View > Transport > Output Meters", Opt::Flag("view.transport.output_meters")),
+            ("View > Transport > Expanded", Opt::Flag("view.transport.expanded")),
+        ],
+    ),
+];
+const AUDIO_OPTIONS: &[OptGroup] = &[
+    ("Recording", &[("Options > Pre/Post-Roll", Opt::Menu), ("Options > Loop Record", Opt::Menu)]),
+    ("Mix", &[("Options > Delay Compensation", Opt::Menu)]),
+];
+
+/// Menu items that are neither in the menus nor in the Settings: switches of the incumbent that
+/// TalkCraft never acts on (they only stored a value).
+const WITHOUT_EFFECT: &[&str] = &[
+    "Options > Link Track and Edit Selection",
+    "Options > Markers Follow Edit",
+    "Options > Marker Target Follows First Selected Track",
+    "Options > Auto-Spot Clips",
+    "Options > Pre-Fader Metering",
+    "Options > Low Latency Monitoring",
+    "Options > Solo Mode",
+    "View > Waveforms > Overlapped Crossfades",
+    "View > Clip > Channel Name",
+    "View > Clip > Overwrite Indicator",
+    "View > Clip > Copy/Move Indicators",
+    "View > Clip > Processing State",
+    "View > Clip > No Time",
+    "View > Clip > Display on All Channels",
+    "View > Track Transcription Lane",
+    "View > Marker Displays",
+];
+
+/// Whether a catalog path now lives in the Settings (or, doing nothing, nowhere) instead of the menus.
+pub fn in_settings(path: &str) -> bool {
+    WITHOUT_EFFECT.iter().any(|p| path.starts_with(p))
+        || [GENERAL_OPTIONS, APPEARANCE_OPTIONS, AUDIO_OPTIONS].iter().flat_map(|g| g.iter()).any(|(_, opts)| opts.iter().any(|(p, _)| *p == path))
+}
+
+/// Whether an option is on (or, for a choice, chosen).
+fn option_state(app: &SoundApp, path: &str, how: Opt) -> bool {
+    let cmd = crate::menus::command_for_path(path, &crate::menus::ui_aliases());
+    let edit = &app.engine.session().edit;
+    match how {
+        Opt::Menu => crate::menus::item_state(app, path, cmd.as_deref()).1,
+        Opt::Flag(f) | Opt::Switch(f, _) => edit.flag(f),
+        Opt::Scroll(m) => edit.scrolling == m,
+        Opt::Radio(f, on) => edit.flag(f) == on,
+    }
+}
+
+/// Flips an on/off option, or chooses a choice, through the menu command it replaced.
+fn option_change(app: &mut SoundApp, path: &str, how: Opt) {
+    let aliases = crate::menus::ui_aliases();
+    let target = match how {
+        Opt::Switch(_, off) if option_state(app, path, how) => off,
+        _ => path,
+    };
+    if let Some(cmd) = crate::menus::command_for_path(target, &aliases) {
+        crate::menus::invoke_menu(app, &cmd, target);
+    }
+}
+
+/// The groups as check boxes. Each runs the menu command it replaced, so behaviour is exactly the
+/// menu's (these options are saved with the session).
+fn option_groups(app: &mut SoundApp, ui: &mut egui::Ui, groups: &[OptGroup]) {
+    let aliases = crate::menus::ui_aliases();
+    for (heading, opts) in groups {
+        ui.add_space(6.0);
+        ui.label(egui::RichText::new(crate::i18n::tr(heading)).strong());
+        for (path, how) in *opts {
+            if crate::menus::command_for_path(path, &aliases).is_none() {
+                continue;
+            }
+            let checked = option_state(app, path, *how);
+            let leaf = crate::i18n::tr(crate::podcast::menu_label(path.rsplit(" > ").next().unwrap_or(path)));
+            let changed = if matches!(how, Opt::Scroll(_) | Opt::Radio(..)) {
+                ui.add(egui::RadioButton::new(checked, leaf)).clicked() && !checked
+            } else {
+                let mut on = checked;
+                ui.add(egui::Checkbox::new(&mut on, leaf)).changed()
+            };
+            if changed {
+                option_change(app, path, *how);
+            }
+        }
+    }
+}
+
+fn session_note(ui: &mut egui::Ui) {
+    ui.add_space(4.0);
+    ui.label(egui::RichText::new(crate::i18n::tr("These options are saved with the session.")).small().color(Tokens::current().text_dim));
+}
+
 fn audio_prefs(app: &mut SoundApp, ui: &mut egui::Ui) {
     let dim = Tokens::current().text_dim;
     {
-        ui.label(egui::RichText::new(crate::i18n::tr("Recording")).strong());
+        ui.label(egui::RichText::new(crate::i18n::tr("Devices")).strong());
         ui.label(
             egui::RichText::new(crate::i18n::tr(
                 "Record (Cmd+Space) records every speaker track except locked ones; a track's own record button records just that speaker.",
             ))
             .color(dim),
         );
-        if ui.button(crate::i18n::tr("Audio devices and buffer…")).clicked() {
-            let _ = app.run("window.playback_engine", json!({"value": true}));
-        }
+        ui.horizontal(|ui| {
+            if ui.button(crate::i18n::tr("Audio devices and buffer…")).clicked() {
+                let _ = app.run("window.playback_engine", json!({"value": true}));
+            }
+            if ui.button(crate::i18n::tr("I/O…")).clicked() {
+                let _ = app.run("window.io_setup", json!({"value": true}));
+            }
+        });
+        ui.separator();
+        option_groups(app, ui, AUDIO_OPTIONS);
+        session_note(ui);
     }
 }
 
@@ -1135,6 +1308,12 @@ fn general_prefs(app: &mut SoundApp, ui: &mut egui::Ui) {
         });
         ui.label(egui::RichText::new(crate::i18n::tr("The macOS menu bar follows after a restart.")).small().color(dim));
         ui.checkbox(&mut app.ui.ask_workspace, crate::i18n::tr("Ask at start what I want to do (otherwise start with everything)"));
+        if ui.button(crate::i18n::tr("Keyboard Shortcuts…")).clicked() {
+            let _ = app.run("window.shortcuts", json!({"value": true}));
+        }
+        ui.separator();
+        option_groups(app, ui, GENERAL_OPTIONS);
+        session_note(ui);
     }
 }
 
@@ -1303,6 +1482,33 @@ fn episode_ui(ui: &mut egui::Ui, services: &crate::Services, e: &mut soundcraft_
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn every_option_in_the_settings_switches_and_shows_its_state() {
+        let mut app = SoundApp::new(soundcraft_engine::Engine::default(), None, crate::Services::default());
+        for group in [GENERAL_OPTIONS, APPEARANCE_OPTIONS, AUDIO_OPTIONS] {
+            for (heading, opts) in group {
+                for (path, how) in *opts {
+                    assert!(crate::menus::command_for_path(path, &crate::menus::ui_aliases()).is_some(), "{path} has a command");
+                    assert!(crate::podcast::hidden_menu(path), "{path} left the menu");
+                    let before = option_state(&app, path, *how);
+                    option_change(&mut app, path, *how);
+                    match how {
+                        Opt::Scroll(_) | Opt::Radio(..) => assert!(option_state(&app, path, *how), "{path} is chosen"),
+                        _ => {
+                            assert_ne!(option_state(&app, path, *how), before, "{path} switches");
+                            option_change(&mut app, path, *how);
+                            assert_eq!(option_state(&app, path, *how), before, "{path} switches back");
+                        }
+                    }
+                }
+                // A choice shows exactly one chosen entry.
+                let chosen = opts.iter().filter(|(p, h)| matches!(h, Opt::Scroll(_) | Opt::Radio(..)) && option_state(&app, p, *h)).count();
+                let choices = opts.iter().filter(|(_, h)| matches!(h, Opt::Scroll(_) | Opt::Radio(..))).count();
+                assert!(choices == 0 || chosen == 1, "{heading}: {chosen} of {choices} chosen");
+            }
+        }
+    }
+
     use super::*;
 
     #[test]

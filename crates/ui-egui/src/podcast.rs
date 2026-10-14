@@ -56,6 +56,8 @@ const HIDDEN_EXACT: &[&str] = &[
     // Appearance is a tab of the Settings.
     "Setup > Appearance",
     "Window > UI Customization",
+    // Under View now (the Options menu's other items are in the Settings).
+    "Options > Loop Playback",
     "AudioSuite > Delay > Mod Delay III",
     "AudioSuite > Harmonic > Eleven Lite",
     "AudioSuite > Harmonic > Lo-Fi",
@@ -191,6 +193,7 @@ pub fn hidden_menu(path: &str) -> bool {
         || HIDDEN_EXACT.contains(&path)
         || HIDDEN_PREFIXES.iter().any(|p| path.starts_with(p))
         || crate::workspace::hidden_menu(path)
+        || crate::dialogs::in_settings(path)
 }
 
 /// Neutral names for menu items the clean-room original named after Avid products.

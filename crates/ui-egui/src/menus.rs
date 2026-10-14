@@ -408,6 +408,8 @@ const MENU_WINDOWS: &[(&str, &str)] = &[
     ("Window > Filler Words", "window.words"),
     ("Window > Jingles", "window.jingles"),
     ("Window > Remote Guests", "window.remote"),
+    // The one option still switched often; the rest moved to the Settings.
+    ("View > Loop Playback", "options.loop_playback"),
     ("File > Export > Audiogram (MP4)...", "window.audiogram"),
     ("Edit > Cut Filler Words...", "window.words"),
     ("View > Rulers > Subtitles", "view.ruler"),

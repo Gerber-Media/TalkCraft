@@ -349,6 +349,10 @@ const DE: &[(&str, &str)] = &[
     ("Waveform", "Wellenform"),
     ("History", "Verlauf"),
     ("General", "Allgemein"),
+    ("Editing", "Bearbeitung"),
+    ("Keyboard Shortcuts…", "Tastaturkürzel …"),
+    ("I/O…", "Ein-/Ausgänge …"),
+    ("These options are saved with the session.", "Diese Optionen werden mit der Session gespeichert."),
     ("The macOS menu bar follows after a restart.", "Die macOS-Menüleiste folgt nach einem Neustart."),
     (
         "Record (Cmd+Space) records every speaker track except locked ones; a track's own record button records just that speaker.",

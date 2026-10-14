@@ -77,6 +77,10 @@ podcast does not need.
 - **Audiogram.** A square or portrait video with cover, title, waveform and subtitles for social
   media (needs ffmpeg).
 - **Languages.** English and German interface (Automatic follows the system).
+- **Settings.** Setup > Preferences has tabs: Episode (saved with the session), General (language,
+  start question, scrolling and editing behaviour), Appearance (size, motion, theme, waveform and
+  clip display), Audio (devices, pre/post-roll, loop recording, delay compensation) and
+  Transcription. Settings you choose once live there, not in the menus.
 
 ## How to
 
@@ -89,7 +93,8 @@ podcast does not need.
 4. Edit: cut with the blade, delete sections (the gap closes on all tracks), Edit > Shorten Pauses,
    Window > Filler Words to remove "ähm"s.
 5. Edit > Match Speaker Levels, place intro/outro from Window > Jingles, Edit > Auto-Duck Music.
-6. Set markers for chapters; Setup > Preferences holds title, cover and episode details.
+6. Set markers for chapters; the Episode tab of Setup > Preferences holds title, cover and episode
+   details.
 7. File > Export Episode (Cmd+Alt+E). Optionally File > Export Shownotes and
    File > Export > Audiogram (MP4).
 
@@ -225,6 +230,11 @@ braucht.
 - **Audiogramm.** Ein quadratisches oder hochkantes Video mit Cover, Titel, Wellenform und
   Untertiteln für Social Media (braucht ffmpeg).
 - **Sprachen.** Deutsche und englische Oberfläche („Automatisch“ folgt dem System).
+- **Einstellungen.** Einstellungen > Einstellungen … hat Reiter: Folge (in der Session gespeichert),
+  Allgemein (Sprache, Startfrage, Scrollen und Bearbeitungsverhalten), Erscheinungsbild (Größe,
+  Bewegung, Farbschema, Wellenform- und Clip-Anzeige), Audio (Geräte, Pre-/Post-Roll,
+  Loop-Aufnahme, Latenzausgleich) und Transkription. Was man einmal einstellt, steht dort und nicht
+  im Menü.
 
 ## Anleitung
 
@@ -239,7 +249,7 @@ braucht.
    Spuren), Bearbeiten > Pausen kürzen, Fenster > Füllwörter für die „ähm“s.
 5. Bearbeiten > Sprecher angleichen, Intro und Outro über Fenster > Jingles setzen,
    Bearbeiten > Musik automatisch absenken.
-6. Marker für Kapitel setzen; unter Einstellungen > Einstellungen … stehen Titel, Cover und
+6. Marker für Kapitel setzen; im Reiter Folge unter Einstellungen > Einstellungen … stehen Titel, Cover und
    Folgendaten.
 7. Ablage > Folge exportieren (Cmd+Alt+E). Wahlweise Ablage > Shownotes exportieren und
    Ablage > Exportieren > Audiogramm (MP4).

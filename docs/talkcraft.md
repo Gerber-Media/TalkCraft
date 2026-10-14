@@ -5,7 +5,7 @@ where possible; the fork adds podcast commands, a slimmer interface and remote g
 is for whoever works on it next (people and agents): where things live, why they are built the way
 they are, and the traps already stepped in. `AGENTS.md` still holds for everything else.
 
-Last updated: 2026-10-14.
+Last updated: 2026-10-14 (Settings tabs).
 
 ## Where things live
 
@@ -49,6 +49,16 @@ simple. Only the apps are called `talkcraft`.
   call and `podcast.import_remote` syncs the guest's file onto it by cross-correlation.
 - **Guests are told apart by name** (their track is "Ferngast – Name"); the studio numbers
   duplicates ("Anna 2"). Track names are German on purpose, like the template's.
+- **Settings, not menus, for what is set once.** Setup > Preferences has tabs (Episode, General,
+  Appearance, Audio, Transcription). Appearance and the former Options menu moved there; the Options
+  menu is gone (Loop Playback, still switched often, sits under View). Each check box runs the menu
+  command it replaced, so behaviour is unchanged (`dialogs.rs`: `GENERAL_OPTIONS`,
+  `APPEARANCE_OPTIONS`, `AUDIO_OPTIONS`; a test switches every one of them). Most of these options
+  are saved with the session, and the tabs say so.
+- **Switches that do nothing are not offered.** Many Options/View items of the incumbent only store
+  a value nothing reads (markers follow edit, solo modes, low-latency monitoring, several clip and
+  marker displays …). They are hidden (`WITHOUT_EFFECT`), not moved; before offering a switch, grep
+  whether anything reads its flag.
 - **Version:** `TALKCRAFT_MINOR.<commits since TALKCRAFT_FORK_BASE>` (`packaging/version.env`).
   Raise `TALKCRAFT_MINOR` by hand for bigger steps; the last number counts itself.
 
@@ -82,6 +92,13 @@ A freshly opened input reports zero callbacks until its first buffer. The stall 
 when an input opens and when a take starts, or a slow USB/Bluetooth input stops the take at once.
 Replacing the Player (device lost, reconnected, picked) must re-attach the open input's monitor
 ring (`SoundApp::replace_player`), or input monitoring goes silent.
+
+### Menu check marks
+`menus::checked_state` knows the `options.*` booleans but not the view flags (`edit.flag(...)`) or
+the scrolling mode, so those menu items never showed a check mark. The Settings read the state
+directly (`option_state`); a choice (scrolling, Peak/Power) must always show exactly one entry.
+Some flag commands only turn a flag on (`view.clip_time_current`); turning it off goes through
+its counterpart (`No Time`).
 
 ### Range markers and cutting time
 `edit::cut_time` must shorten a range marker that runs into or across the cut, not only move the
