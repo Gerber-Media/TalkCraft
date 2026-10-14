@@ -216,8 +216,10 @@ fn db(x: f32) -> f32 {
 /// Reads the input peaks and moves detection and soundcheck along. Called every frame while the
 /// window is open.
 fn update(app: &mut SoundApp) {
-    let Some(rec) = &app.recorder else { return };
-    let peaks = rec.levels.take();
+    if app.recorder.is_none() {
+        return;
+    }
+    let peaks = app.input_peaks.clone();
     let st = &mut app.extra.audio_setup;
     st.meters.resize(peaks.len(), 0.0);
     for (m, p) in st.meters.iter_mut().zip(&peaks) {

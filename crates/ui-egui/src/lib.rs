@@ -24,6 +24,7 @@ pub mod ops_windows;
 pub mod palette;
 pub mod panels;
 pub mod podcast;
+pub mod readiness;
 pub mod remote;
 pub mod score_editor;
 pub mod shortcuts;
@@ -84,6 +85,9 @@ pub struct UiState {
     /// Ask at start what the user wants to do (Setup can turn it off: then All).
     #[serde(default = "default_true")]
     pub ask_workspace: bool,
+    /// Count 3-2-1 before a recording starts.
+    #[serde(default = "default_true")]
+    pub countdown: bool,
     /// Listening rate that keeps the pitch (1 = normal; the toolbar's 1× button).
     #[serde(default = "default_rate")]
     pub playback_rate: f32,
@@ -158,6 +162,8 @@ impl Default for UiState {
             // starts with "auto" (main.rs), and older settings files without the field get it too.
             language: "en".into(),
             playback_rate: 1.0,
+            // Tests record at once.
+            countdown: false,
             workspace: workspace::Workspace::All,
             // Tests start without the question; the app asks on a fresh install.
             ask_workspace: false,
@@ -271,6 +277,11 @@ pub struct SoundApp {
     pub player: Option<Player>,
     /// Input capture, opened on first record.
     pub recorder: Option<soundcraft_playback::record::Recorder>,
+    /// Each input's peak since the last frame (read once per frame; the setup window and the
+    /// readiness check both use it).
+    pub input_peaks: Vec<f32>,
+    /// Record pressed with the countdown on: when the take starts, and which tracks.
+    pub countdown: Option<(std::time::Instant, Vec<TrackId>)>,
     record_start: Samples,
     /// Punch range to trim the take to (pre/post-roll recordings).
     punch: Option<Range>,
@@ -344,6 +355,8 @@ impl SoundApp {
             engine,
             player,
             recorder: None,
+            input_peaks: Vec::new(),
+            countdown: None,
             record_start: 0,
             punch: None,
             recorder_failed: false,
@@ -889,9 +902,15 @@ impl SoundApp {
                 TransportRequest::Record => {
                     if self.engine.transport.recording {
                         self.stop_play();
+                    } else if self.countdown.take().is_some() {
+                        // Record again during the countdown cancels it.
                     } else {
                         let all = soundcraft_engine::podcast::record_targets(self.engine.session());
-                        self.start_recording(all);
+                        if self.ui.countdown && !self.is_playing() {
+                            self.countdown = Some((std::time::Instant::now() + crate::readiness::COUNTDOWN, all));
+                        } else {
+                            self.start_recording(all);
+                        }
                     }
                 }
                 TransportRequest::RecordTracks(tracks) => {
@@ -983,6 +1002,8 @@ impl SoundApp {
         crate::i18n::set(&self.ui.language);
         crate::workspace::set(self.ui.workspace);
         self.watch_devices();
+        self.input_peaks = self.recorder.as_ref().map(|r| r.levels.take()).unwrap_or_default();
+        crate::readiness::tick(self);
         if let Some(p) = &self.player
             && (p.rate() - self.ui.playback_rate).abs() > 0.001
         {

@@ -290,7 +290,15 @@ impl Server {
 
 /// A remote guest's track in the session.
 pub fn track_name(guest: &str) -> String {
-    format!("Ferngast – {guest}")
+    format!("{TRACK_PREFIX}{guest}")
+}
+
+/// Start of a remote guest's track name.
+pub const TRACK_PREFIX: &str = "Ferngast – ";
+
+/// The guests the studio page reports (empty while the studio is closed).
+pub fn guests(app: &SoundApp) -> Vec<Guest> {
+    app.extra.remote.server.as_ref().and_then(|s| s.shared.lock().ok().map(|sh| sh.guests.clone())).unwrap_or_default()
 }
 
 /// Makes the guest's track when they join: mono, locked against local recording (their sound

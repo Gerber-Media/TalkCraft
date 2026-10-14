@@ -18,6 +18,7 @@ pub struct ExtraState {
     pub jingles: crate::jingles_window::JinglesWindow,
     pub audio_setup: crate::audio_setup::AudioSetup,
     pub remote: crate::remote::RemoteStudio,
+    pub readiness: crate::readiness::Readiness,
     /// The start question is open; after a recording, switching to editing is offered.
     pub ask_workspace: bool,
     pub offer_edit: bool,
@@ -40,6 +41,7 @@ impl Default for ExtraState {
             jingles: Default::default(),
             audio_setup: Default::default(),
             remote: Default::default(),
+            readiness: Default::default(),
             ask_workspace: false,
             offer_edit: false,
             workspace_started: false,
@@ -99,6 +101,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
         }
     }
     crate::workspace::window(app, ctx);
+    crate::readiness::countdown_overlay(app, ctx);
     ui_customization(app, ctx);
     apply_customization(app, ctx);
 }

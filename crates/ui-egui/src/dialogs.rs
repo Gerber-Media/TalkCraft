@@ -1291,6 +1291,7 @@ fn audio_prefs(app: &mut SoundApp, ui: &mut egui::Ui) {
                 let _ = app.run("window.io_setup", json!({"value": true}));
             }
         });
+        ui.checkbox(&mut app.ui.countdown, crate::i18n::tr("Count 3-2-1 before recording starts"));
         ui.separator();
         option_groups(app, ui, AUDIO_OPTIONS);
         session_note(ui);

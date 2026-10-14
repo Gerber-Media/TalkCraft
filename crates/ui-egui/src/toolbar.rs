@@ -48,6 +48,9 @@ fn toolbar_row(app: &mut SoundApp, ui: &mut Ui) {
             grid_nudge(app, ui);
         }
         transport(app, ui);
+        if app.ui.workspace.records() {
+            crate::readiness::toolbar(app, ui);
+        }
         marker_group(app, ui);
         loudness(app, ui);
         output_meter(app, ui);
