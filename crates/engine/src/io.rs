@@ -549,7 +549,122 @@ pub fn save_session(e: &mut Engine, path: &str) -> Result<usize> {
     *e.session_mut() = fresh;
     e.path = Some(p.to_string_lossy().into_owned());
     e.mark_clean();
+    // The History survives closing: written next to the session (a failure only costs the History).
+    if let Err(err) = write_history(e, &p) {
+        log::warn!("history not saved: {err}");
+    }
     Ok(written)
+}
+
+/// Most History steps kept with a session, and most bytes for them.
+const HISTORY_STEPS: usize = 100;
+const HISTORY_BYTES: usize = 64 << 20;
+
+/// `<session>.history.json` next to the session file.
+pub fn history_path(session: &Path) -> PathBuf {
+    let stem = session.file_stem().and_then(|s| s.to_str()).unwrap_or("session");
+    session.with_file_name(format!("{stem}.history.json"))
+}
+
+fn text_hash(text: &str) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    text.hash(&mut h);
+    format!("{:016x}-{}", h.finish(), text.len())
+}
+
+/// Writes the undo steps, newest first until one needs audio that exists only in memory (that step
+/// and older ones could not come back intact) or the limits are reached.
+fn write_history(e: &Engine, session_file: &Path) -> std::result::Result<(), String> {
+    let hp = history_path(session_file);
+    let states = e.undo_states();
+    if states.is_empty() {
+        let _ = std::fs::remove_file(&hp);
+        return Ok(());
+    }
+    let dir = session_file.parent().map(Path::to_path_buf).unwrap_or_default();
+    let saved = std::fs::read_to_string(session_file).map_err(|err| err.to_string())?;
+    let mut steps: Vec<Value> = Vec::new();
+    let mut bytes = 0usize;
+    for (label, doc) in states.iter().rev().take(HISTORY_STEPS) {
+        let mut s = (**doc).clone();
+        let mut ok = true;
+        for src in &mut s.sources {
+            let abs = if Path::new(&src.path).is_absolute() { PathBuf::from(&src.path) } else { dir.join(&src.path) };
+            if !abs.is_file() {
+                ok = false;
+                break;
+            }
+            src.path = abs.to_string_lossy().into_owned();
+            src.unsaved = false;
+        }
+        if !ok {
+            break;
+        }
+        let v = serde_json::to_value(&s).map_err(|err| err.to_string())?;
+        bytes += v.to_string().len();
+        if bytes > HISTORY_BYTES {
+            break;
+        }
+        steps.push(json!({"label": label, "session": v}));
+    }
+    steps.reverse();
+    let doc = json!({"version": 1, "session": text_hash(&saved), "steps": steps});
+    std::fs::write(&hp, doc.to_string()).map_err(|err| format!("{}: {err}", hp.display()))
+}
+
+/// Puts the History saved with `session_file` back, if it belongs to exactly this saved state.
+/// Audio already open is shared; a step whose audio is gone ends the History there.
+fn read_history(e: &mut Engine, session_file: &Path, saved_text: &str) -> usize {
+    let Ok(text) = std::fs::read_to_string(history_path(session_file)) else { return 0 };
+    let Ok(v) = serde_json::from_str::<Value>(&text) else { return 0 };
+    if v["session"].as_str() != Some(text_hash(saved_text).as_str()) {
+        return 0;
+    }
+    let Some(steps) = v["steps"].as_array() else { return 0 };
+    let dir = session_file.parent().map(Path::to_path_buf).unwrap_or_default();
+    let current = e.session().clone();
+    let open_audio = |path: &str| -> Option<Arc<SourceAudio>> {
+        current
+            .sources
+            .iter()
+            .find(|c| {
+                let abs = if Path::new(&c.path).is_absolute() { PathBuf::from(&c.path) } else { dir.join(&c.path) };
+                same_path(&abs, Path::new(path))
+            })
+            .and_then(|c| current.pool.get(c.id).cloned())
+    };
+    let mut states: Vec<(String, Arc<Session>)> = Vec::new();
+    for step in steps.iter().rev() {
+        let Ok(mut s) =
+            serde_json::to_string(&step["session"]).map_err(|e| e.to_string()).and_then(|t| Session::from_json(&t).map_err(|e| e.to_string()))
+        else {
+            break;
+        };
+        let mut ok = true;
+        for src in s.sources.clone() {
+            if let Some(a) = open_audio(&src.path) {
+                s.pool.insert(src.id, a);
+                continue;
+            }
+            match std::fs::read(&src.path) {
+                Ok(bytes) if load_source_audio(&mut s, src.id, &bytes, Path::new(&src.path).extension().and_then(|x| x.to_str())).is_ok() => {}
+                _ => {
+                    ok = false;
+                    break;
+                }
+            }
+        }
+        if !ok {
+            break;
+        }
+        s.folder = Some(dir.clone());
+        states.push((step["label"].as_str().unwrap_or("Edit").to_string(), Arc::new(s)));
+    }
+    states.reverse();
+    let n = states.len();
+    e.restore_undo(states);
+    n
 }
 
 /// Write a copy of the session (and any audio it needs) without touching the open document —
@@ -736,6 +851,7 @@ fn store_wav(dir: &Path, stem: &str, bytes: &[u8]) -> Result<(String, bool)> {
 /// Open a `.scraft` session and decode its audio files (missing files are reported, not fatal).
 pub fn open_session(e: &mut Engine, path: &str) -> Result<Vec<String>> {
     let text = std::fs::read_to_string(path).map_err(|err| EngineError::Io(format!("{path}: {err}")))?;
+    let saved_text = text.clone();
     let mut s = Session::from_json(&text).map_err(|err| EngineError::Io(err.to_string()))?;
     let dir = Path::new(path).parent().map(Path::to_path_buf).unwrap_or_default();
     let mut missing = Vec::new();
@@ -754,6 +870,7 @@ pub fn open_session(e: &mut Engine, path: &str) -> Result<Vec<String>> {
     s.folder = Some(dir);
     e.replace_session(s);
     e.path = Some(path.to_string());
+    read_history(e, Path::new(path), &saved_text);
     for m in &missing {
         e.message(format!("missing media: {m}"));
     }
@@ -1061,6 +1178,44 @@ mod record_tests {
 #[cfg(test)]
 mod save_tests {
     use super::*;
+
+    #[test]
+    fn the_history_survives_closing_and_opening() {
+        let dir = std::env::temp_dir().join(format!("sc-history-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let wav = dir.join("talk.wav");
+        let buf = AudioBuffer { sample_rate: 48_000, channels: vec![vec![0.25; 48_000]] };
+        std::fs::write(&wav, soundcraft_audio_io::encode(&buf, &EncodeOptions::default()).unwrap()).unwrap();
+        let mut e = Engine::default();
+        e.execute("session.new", &json!({"name": "H", "template": "podcast", "speakers": 1})).unwrap();
+        e.execute("file.import_audio", &json!({"path": wav.to_string_lossy(), "track": "Moderation", "new_tracks": false})).unwrap();
+        e.execute("mix.volume", &json!({"track": "Moderation", "db": -6.0})).unwrap();
+        e.execute("track.new", &json!({"name": "Extra"})).unwrap();
+        let path = dir.join("H.scraft");
+        e.execute("session.save_as", &json!({"path": path.to_string_lossy()})).unwrap();
+        let labels = e.undo_history();
+        assert!(history_path(&path).is_file());
+
+        let mut r = Engine::default();
+        r.execute("session.open", &json!({"path": path.to_string_lossy()})).unwrap();
+        assert_eq!(r.undo_history(), labels, "the same steps after opening");
+        r.execute("edit.undo", &json!({})).unwrap();
+        assert!(r.session().track_by_name("Extra").is_none(), "undo works after opening");
+        r.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(r.session().track_by_name("Moderation").unwrap().mixer.volume_db, 0.0);
+        r.execute("edit.undo", &json!({})).unwrap();
+        r.execute("edit.redo", &json!({})).unwrap();
+        let src = r.session().sources[0].id;
+        assert!(r.session().pool.get(src).is_some(), "the audio is there in the restored state");
+
+        // A saved session changed elsewhere does not get a History that does not belong to it.
+        std::fs::write(&path, std::fs::read_to_string(&path).unwrap().replace("\"H\"", "\"H2\"")).unwrap();
+        let mut x = Engine::default();
+        x.execute("session.open", &json!({"path": path.to_string_lossy()})).unwrap();
+        assert!(x.undo_history().is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn autosave_copy_leaves_document_untouched_and_reuses_audio() {

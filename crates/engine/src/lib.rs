@@ -229,6 +229,17 @@ impl Engine {
     pub fn undo_history(&self) -> Vec<String> {
         self.undo.iter().map(|h| h.label.clone()).collect()
     }
+    /// The undo steps as (label, the document before that step), oldest first.
+    pub fn undo_states(&self) -> Vec<(String, Arc<Session>)> {
+        self.undo.iter().map(|h| (h.label.clone(), Arc::clone(&h.doc))).collect()
+    }
+
+    /// Puts back undo steps kept from an earlier run (oldest first); the redo steps go.
+    pub fn restore_undo(&mut self, states: Vec<(String, Arc<Session>)>) {
+        self.undo = states.into_iter().map(|(label, doc)| HistoryEntry { label, doc }).collect();
+        self.redo.clear();
+    }
+
     /// Steps that can be redone, next one first.
     pub fn redo_history(&self) -> Vec<String> {
         self.redo.iter().rev().map(|h| h.label.clone()).collect()
