@@ -12,40 +12,7 @@ use std::fmt::Write as _;
 
 use serde_json::Value;
 
-/// The commit TalkCraft was forked from: the build number counts TalkCraft's own commits.
-const FORK_BASE: &str = "6cf896e76c0ec82a11bf2494f209cfe7c8507f74";
-/// Raised by hand for bigger steps; the last part is the build number.
-const TALKCRAFT_MINOR: &str = "0.1";
-
-/// TalkCraft's running version: `0.1.<commits since the fork>`, from git at build time
-/// (`0.1.0-dev` without git, e.g. from a source archive).
-fn version() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for f in [".git/HEAD", ".git/refs/heads", ".git/packed-refs"] {
-        println!("cargo::rerun-if-changed={}", root.join(f).display());
-    }
-    let build = std::process::Command::new("git")
-        .args(["rev-list", "--count", &format!("{FORK_BASE}..HEAD")])
-        .current_dir(&root)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8_lossy(&o.stdout).trim().parse::<u32>().ok());
-    let (v, b) = match build {
-        Some(n) => (format!("{TALKCRAFT_MINOR}.{n}"), n),
-        None => (format!("{TALKCRAFT_MINOR}.0-dev"), 0),
-    };
-    let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default()).join("talkcraft_version.rs");
-    let code = format!(
-        "/// TalkCraft's version (`minor.build`).\npub const VERSION: &str = {v:?};\n/// Commits since the fork.\npub const BUILD: u32 = {b};\n"
-    );
-    if let Err(e) = std::fs::write(&out, code) {
-        println!("cargo::warning=writing {}: {e}", out.display());
-    }
-}
-
 fn main() {
-    version();
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../contributors");
     let json = read(&dir.join("contributors.json"), "the About window shows no contributors", |t| {
         serde_json::from_str::<Value>(t).map_err(|e| e.to_string())

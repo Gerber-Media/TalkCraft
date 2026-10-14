@@ -3,7 +3,9 @@
 #
 # Exports:
 #   ROOT                    workspace root
-#   VERSION                 [workspace.package] version from Cargo.toml (override: TALKCRAFT_VERSION)
+#   VERSION                 TalkCraft's version, TALKCRAFT_MINOR.<commits since the fork> from
+#                           packaging/version.env (override: TALKCRAFT_VERSION); also exported as
+#                           TALKCRAFT_VERSION so the binaries report the same number
 #   DIST                    output directory for release artifacts (default: $ROOT/dist/release)
 #   TALKCRAFT_BUILD_SHA    git commit (recorded in the macOS Info.plist and the job summary)
 #   TALKCRAFT_BUILD_DATE   UTC build date, YYYY-MM-DD (AppStream release date)
@@ -12,21 +14,29 @@
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export ROOT
 
-# The version lives in exactly one place: `[workspace.package] version` in the root Cargo.toml.
-# (`cargo xtask version` prints the same thing; awk avoids compiling xtask here.)
-workspace_version() {
-  awk '
-    /^\[/ { in_pkg = ($0 == "[workspace.package]") ; next }
-    in_pkg && $1 == "version" { gsub(/[" ]/, "", $3); print $3; exit }
-  ' "$ROOT/Cargo.toml"
+# The version is set in exactly one place, packaging/version.env (the same numbers the app shows
+# in About; crates/engine/build.rs computes it the same way). The crates keep the SoundCraft
+# version in Cargo.toml, so upstream merges stay simple.
+talkcraft_version() {
+  local minor base count
+  minor="$(sed -n 's/^TALKCRAFT_MINOR=//p' "$ROOT/packaging/version.env")"
+  base="$(sed -n 's/^TALKCRAFT_FORK_BASE=//p' "$ROOT/packaging/version.env")"
+  if count="$(git -C "$ROOT" rev-list --count "$base..HEAD" 2>/dev/null)"; then
+    echo "$minor.$count"
+  else
+    echo "$minor.0"
+  fi
 }
 
-VERSION="${TALKCRAFT_VERSION:-$(workspace_version)}"
+VERSION="${TALKCRAFT_VERSION:-$(talkcraft_version)}"
 if [ -z "$VERSION" ]; then
-  echo "error: could not read [workspace.package] version from $ROOT/Cargo.toml" >&2
+  echo "error: could not work out the version from $ROOT/packaging/version.env" >&2
   exit 1
 fi
 export VERSION
+export TALKCRAFT_VERSION="$VERSION"
+# For builds that see neither git nor this environment (the Flatpak sandbox): gitignored.
+echo "$VERSION" > "$ROOT/packaging/talkcraft-version"
 
 DIST="${DIST:-$ROOT/dist/release}"
 mkdir -p "$DIST"

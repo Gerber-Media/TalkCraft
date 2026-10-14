@@ -32,16 +32,21 @@ function Invoke-Native([string] $What, [scriptblock] $Block) {
   if ($LASTEXITCODE -ne 0) { throw "$What failed with exit code $LASTEXITCODE" }
 }
 
-# The version lives in one place: [workspace.package] version in the root Cargo.toml.
+# The version is set in one place, packaging/version.env: TALKCRAFT_MINOR.<commits since the fork>
+# (the number the app shows in About; crates/engine/build.rs computes it the same way).
 $Version = $env:TALKCRAFT_VERSION
 if (-not $Version) {
-  $inPkg = $false
-  foreach ($line in Get-Content (Join-Path $Root 'Cargo.toml')) {
-    if ($line -match '^\s*\[') { $inPkg = ($line.Trim() -eq '[workspace.package]'); continue }
-    if ($inPkg -and $line -match '^\s*version\s*=\s*"([^"]+)"') { $Version = $Matches[1]; break }
+  $vars = @{}
+  foreach ($line in Get-Content (Join-Path $Root 'packaging\version.env')) {
+    if ($line -match '^\s*(TALKCRAFT_[A-Z_]+)=(.+)$') { $vars[$Matches[1]] = $Matches[2].Trim() }
   }
+  $count = & git -C $Root rev-list --count "$($vars['TALKCRAFT_FORK_BASE'])..HEAD" 2>$null
+  if ($LASTEXITCODE -ne 0 -or -not $count) { $count = '0' }
+  $Version = "$($vars['TALKCRAFT_MINOR']).$($count.Trim())"
 }
-if (-not $Version) { throw 'could not read [workspace.package] version from Cargo.toml' }
+if (-not $Version) { throw 'could not work out the version from packaging\version.env' }
+# The binaries report the same number.
+$env:TALKCRAFT_VERSION = $Version
 # MSI ProductVersion is numeric (major.minor.build); pre-release tags are dropped there.
 $MsiVersion = ($Version -split '-')[0]
 

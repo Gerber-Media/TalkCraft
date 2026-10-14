@@ -76,7 +76,7 @@ modules:
       - install -Dm644 packaging/linux/media.gerber.talkcraft.mime.xml /app/share/mime/packages/media.gerber.talkcraft.xml
       - mkdir -p /app/share/icons && cp -R assets/app-icon/hicolor /app/share/icons/
       - >-
-        version=$(awk '/^\[/{p=($0=="[workspace.package]");next} p&&$1=="version"{gsub(/[" ]/,"",$3);print $3;exit}' Cargo.toml);
+        version=$(cat packaging/talkcraft-version 2>/dev/null || sed -n 's/^TALKCRAFT_MINOR=//p' packaging/version.env);
         install -d /app/share/metainfo;
         sed -e "s/@VERSION@/$version/" -e "s/@DATE@/$(date -u +%Y-%m-%d)/"
         packaging/linux/media.gerber.talkcraft.metainfo.xml.in > /app/share/metainfo/media.gerber.talkcraft.metainfo.xml

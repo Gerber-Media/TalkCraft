@@ -5,6 +5,10 @@
 //! The engine owns the [`Session`] behind an `Arc` (copy-on-write), so undo snapshots are cheap.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+/// TalkCraft's running version: `packaging/version.env` plus the commit count, at build time.
+pub mod version {
+    include!(concat!(env!("OUT_DIR"), "/talkcraft_version.rs"));
+}
 pub mod aac;
 pub mod catalog;
 pub mod catalog_more;

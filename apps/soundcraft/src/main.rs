@@ -219,7 +219,7 @@ fn main() -> eframe::Result {
     let logger = logging::install();
     let args: Vec<String> = std::env::args().skip(1).collect();
     if args.iter().any(|a| a == "--version" || a == "-V") {
-        println!("SoundCraft {}", env!("CARGO_PKG_VERSION"));
+        println!("TalkCraft {}", soundcraft_engine::version::VERSION);
         return Ok(());
     }
     let demo = args.iter().any(|a| a == "--demo" || a == "--sample");
@@ -236,7 +236,7 @@ fn main() -> eframe::Result {
         .filter(|(i, a)| !(a.starts_with("--") || (i > &0 && args.get(i - 1).is_some_and(|p| p == "--control"))))
         .map(|(_, a)| a.clone())
         .collect();
-    log::info!("SoundCraft {} ({} {})", env!("CARGO_PKG_VERSION"), std::env::consts::OS, std::env::consts::ARCH);
+    log::info!("TalkCraft {} ({} {})", soundcraft_engine::version::VERSION, std::env::consts::OS, std::env::consts::ARCH);
     // The log file lives in the settings directory; opened after the arguments, so `--version`
     // leaves no file behind. Records logged until now are written to it first. Runs without
     // preferences (agents' test runs) log to standard error only, so they don't rotate away the
