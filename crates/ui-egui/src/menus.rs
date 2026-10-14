@@ -25,6 +25,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("publish.checklist", "Publishing Checklist", "", None),
     ("publish.start", "Export and Publish", "", None),
     ("publish.status", "Publishing Status", "", None),
+    ("words.quote_clip", "Quote Clip...", "", None),
     ("transport.rate", "Playback Speed", "", None),
     ("ui.workspace", "Work Mode", "", None),
     ("window.audiogram", "Audiogram (MP4)...", "File > Export > Audiogram (MP4)...", None),
@@ -544,6 +545,9 @@ fn wants_dialog(id: &str) -> bool {
 pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<Value, String>> {
     if matches!(id, "ui.dock" | "ui.dock.reset") {
         return Some(crate::docking::command(app, id == "ui.dock.reset", p));
+    }
+    if id == "words.quote_clip" {
+        return Some(crate::words_window::quote_clip(app));
     }
     if id == "window.publish" || id.starts_with("publish.") {
         return Some(crate::publish_window::command(app, id, p));

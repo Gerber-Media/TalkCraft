@@ -569,6 +569,27 @@ const DE: &[(&str, &str)] = &[
     ("Quit TalkCraft", "TalkCraft beenden"),
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
+    (
+        "A short portrait video of the selected sentences (first to last word) for Instagram, TikTok and co. 15–60 seconds work best.",
+        "Ein kurzes Hochkant-Video der markierten Sätze (erstes bis letztes Wort) für Instagram, TikTok und Co. 15–60 Sekunden wirken am besten.",
+    ),
+    ("Address", "Adresse"),
+    ("After a change: Show Studio Page again and send the new link.", "Nach einer Änderung: Studio-Seite erneut zeigen und den neuen Link schicken."),
+    ("Fallback server (company networks)", "Ausweich-Server (Firmennetze)"),
+    ("Quote Clip...", "Zitat-Clip …"),
+    (
+        "Quote clips: mark the best sentences in Window › Edit by Text, then Quote Clip.",
+        "Zitat-Clips: die besten Sätze unter Fenster › Schnitt am Text markieren, dann „Zitat-Clip …“.",
+    ),
+    ("Select the sentences in Edit by Text first", "Erst die Sätze in „Schnitt am Text“ markieren"),
+    (
+        "The relay's login travels in the invitation link: guests' browsers need it.",
+        "Die Anmeldung des Ausweich-Servers steht im Einladungslink: Die Browser der Gäste brauchen sie.",
+    ),
+    (
+        "If a guest's network blocks direct calls, their page tries this relay server after 12 seconds. You need your own (e.g. from Metered or Cloudflare, both with a free allowance); use an address on port 443 (turns:…:443?transport=tcp).",
+        "Blockiert das Netz eines Gastes direkte Gespräche, versucht seine Seite nach 12 Sekunden diesen Ausweich-Server. Du brauchst einen eigenen (z. B. von Metered oder Cloudflare, beide mit kostenlosem Kontingent); nimm eine Adresse auf Port 443 (turns:…:443?transport=tcp).",
+    ),
     ("{} × {} px: needs square, 1400–3000 px", "{} × {} px: muss quadratisch sein, 1400–3000 px"),
     ("{} chapter(s)", "{} Kapitel"),
     ("{} still open", "{} noch offen"),

@@ -77,6 +77,23 @@ pub fn after_cut(words: &[Word], cut: &[(Samples, Samples)]) -> Vec<Word> {
         .collect()
 }
 
+/// The selected words' stretch (first to last), with a little air around it.
+pub fn quote_range(words: &[Word], sr: soundcraft_time::SampleRate) -> Option<soundcraft_time::Range> {
+    let first = words.iter().find(|w| w.selected)?;
+    let last = words.iter().rev().find(|w| w.selected)?;
+    Some(soundcraft_time::Range::new((first.start - sr.samples(0.2)).max(0), last.end + sr.samples(0.4)))
+}
+
+/// `words.quote_clip`: the selected sentences as a short portrait video for social media (the
+/// Audiogram window opens with that stretch selected).
+pub fn quote_clip(app: &mut SoundApp) -> Result<Value, String> {
+    let sr = app.engine.session().sample_rate;
+    let r = quote_range(&app.extra.words.words, sr).ok_or_else(|| crate::i18n::tr("Select the sentences in Edit by Text first").to_string())?;
+    app.engine.session_mut().edit.selection = r;
+    app.dialogs.open_quote_clip(&app.engine, sr.seconds(r.start));
+    Ok(json!({"start": r.start, "end": r.end, "seconds": sr.seconds(r.len())}))
+}
+
 fn start(app: &mut SoundApp) -> Result<(), String> {
     let s = app.engine.session();
     let r = soundcraft_time::Range::new(0, s.content_end().max(1));
@@ -163,6 +180,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let mut open = true;
     let mut find = false;
     let mut cut = false;
+    let mut make_quote = false;
     let mut locate: Option<Samples> = None;
     let sr = app.engine.session().sample_rate;
     let screen = ctx.content_rect();
@@ -197,6 +215,11 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 }
                 if ui.add_enabled(w.words.iter().any(|x| x.selected), egui::Button::new(crate::i18n::tr("Select none"))).clicked() {
                     w.words.iter_mut().for_each(|x| x.selected = false);
+                }
+                let quote = quote_range(&w.words, sr).map(|r| sr.seconds(r.len()));
+                let tip = crate::i18n::tr("A short portrait video of the selected sentences (first to last word) for Instagram, TikTok and co. 15–60 seconds work best.");
+                if ui.add_enabled(quote.is_some(), egui::Button::new(crate::i18n::tr("Quote Clip..."))).on_hover_text(tip).clicked() {
+                    make_quote = true;
                 }
                 let n = w.words.iter().filter(|x| x.selected).count();
                 let secs: f64 = w.words.iter().filter(|x| x.selected).map(|x| sr.seconds(x.end - x.start)).sum();
@@ -272,6 +295,9 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     if cut {
         cut_selected(app);
     }
+    if make_quote && let Err(e) = quote_clip(app) {
+        app.ui.status = e;
+    }
     if let Some(at) = locate {
         let from = (at - sr.samples(1.0)).max(0);
         // Play starts at the insertion point: put it a second before the word.
@@ -284,6 +310,23 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_quote_clip_spans_the_selected_sentences() {
+        let mut app = SoundApp::new(soundcraft_engine::Engine::default(), None, crate::Services::default());
+        app.engine.execute("session.new", &json!({"name": "S", "template": "podcast", "speakers": 1})).unwrap();
+        assert!(app.run("words.quote_clip", json!({})).is_err(), "nothing selected");
+        let sr = app.engine.session().sample_rate;
+        let s = |x: f64| sr.samples(x);
+        app.extra.words.words =
+            vec![w(s(10.0), s(10.5), "Das"), w(s(10.5), s(11.0), "ist"), w(s(11.0), s(40.0), "wichtig"), w(s(40.0), s(41.0), "danach")];
+        app.extra.words.words[0].selected = true;
+        app.extra.words.words[2].selected = true;
+        let v = app.run("words.quote_clip", json!({})).unwrap();
+        assert_eq!(v["start"], json!(s(9.8)));
+        assert_eq!(v["end"], json!(s(40.4)));
+        assert_eq!(app.engine.session().edit.selection, soundcraft_time::Range::new(s(9.8), s(40.4)));
+    }
 
     fn w(start: Samples, end: Samples, text: &str) -> Word {
         Word { start, end, text: text.into(), filler: false, selected: false }

@@ -203,6 +203,14 @@ impl Dialogs {
         self.open = Some(Dialog::Audiogram { path: format!("{}/{name} Audiogram.mp4", default_dir()), portrait: false });
     }
 
+    /// A quote clip: a portrait audiogram (stories, reels) of the edit selection.
+    pub fn open_quote_clip(&mut self, e: &Engine, at_s: f64) {
+        let name = &e.session().name;
+        let at = at_s.max(0.0) as u64;
+        let label = if crate::i18n::german() { "Zitat" } else { "Quote" };
+        self.open = Some(Dialog::Audiogram { path: format!("{}/{name} {label} {}m{:02}s.mp4", default_dir(), at / 60, at % 60), portrait: true });
+    }
+
     pub fn open_rename_track(&mut self, id: TrackId, name: &str) {
         self.open = Some(Dialog::RenameTrack { id, name: name.to_string() });
     }

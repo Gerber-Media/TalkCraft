@@ -100,6 +100,9 @@ const TEXT = {
     hello: (host, name) => `Connected to ${host} as ${name}. Waiting for the recording to start …`,
     tap: "Tap the page once to hear the studio.", ended: "Call ended. Thanks for taking part!",
     error: (t) => `Connection error: ${t}. Please reload the page.`,
+    relay: "No direct connection: trying the fallback server …",
+    relay_failed: "No connection, not even through the fallback server. Try another network, such as your phone's hotspot, and tell the host.",
+    blocked: "No connection. This network probably blocks calls (a company network?). Try another network, such as your phone's hotspot, or ask the host for a link with a fallback server.",
     none_yet: "No finished recording yet.", guest: "Guest", file: "TalkCraft-Guest",
   },
   de: {
@@ -125,6 +128,9 @@ const TEXT = {
     hello: (host, name) => `Verbunden mit ${host} als ${name}. Wartet auf den Start der Aufnahme …`,
     tap: "Tippe einmal auf die Seite, um das Studio zu hören.", ended: "Verbindung beendet. Danke fürs Mitmachen!",
     error: (t) => `Verbindungsfehler: ${t}. Bitte Seite neu laden.`,
+    relay: "Keine direkte Verbindung: Versuch über den Ausweich-Server …",
+    relay_failed: "Keine Verbindung, auch nicht über den Ausweich-Server. Versuch ein anderes Netz, etwa den Hotspot deines Handys, und sag dem Gastgeber Bescheid.",
+    blocked: "Keine Verbindung. Dieses Netz blockiert vermutlich Gespräche (Firmennetz?). Versuch ein anderes Netz, etwa den Hotspot deines Handys, oder bitte den Gastgeber um einen Link mit Ausweich-Server.",
     none_yet: "Noch keine fertige Aufnahme.", guest: "Gast", file: "TalkCraft-Gast",
   },
 };
@@ -136,7 +142,17 @@ for (const el of document.querySelectorAll("[data-t]")) el.textContent = T[el.da
 for (const el of document.querySelectorAll("[data-th]")) el.innerHTML = T[el.dataset.th];
 for (const el of document.querySelectorAll("[data-tp]")) el.placeholder = T[el.dataset.tp];
 
-const room = decodeURIComponent((location.hash || "").slice(1));
+// "#ROOM" or "#ROOM&turn=…": the host's fallback server (TURN) for networks that block direct calls.
+const [roomPart, ...hashParams] = (location.hash || "").slice(1).split("&");
+const room = decodeURIComponent(roomPart);
+let TURN = null;
+for (const p of hashParams) if (p.startsWith("turn=")) { try { TURN = JSON.parse(decodeURIComponent(p.slice(5))); } catch {} }
+// PeerJS's own servers; its relay listens only on port 3478, which company networks often block.
+const ICE = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" },
+];
+const DIRECT_WAIT_MS = 12000;
 const $ = (id) => document.getElementById(id);
 const CHUNK = 64 * 1024;
 let stream, ctx, analyser, peer, conn, call, recorder = null, takes = [], muted = false, kicked = false;
@@ -306,10 +322,26 @@ $("join").onclick = () => {
   player = new Audio();
   player.playsInline = true;
   player.play().catch(() => {});
-  peer = new Peer();
+  connect(false);
+};
+
+// Joins the studio; without a connection after a few seconds, once more through the fallback server.
+function connect(relay) {
+  const name = myName;
+  if (relay) $("state").textContent = T.relay;
+  peer = new Peer(relay ? { config: { iceServers: [...ICE, TURN] } } : undefined);
+  window.tcRelay = relay;
+  let opened = false;
+  const giveUp = setTimeout(() => {
+    if (opened || kicked) return;
+    if (!relay && TURN) { peer.destroy(); connect(true); }
+    else $("state").textContent = relay ? T.relay_failed : T.blocked;
+  }, DIRECT_WAIT_MS);
   peer.on("open", () => {
     conn = peer.connect(room, { reliable: true, serialization: "binary", metadata: { name } });
     conn.on("open", () => {
+      opened = true;
+      clearTimeout(giveUp);
       conn.send({ t: "hello", name });
       // The call gets its own copy of the microphone, so muting it never touches the meter.
       callStream = stream.clone();
@@ -321,10 +353,10 @@ $("join").onclick = () => {
       });
     });
     conn.on("data", (d) => { if (d && d.t) onMessage(d); });
-    conn.on("close", () => { if (!kicked) $("state").textContent = T.ended; });
+    conn.on("close", () => { if (!kicked && opened) $("state").textContent = T.ended; });
   });
-  peer.on("error", (e) => { $("state").textContent = T.error(e.type); });
-};
+  peer.on("error", (e) => { if (!peer.destroyed) $("state").textContent = T.error(e.type); });
+}
 
 function setSelfMute(on) {
   selfMuted = on;

@@ -21,6 +21,68 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 /// Where guests open their page; the room follows after `#`.
 pub const GUEST_PAGE: &str = "https://gerbermedia.codefloe.page/talkcraft-gast/";
 const HOST_PAGE: &str = include_str!("../../../remote/host/index.html");
+
+/// A relay (TURN) server of the user's own, offered when a guest's network blocks direct calls
+/// (company networks often allow only web traffic: `turns:` on port 443). PeerJS's own relay uses
+/// port 3478 only.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct TurnServer {
+    /// One or more addresses, separated by spaces or commas, e.g. `turns:relay.example.com:443?transport=tcp`.
+    pub url: String,
+    pub username: String,
+    pub credential: String,
+}
+
+impl TurnServer {
+    /// The server as an `RTCIceServer`, or nothing when no address is set.
+    pub fn ice(&self) -> Option<Value> {
+        let urls: Vec<&str> = self.url.split([' ', ',']).map(str::trim).filter(|u| !u.is_empty()).collect();
+        if urls.is_empty() {
+            return None;
+        }
+        Some(json!({"urls": urls, "username": self.username.trim(), "credential": self.credential.trim()}))
+    }
+}
+
+/// The fallback server's fields, folded away: most never need it.
+fn turn_settings(ui: &mut egui::Ui, turn: &mut TurnServer, studio_open: bool) {
+    let t = Tokens::current();
+    ui.add_space(4.0);
+    egui::CollapsingHeader::new(tr("Fallback server (company networks)")).id_salt("remote_turn").default_open(turn.ice().is_some()).show(ui, |ui| {
+        ui.label(
+            RichText::new(tr(
+                "If a guest's network blocks direct calls, their page tries this relay server after 12 seconds. You need your own (e.g. from Metered or Cloudflare, both with a free allowance); use an address on port 443 (turns:…:443?transport=tcp).",
+            ))
+            .small()
+            .color(t.text_dim),
+        );
+        egui::Grid::new("remote_turn_grid").num_columns(2).show(ui, |ui| {
+            ui.label(tr("Address"));
+            ui.add(egui::TextEdit::singleline(&mut turn.url).hint_text("turns:relay.example.com:443?transport=tcp").desired_width(300.0));
+            ui.end_row();
+            ui.label(tr("User"));
+            ui.add(egui::TextEdit::singleline(&mut turn.username).desired_width(300.0));
+            ui.end_row();
+            ui.label(tr("Password"));
+            ui.add(egui::TextEdit::singleline(&mut turn.credential).password(true).desired_width(300.0));
+            ui.end_row();
+        });
+        ui.label(RichText::new(tr("The relay's login travels in the invitation link: guests' browsers need it.")).small().color(t.text_dim));
+        if studio_open {
+            ui.label(RichText::new(tr("After a change: Show Studio Page again and send the new link.")).small().color(t.text_dim));
+        }
+    });
+}
+
+/// The guests' link; with a fallback server it travels in the link's `#` part (never sent to the
+/// web server that hosts the guest page).
+pub fn invite_link(room: &str, turn: &TurnServer) -> String {
+    match turn.ice() {
+        Some(ice) => format!("{GUEST_PAGE}#{room}&turn={}", soundcraft_engine::publish::hosts::url_encode(&ice.to_string())),
+        None => format!("{GUEST_PAGE}#{room}"),
+    }
+}
 /// The parrot for the studio page (the same files as the guest page's).
 const LOGO: &[u8] = include_bytes!("../../../remote/guest/logo.png");
 const FAVICON: &[u8] = include_bytes!("../../../remote/guest/favicon.ico");
@@ -95,6 +157,8 @@ struct Shared {
     /// The jingle pads' files, and the last pad fired (counter, pad 1..8) for the guests to hear.
     jingles: Vec<String>,
     jingle: (u64, usize),
+    /// The fallback server for the studio page (JSON for RTCIceServer), or null.
+    turn: Value,
 }
 
 #[derive(Debug)]
@@ -195,7 +259,12 @@ fn route(method: &str, path: &str, body: &[u8], srv: &Server, tx: &Sender<Upload
     let busy = || (500, "text/plain", b"busy".to_vec());
     match (method, path) {
         ("GET", "" | "/") => {
-            let page = HOST_PAGE.replace("{{ROOM}}", &srv.room).replace("{{TOKEN}}", &srv.token).replace("{{GUEST_URL}}", GUEST_PAGE);
+            let turn = srv.shared.lock().map(|sh| sh.turn.to_string()).unwrap_or_else(|_| "null".into());
+            let page = HOST_PAGE
+                .replace("{{ROOM}}", &srv.room)
+                .replace("{{TOKEN}}", &srv.token)
+                .replace("{{GUEST_URL}}", GUEST_PAGE)
+                .replace("{{TURN}}", &turn);
             (200, "text/html; charset=utf-8", page.into_bytes())
         }
         ("GET", p) if p.starts_with("/jingle/") => {
@@ -407,6 +476,7 @@ pub fn update(app: &mut SoundApp) {
         sh.take = w.take;
         sh.dir = upload_dir(app);
         sh.jingles = app.engine.session().podcast.jingles.clone();
+        sh.turn = app.ui.turn.ice().unwrap_or(Value::Null);
         if sh.guests_seen.is_some_and(|t| t.elapsed() > GUEST_TIMEOUT) {
             sh.guests.clear();
         }
@@ -513,6 +583,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let mut kick: Option<String> = None;
     let muted = |name: &str| app.engine.session().track_by_name(&track_name(name)).is_some_and(|t| t.mixer.mute);
     let guests = app.extra.remote.server.as_ref().and_then(|s| s.shared.lock().ok().map(|sh| sh.guests.clone())).unwrap_or_default();
+    let mut turn = app.ui.turn.clone();
     egui::Window::new(tr("Remote Guests")).open(&mut open).default_size(vec2(460.0, 300.0)).resizable(true).show(ctx, |ui| {
         let w = &app.extra.remote;
         match &w.server {
@@ -522,9 +593,10 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 if ui.button(tr("Open Studio")).clicked() {
                     start = true;
                 }
+                turn_settings(ui, &mut turn, false);
             }
             Some(s) => {
-                let link = format!("{GUEST_PAGE}#{}", s.room);
+                let link = invite_link(&s.room, &app.ui.turn);
                 ui.label(RichText::new(tr("Invitation link for guests")).strong());
                 ui.horizontal(|ui| {
                     ui.add(egui::TextEdit::singleline(&mut link.as_str()).desired_width(320.0));
@@ -535,6 +607,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 if ui.button(tr("Show Studio Page")).on_hover_text(tr("Keep the studio page open in your browser while guests are on.")).clicked() {
                     start = true;
                 }
+                turn_settings(ui, &mut turn, true);
                 ui.separator();
                 if guests.is_empty() {
                     ui.label(RichText::new(tr("No guests yet.")).color(t.text_dim));
@@ -605,6 +678,9 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     if !guests.is_empty() {
         ctx.request_repaint_after(Duration::from_millis(100));
     }
+    if turn != app.ui.turn {
+        app.ui.turn = turn;
+    }
     if start {
         open_studio(app);
     }
@@ -613,6 +689,33 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_fallback_server_travels_in_the_link() {
+        let none = TurnServer::default();
+        assert_eq!(invite_link("abc", &none), format!("{GUEST_PAGE}#abc"));
+        let turn =
+            TurnServer { url: "turns:r.example.com:443?transport=tcp, turn:r.example.com:80".into(), username: "u".into(), credential: "p w".into() };
+        let ice = turn.ice().unwrap();
+        assert_eq!(ice["urls"].as_array().unwrap().len(), 2);
+        let link = invite_link("abc", &turn);
+        let enc = link.split("&turn=").nth(1).unwrap();
+        assert!(link.starts_with(&format!("{GUEST_PAGE}#abc&turn=")) && !enc.contains(['&', '#', ' ']));
+        // The guest page decodes it with decodeURIComponent: percent-decoding gives the JSON back.
+        let mut out = Vec::new();
+        let b = enc.as_bytes();
+        let mut i = 0;
+        while i < b.len() {
+            if b[i] == b'%' {
+                out.push(u8::from_str_radix(&enc[i + 1..i + 3], 16).unwrap());
+                i += 3;
+            } else {
+                out.push(b[i]);
+                i += 1;
+            }
+        }
+        assert_eq!(serde_json::from_slice::<Value>(&out).unwrap(), ice);
+    }
 
     #[test]
     fn connection_quality_from_round_trip_loss_and_jitter() {

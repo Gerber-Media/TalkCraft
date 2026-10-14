@@ -49,7 +49,9 @@ podcast does not need.
   track, synced to a backup of the call. Browser to browser (WebRTC); the guest page lives in
   [Talkcraft-Gast](https://codefloe.com/GerberMedia/Talkcraft-Gast). Works on phones too
   (iPhone and Android): the screen stays on during the call and the page gives tips for recording
-  on the go.
+  on the go. For guests in strict networks (company networks often allow only web traffic) a
+  fallback relay server of your own can be set in the Remote Guests window: their page switches to
+  it when no direct connection comes up within 12 seconds.
 - **Editing.** The blade splits a clip where you click (Alt: every track). Delete/Backspace removes
   the selected section after asking, closing the gap on all tracks so speakers stay in sync.
   A click places the cursor with every tool, the hand too (dragging moves clips, Shift-click
@@ -99,7 +101,8 @@ podcast does not need.
   Megaphone (format from secondary sources, marked untested; they take the audio as a URL from your
   storage). Each user enters their own keys; they are stored only in `publish/publish.json` in the
   settings folder, readable only by the user. A social package (post text, chapters, cover,
-  shownotes) and the audiogram for social media.
+  shownotes), the audiogram, and quote clips: mark the best sentences in Edit by Text and Quote
+  Clip makes a short portrait video of them for Instagram, TikTok and co.
 - **Languages.** English and German interface (Automatic follows the system).
 - **Settings.** Setup > Preferences has tabs: Episode (saved with the session), General (language,
   start question, scrolling and editing behaviour), Appearance (size, motion, theme, waveform and
@@ -238,7 +241,9 @@ braucht.
   läuft direkt von Browser zu Browser (WebRTC); die Gast-Seite liegt in
   [Talkcraft-Gast](https://codefloe.com/GerberMedia/Talkcraft-Gast). Klappt auch mit dem Handy
   (iPhone und Android): Der Bildschirm bleibt während des Gesprächs an, und die Seite gibt Tipps
-  für die Aufnahme unterwegs.
+  für die Aufnahme unterwegs. Für Gäste in strengen Netzen (Firmennetze lassen oft nur Webverkehr
+  durch) lässt sich im Fenster Ferngäste ein eigener Ausweich-Server eintragen: Ihre Seite wechselt
+  dorthin, wenn nach 12 Sekunden keine direkte Verbindung steht.
 - **Schnitt.** Die Klinge teilt einen Clip, wo man klickt (Alt: alle Spuren). Entf/Rückschritt
   entfernt nach Rückfrage den markierten Abschnitt und schließt die Lücke auf allen Spuren, damit
   die Sprecher synchron bleiben. Ein Klick setzt mit jedem Werkzeug die Einfügemarke, auch mit der Hand (Ziehen verschiebt
@@ -293,7 +298,9 @@ braucht.
   aus Sekundärquellen, als ungetestet markiert; sie nehmen das Audio als Adresse von deinem
   Speicherort). Jede Nutzerin und jeder Nutzer trägt die eigenen Schlüssel ein; sie liegen nur in
   `publish/publish.json` im Einstellungsordner, nur für den eigenen Benutzer lesbar. Dazu ein
-  Social-Paket (Beitragstext, Kapitel, Cover, Shownotes) und das Audiogramm für Social Media.
+  Social-Paket (Beitragstext, Kapitel, Cover, Shownotes), das Audiogramm und Zitat-Clips: die besten
+  Sätze in „Schnitt am Text“ markieren, „Zitat-Clip …“ macht daraus ein kurzes Hochkant-Video für
+  Instagram, TikTok und Co.
 - **Sprachen.** Deutsche und englische Oberfläche („Automatisch“ folgt dem System).
 - **Einstellungen.** Einstellungen > Einstellungen … hat Reiter: Folge (in der Session gespeichert),
   Allgemein (Sprache, Startfrage, Scrollen und Bearbeitungsverhalten), Erscheinungsbild (Größe,

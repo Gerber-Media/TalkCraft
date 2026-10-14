@@ -500,6 +500,11 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                     audiogram = true;
                 }
             });
+            ui.label(
+                RichText::new(tr("Quote clips: mark the best sentences in Window › Edit by Text, then Quote Clip."))
+                    .small()
+                    .color(t.text_dim),
+            );
         });
     });
     let now = ctx.input(|i| i.time);

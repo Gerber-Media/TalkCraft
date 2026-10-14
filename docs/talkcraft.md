@@ -190,3 +190,17 @@ background job is a separate step.
   in the window shows the HTTP status and the start of the answer.
 - The interface font has no ✓ (U+2713): it renders as a box. Use ✔ (U+2714, in egui's emoji
   font) or draw a shape.
+
+## Fallback relay for remote guests
+
+- PeerJS's default ICE servers include its own TURN, but on port 3478 only (UDP/TCP). Company
+  networks that pass only web traffic block it: ICE stays at "checking" (seen behind Cisco
+  AnyConnect). Only a TURN server on 443 (`turns:…:443?transport=tcp`) gets through.
+- No free public TURN is left (Open Relay's `openrelay.metered.ca` resolves to 192.0.2.1), so the
+  user enters their own in the Remote Guests window (`UiState.turn`). It travels in the invitation
+  link's `#` part (`#ROOM&turn=<json>`), never sent to the Pages server; TURN credentials are
+  visible to guests by nature.
+- The guest page tries without it first and switches after 12 s without an open data connection;
+  the studio page offers it from the start (direct paths still win). Tested with Playwright in a
+  network where the direct path hangs: switch after 12 s, then the "not even through the fallback"
+  hint. A working relay could not be tested (no account).

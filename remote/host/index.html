@@ -88,6 +88,12 @@ for (const el of document.querySelectorAll("[data-t]")) el.textContent = T[el.da
 const ROOM = "{{ROOM}}";
 const TOKEN = "{{TOKEN}}";
 const GUEST_URL = "{{GUEST_URL}}";
+// The fallback server (TURN) from TalkCraft's Remote Guests window, or null.
+const TURN = {{TURN}};
+const ICE = [
+  { urls: "stun:stun.l.google.com:19302" },
+  { urls: ["turn:eu-0.turn.peerjs.com:3478", "turn:us-0.turn.peerjs.com:3478"], username: "peerjs", credential: "peerjsp" },
+];
 const $ = (id) => document.getElementById(id);
 const api = (path) => `/${TOKEN}/${path}`;
 const WORKLET = `class Tap extends AudioWorkletProcessor {
@@ -95,7 +101,7 @@ const WORKLET = `class Tap extends AudioWorkletProcessor {
 }
 registerProcessor("tap", Tap);`;
 
-$("link").value = `${GUEST_URL}#${ROOM}`;
+$("link").value = `${GUEST_URL}#${ROOM}` + (TURN ? `&turn=${encodeURIComponent(JSON.stringify(TURN))}` : "");
 $("copy").onclick = async () => {
   try { await navigator.clipboard.writeText($("link").value); $("copy").textContent = T.copied; }
   catch { $("link").select(); document.execCommand("copy"); }
@@ -340,7 +346,8 @@ async function poll() {
 }
 
 function connectPeer(attempt = 0) {
-  peer = new Peer(ROOM);
+  // With a fallback server the studio offers it too; direct paths are still preferred.
+  peer = new Peer(ROOM, TURN ? { config: { iceServers: [...ICE, TURN] } } : undefined);
   peer.on("open", () => { $("state").textContent = T.ready; });
   peer.on("connection", addGuest);
   peer.on("call", onCall);

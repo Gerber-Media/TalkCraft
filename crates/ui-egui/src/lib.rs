@@ -91,6 +91,8 @@ pub struct UiState {
     /// Count 3-2-1 before a recording starts.
     #[serde(default = "default_true")]
     pub countdown: bool,
+    /// The user's own relay server for remote guests behind strict networks.
+    pub turn: remote::TurnServer,
     /// Listening rate that keeps the pitch (1 = normal; the toolbar's 1× button).
     #[serde(default = "default_rate")]
     pub playback_rate: f32,
@@ -167,6 +169,7 @@ impl Default for UiState {
             playback_rate: 1.0,
             // Tests record at once.
             countdown: false,
+            turn: Default::default(),
             workspace: workspace::Workspace::All,
             // Tests start without the question; the app asks on a fresh install.
             ask_workspace: false,
