@@ -569,6 +569,11 @@ const DE: &[(&str, &str)] = &[
     ("Quit TalkCraft", "TalkCraft beenden"),
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
+    ("Edit by Text", "Schnitt am Text"),
+    (
+        "{} s · click: select for cutting · Shift-click: select up to here · right-click: listen · Delete: cut",
+        "{} s · Klick: zum Schneiden markieren · Umschalt-Klick: bis hierher markieren · Rechtsklick: anhören · Entf: schneiden",
+    ),
     ("Run Sheet", "Ablaufplan"),
     ("Topic {}", "Thema {}"),
     ("Now", "Jetzt"),

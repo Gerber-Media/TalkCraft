@@ -118,7 +118,7 @@ fn fixed(app: &mut SoundApp, key: Key, m: Modifiers, mac: bool) -> bool {
             let _ = app.run("window.toggle_mix_edit", json!({}));
             true
         }
-        Key::Delete | Key::Backspace if plain && app.ui.window == MainWindow::Edit && app.ui.workspace.edits() => {
+        Key::Delete | Key::Backspace if plain && app.ui.window == MainWindow::Edit && app.ui.workspace.edits() && !app.extra.words.wants_keys => {
             if let Err(e) = app.dialogs.open_delete(&app.engine) {
                 app.ui.status = e;
             }

@@ -74,7 +74,7 @@ pub fn current() -> Workspace {
 
 /// Menu items only an editing session needs (hidden while recording).
 const EDIT_ONLY_PREFIXES: &[&str] =
-    &["Clip >", "AudioSuite >", "Event >", "File > Export", "File > Bounce", "Window > Subtitles", "Window > Filler Words"];
+    &["Clip >", "AudioSuite >", "Event >", "File > Export", "File > Bounce", "Window > Subtitles", "Window > Edit by Text"];
 /// Edit menu items that stay while recording.
 const EDIT_KEPT_WHILE_RECORDING: &[&str] = &["Edit > Can't Undo", "Edit > Can't Redo", "Edit > Select All"];
 /// Menu items only a recording session needs (hidden while editing).

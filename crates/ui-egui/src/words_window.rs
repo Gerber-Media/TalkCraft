@@ -24,12 +24,16 @@ pub struct WordsWindow {
     pub show: bool,
     pub words: Vec<Word>,
     task: Option<(Job, Child)>,
+    /// The word clicked last: Shift-click selects from it.
+    anchor: Option<usize>,
+    /// The pointer is over the text: Delete cuts the selected words instead of the timeline.
+    pub wants_keys: bool,
 }
 
 /// A copy never owns the running whisper.
 impl Clone for WordsWindow {
     fn clone(&self) -> Self {
-        Self { show: self.show, words: self.words.clone(), task: None }
+        Self { show: self.show, words: self.words.clone(), task: None, anchor: self.anchor, wants_keys: false }
     }
 }
 
@@ -115,6 +119,11 @@ fn poll(app: &mut SoundApp, ctx: &egui::Context) {
     }
 }
 
+/// While playing, the text follows the spoken word (unless the pointer is scrolling the text).
+fn app_follow(ui: &egui::Ui) -> bool {
+    !ui.input(|i| i.pointer.any_down()) && ui.input(|i| i.smooth_scroll_delta.y == 0.0)
+}
+
 /// Cuts the selected words (padded a little into the pauses around them) from every track.
 fn cut_selected(app: &mut SoundApp) {
     let sr = app.engine.session().sample_rate;
@@ -157,7 +166,10 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let mut locate: Option<Samples> = None;
     let sr = app.engine.session().sample_rate;
     let screen = ctx.content_rect();
-    egui::Window::new(crate::i18n::tr("Filler Words"))
+    let playing_at = app.is_playing().then(|| app.position());
+    let mut hovered = false;
+    let mut delete = false;
+    egui::Window::new(crate::i18n::tr("Edit by Text"))
         .open(&mut open)
         .default_size(vec2(640.0, 380.0))
         .default_pos(egui::pos2((screen.max.x - 680.0).max(16.0), 140.0))
@@ -202,10 +214,14 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 });
                 return;
             }
-            egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+            // The word being spoken while playing.
+            let speaking = playing_at.and_then(|at| w.words.iter().rposition(|x| x.start <= at && at < x.end + sr.samples(0.3)));
+            let shift = ui.input(|i| i.modifiers.shift);
+            let mut range: Option<(usize, usize)> = None;
+            let area = egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
                     ui.spacing_mut().item_spacing = vec2(3.0, 4.0);
-                    for word in &mut w.words {
+                    for (i, word) in w.words.iter_mut().enumerate() {
                         let mut text = RichText::new(&word.text);
                         if word.filler {
                             text = text.color(Color32::from_rgb(240, 170, 60));
@@ -213,18 +229,42 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                         if word.selected {
                             text = text.strikethrough().color(Color32::from_rgb(255, 120, 120));
                         }
+                        if speaking == Some(i) {
+                            text = text.underline().strong();
+                        }
                         let r = ui.add(egui::Button::new(text).frame(word.selected).fill(Color32::from_rgba_unmultiplied(160, 40, 40, 60)));
+                        if speaking == Some(i) && app_follow(ui) {
+                            r.scroll_to_me(Some(egui::Align::Center));
+                        }
                         if r.clicked() {
-                            word.selected = !word.selected;
+                            match w.anchor {
+                                Some(a) if shift => range = Some((a.min(i), a.max(i))),
+                                _ => word.selected = !word.selected,
+                            }
+                            w.anchor = Some(i);
                         }
                         if r.secondary_clicked() {
                             locate = Some(word.start);
                         }
-                        r.on_hover_text(crate::i18n::trf("{} s · click: select for cutting · right-click: listen", &[&format!("{:.2}", sr.seconds(word.start))]));
+                        r.on_hover_text(crate::i18n::trf(
+                            "{} s · click: select for cutting · Shift-click: select up to here · right-click: listen · Delete: cut",
+                            &[&format!("{:.2}", sr.seconds(word.start))],
+                        ));
                     }
                 });
             });
+            if let Some((a, b)) = range {
+                for x in w.words.iter_mut().skip(a).take(b - a + 1) {
+                    x.selected = true;
+                }
+            }
+            hovered = area.inner_rect.contains(ui.input(|i| i.pointer.hover_pos().unwrap_or_default()));
+            delete = hovered && ui.input(|i| i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace));
         });
+    app.extra.words.wants_keys = hovered && app.extra.words.words.iter().any(|x| x.selected);
+    if delete {
+        cut = true;
+    }
     app.extra.words.show = open;
     if find && let Err(e) = start(app) {
         app.ui.status = e;
