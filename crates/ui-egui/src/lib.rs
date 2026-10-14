@@ -26,6 +26,7 @@ pub mod panels;
 pub mod podcast;
 pub mod readiness;
 pub mod remote;
+pub mod rundown_window;
 pub mod score_editor;
 pub mod shortcuts;
 pub mod subtitle_editor;

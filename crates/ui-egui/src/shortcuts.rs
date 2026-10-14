@@ -159,6 +159,8 @@ fn fixed(app: &mut SoundApp, key: Key, m: Modifiers, mac: bool) -> bool {
             };
             crate::jingles_window::fire(app, pad)
         }
+        // Tab while recording: the next topic of the run sheet (a chapter named after it).
+        Key::Tab if plain && app.engine.transport.recording && crate::rundown_window::next_topic(app) => true,
         Key::Enter if plain => {
             let _ = app.run("markers.add", json!({}));
             true

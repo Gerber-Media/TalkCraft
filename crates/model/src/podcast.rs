@@ -86,6 +86,17 @@ pub struct PodcastSettings {
     pub episode: EpisodeInfo,
     /// Audio files on the jingle pads (intro, outro, stingers), up to eight; "" = empty pad.
     pub jingles: Vec<String>,
+    /// The run sheet: the episode's topics in order, each with its planned length.
+    pub rundown: Vec<RundownItem>,
+}
+
+/// One topic of the run sheet.
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct RundownItem {
+    pub title: String,
+    /// Planned length in minutes (0 = open).
+    pub minutes: f32,
 }
 
 /// One subtitle (caption) cue on the session timeline.

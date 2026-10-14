@@ -572,6 +572,9 @@ fn checked(id: &str, v: Value) -> Result<PodcastSettings> {
     if s.jingles.len() > JINGLE_PADS {
         return Err(bad(id, format!("at most {JINGLE_PADS} jingle pads")));
     }
+    if s.rundown.len() > 200 || s.rundown.iter().any(|i| !(i.minutes.is_finite() && (0.0..=600.0).contains(&i.minutes)) || i.title.len() > 500) {
+        return Err(bad(id, "the run sheet holds up to 200 topics of 0 to 600 minutes"));
+    }
     Ok(s)
 }
 
