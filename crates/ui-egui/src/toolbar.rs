@@ -201,9 +201,16 @@ fn counters(app: &mut SoundApp, ui: &mut Ui) {
     ui.painter().text(pos2(r.max.x - 8.0, y), Align2::RIGHT_CENTER, format!("{st} · {dev}"), regular(10.0), t.text_dim);
 }
 
-/// A grid or nudge value in the interface language ("1/16 note" → "1/16 Note").
+/// A grid or nudge value in the interface language ("1/16 note" → "1/16 Note",
+/// "1.000 sec" → "1,000 Sek.").
 fn value_label(v: &str) -> String {
-    if crate::i18n::german() { v.replace(" notes", " Noten").replace(" note", " Note") } else { v.to_string() }
+    if !crate::i18n::german() {
+        return v.to_string();
+    }
+    if let Some(n) = v.strip_suffix(" sec") {
+        return format!("{} Sek.", n.replace('.', ","));
+    }
+    v.replace(" notes", " Noten").replace(" note", " Note").replace(" bar", " Takt").replace(" samples", " Samples").replace(" frame", " Frame")
 }
 
 fn grid_nudge(app: &mut SoundApp, ui: &mut Ui) {
@@ -225,6 +232,11 @@ fn grid_nudge(app: &mut SoundApp, ui: &mut Ui) {
     let gresp = ui.interact(gr, ui.id().with("grid_value"), Sense::click());
     value_menu(app, &gresp, "view.grid");
     ui.painter().text(pos2(r.min.x + 10.0, r.min.y + 44.0), Align2::LEFT_CENTER, crate::i18n::tr("Nudge"), regular(11.0), t.counter_label);
+    // What Nudge is, on the label.
+    let label_r = Rect::from_min_size(pos2(r.min.x + 4.0, r.min.y + 34.0), vec2(54.0, 20.0));
+    let _ = ui
+        .interact(label_r, ui.id().with("nudge_label"), Sense::hover())
+        .on_hover_text(crate::i18n::tr("Step for the + and − keys: moves the selected clips (or the selection) by this much"));
     let nr = Rect::from_min_max(pos2(r.min.x + 60.0, r.min.y + 34.0), pos2(r.max.x - 4.0, r.min.y + 54.0));
     ui.painter().text(pos2(nr.max.x - 14.0, nr.center().y), Align2::RIGHT_CENTER, value_label(&nudge.label()), mono(11.0), t.counter_text);
     let nresp = ui.interact(nr, ui.id().with("nudge_value"), Sense::click());
@@ -237,7 +249,7 @@ fn grid_nudge(app: &mut SoundApp, ui: &mut Ui) {
 fn value_menu(app: &mut SoundApp, resp: &egui::Response, cmd: &str) {
     egui::Popup::menu(resp).show(|ui| {
         for v in ["1 bar", "1/2", "1/4", "1/8", "1/16", "1/32", "1/64", "1/8t", "1/16t", "1/4."] {
-            if ui.button(v).clicked() {
+            if ui.button(value_label(v)).clicked() {
                 let _ = app.run(cmd, json!({"value": v}));
             }
         }
@@ -250,7 +262,7 @@ fn value_menu(app: &mut SoundApp, resp: &egui::Response, cmd: &str) {
             ("1 frame", json!({"frames": 1})),
             ("100 samples", json!({"samples": 100})),
         ] {
-            if ui.button(label).clicked() {
+            if ui.button(crate::i18n::tr(label)).clicked() {
                 let _ = app.run(cmd, json!({"value": v}));
             }
         }
