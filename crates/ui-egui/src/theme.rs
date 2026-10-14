@@ -389,6 +389,9 @@ pub fn apply(ctx: &egui::Context, light: bool) {
     v.extreme_bg_color = t.slot_bg;
     v.faint_bg_color = t.panel_bg2;
     v.selection.bg_fill = t.accent;
+    // Text on the accent (selected tabs, list rows, menu entries) is white in both palettes:
+    // egui's light default is dark blue, hard to read on the blue accent.
+    v.selection.stroke.color = egui::Color32::WHITE;
     v.widgets.inactive.weak_bg_fill = t.button;
     v.widgets.inactive.bg_fill = t.button;
     v.widgets.hovered.weak_bg_fill = t.button_hi;
