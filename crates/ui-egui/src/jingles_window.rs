@@ -120,9 +120,24 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
         set_pad(app, i, &path);
     }
     if let Some(i) = place {
-        match app.run("podcast.place_jingle", json!({"pad": i + 1})) {
-            Ok(_) => app.ui.status = crate::i18n::trf("Placed {}", &[&(file_name(pads.get(i).map(String::as_str).unwrap_or("")))]),
-            Err(e) => app.ui.status = e,
-        }
+        fire(app, i + 1);
     }
+}
+
+/// Plays pad `pad` (1..8): during a take or playback at the playhead, so it sounds now and is in
+/// the episode, else at the insertion point. Remote guests hear it too. False when the pad is empty.
+pub fn fire(app: &mut SoundApp, pad: usize) -> bool {
+    let path = app.engine.session().podcast.jingles.get(pad.wrapping_sub(1)).cloned().unwrap_or_default();
+    if path.trim().is_empty() {
+        return false;
+    }
+    let at = if app.is_playing() { app.position() } else { app.engine.session().edit.selection.start };
+    match app.run("podcast.place_jingle", json!({"pad": pad, "at": at})) {
+        Ok(_) => {
+            crate::remote::announce_jingle(app, pad);
+            app.ui.status = crate::i18n::trf("Placed {}", &[&file_name(&path)]);
+        }
+        Err(e) => app.ui.status = e,
+    }
+    true
 }

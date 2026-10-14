@@ -142,6 +142,23 @@ fn fixed(app: &mut SoundApp, key: Key, m: Modifiers, mac: bool) -> bool {
             }
             true
         }
+        // Jingle pads 1..8 while recording (or in the Record mode); elsewhere the digits keep
+        // their meaning (memory locations).
+        Key::Num1 | Key::Num2 | Key::Num3 | Key::Num4 | Key::Num5 | Key::Num6 | Key::Num7 | Key::Num8
+            if plain && (app.engine.transport.recording || app.ui.workspace == crate::workspace::Workspace::Record) =>
+        {
+            let pad = match key {
+                Key::Num1 => 1,
+                Key::Num2 => 2,
+                Key::Num3 => 3,
+                Key::Num4 => 4,
+                Key::Num5 => 5,
+                Key::Num6 => 6,
+                Key::Num7 => 7,
+                _ => 8,
+            };
+            crate::jingles_window::fire(app, pad)
+        }
         Key::Enter if plain => {
             let _ = app.run("markers.add", json!({}));
             true

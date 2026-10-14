@@ -63,6 +63,9 @@ struct Shared {
     kick: Vec<String>,
     /// Where uploads are written.
     dir: PathBuf,
+    /// The jingle pads' files, and the last pad fired (counter, pad 1..8) for the guests to hear.
+    jingles: Vec<String>,
+    jingle: (u64, usize),
 }
 
 #[derive(Debug)]
@@ -166,13 +169,32 @@ fn route(method: &str, path: &str, body: &[u8], srv: &Server, tx: &Sender<Upload
             let page = HOST_PAGE.replace("{{ROOM}}", &srv.room).replace("{{TOKEN}}", &srv.token).replace("{{GUEST_URL}}", GUEST_PAGE);
             (200, "text/html; charset=utf-8", page.into_bytes())
         }
+        ("GET", p) if p.starts_with("/jingle/") => {
+            // A pad's audio for the studio page to play to the guests.
+            let n = p.trim_start_matches("/jingle/").parse::<usize>().unwrap_or(0);
+            let file = srv.shared.lock().ok().and_then(|sh| sh.jingles.get(n.wrapping_sub(1)).cloned()).filter(|f| !f.trim().is_empty());
+            match file.and_then(|f| std::fs::read(&f).ok().map(|b| (f, b))) {
+                Some((f, bytes)) => {
+                    let ext = std::path::Path::new(&f).extension().and_then(|x| x.to_str()).unwrap_or("").to_ascii_lowercase();
+                    let kind = match ext.as_str() {
+                        "mp3" => "audio/mpeg",
+                        "m4a" | "aac" => "audio/mp4",
+                        "ogg" | "oga" => "audio/ogg",
+                        "flac" => "audio/flac",
+                        _ => "audio/wav",
+                    };
+                    (200, kind, bytes)
+                }
+                None => (404, "text/plain", b"no such pad".to_vec()),
+            }
+        }
         ("GET", "/logo.png") => (200, "image/png", LOGO.to_vec()),
         ("GET", "/favicon.ico") => (200, "image/x-icon", FAVICON.to_vec()),
         ("GET", "/favicon-32.png") => (200, "image/png", FAVICON_32.to_vec()),
         ("GET", "/state") => {
             let Ok(mut sh) = srv.shared.lock() else { return busy() };
             let kick = std::mem::take(&mut sh.kick);
-            let state = json!({"recording": sh.recording, "take": sh.take, "room": srv.room, "muted": sh.muted, "kick": kick});
+            let state = json!({"recording": sh.recording, "take": sh.take, "room": srv.room, "muted": sh.muted, "kick": kick, "jingle": {"seq": sh.jingle.0, "pad": sh.jingle.1, "file": sh.jingles.get(sh.jingle.1.wrapping_sub(1)).cloned().unwrap_or_default()}});
             (200, "application/json", state.to_string().into_bytes())
         }
         ("POST", "/guests") => {
@@ -293,6 +315,15 @@ pub fn track_name(guest: &str) -> String {
     format!("{TRACK_PREFIX}{guest}")
 }
 
+/// Tells the studio page to play jingle pad `pad` (1..8) to the guests.
+pub fn announce_jingle(app: &SoundApp, pad: usize) {
+    if let Some(srv) = &app.extra.remote.server
+        && let Ok(mut sh) = srv.shared.lock()
+    {
+        sh.jingle = (sh.jingle.0.wrapping_add(1), pad);
+    }
+}
+
 /// Start of a remote guest's track name.
 pub const TRACK_PREFIX: &str = "Ferngast – ";
 
@@ -342,6 +373,7 @@ pub fn update(app: &mut SoundApp) {
         sh.recording = recording;
         sh.take = w.take;
         sh.dir = upload_dir(app);
+        sh.jingles = app.engine.session().podcast.jingles.clone();
         if sh.guests_seen.is_some_and(|t| t.elapsed() > GUEST_TIMEOUT) {
             sh.guests.clear();
         }
@@ -560,6 +592,16 @@ mod tests {
         assert!(ask("GET /state HTTP/1.1\r\n\r\n".into()).starts_with("HTTP/1.1 404"), "nothing without the token");
         assert!(ask(format!("GET /{}/state HTTP/1.1\r\n\r\n", srv.token)).contains("\"recording\":false"));
         assert!(ask(format!("GET /{}/favicon.ico HTTP/1.1\r\n\r\n", srv.token)).contains("image/x-icon"), "the parrot in the tab");
+        // Jingle pads: served to the studio page, and announced in the state.
+        let pad = dir.join("intro.wav");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(&pad, b"RIFFfake").unwrap();
+        srv.shared.lock().unwrap().jingles = vec![pad.to_string_lossy().into_owned()];
+        let r = ask(format!("GET /{}/jingle/1 HTTP/1.1\r\n\r\n", srv.token));
+        assert!(r.starts_with("HTTP/1.1 200") && r.contains("audio/wav") && r.ends_with("RIFFfake"), "{r}");
+        assert!(ask(format!("GET /{}/jingle/2 HTTP/1.1\r\n\r\n", srv.token)).starts_with("HTTP/1.1 404"));
+        srv.shared.lock().unwrap().jingle = (1, 1);
+        assert!(ask(format!("GET /{}/state HTTP/1.1\r\n\r\n", srv.token)).contains("\"jingle\":{\"file\""), "announced");
         let body = "RIFF";
         let r =
             ask(format!("POST /{}/upload?guest=Anna&kind=hq&take=2&started=5 HTTP/1.1\r\nContent-Length: {}\r\n\r\n{body}", srv.token, body.len()));

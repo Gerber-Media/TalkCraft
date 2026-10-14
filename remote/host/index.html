@@ -258,6 +258,24 @@ function onCall(call) {
   });
 }
 
+// Jingles fired in TalkCraft: the guests hear them through the call (the host hears TalkCraft).
+let jingleSeq = null;
+const jingleCache = new Map();
+async function playJingle(pad, file) {
+  const key = pad + "|" + file;
+  let buf = jingleCache.get(key);
+  if (!buf) {
+    const r = await fetch(api("jingle/" + pad));
+    if (!r.ok) return;
+    buf = await ctx.decodeAudioData(await r.arrayBuffer());
+    jingleCache.set(key, buf);
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  for (const g of guests.values()) if (g.dest) src.connect(g.dest);
+  src.start();
+}
+
 async function report() {
   const list = [...guests.values()].map((g) => ({ name: g.name, level: g.selfMuted ? -60 : g.level, connected: !!g.src, self_muted: !!g.selfMuted }));
   try { await fetch(api("guests"), { method: "POST", body: JSON.stringify(list) }); } catch { /* TalkCraft closed */ }
@@ -266,6 +284,10 @@ async function report() {
 async function poll() {
   try {
     const s = await (await fetch(api("state"))).json();
+    if (s.jingle) {
+      if (jingleSeq !== null && s.jingle.seq !== jingleSeq && ctx) playJingle(s.jingle.pad, s.jingle.file).catch(() => {});
+      jingleSeq = s.jingle.seq;
+    }
     for (const g of guests.values()) {
       const m = (s.muted || []).includes(g.name);
       if (m !== g.muted) {
