@@ -438,7 +438,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
         app.ui.output_device = out_dev;
         soundcraft_playback::record::set_preferred_devices(app.ui.output_device.clone(), app.ui.input_device.clone());
         if out_changed && !app.engine.transport.playing {
-            app.player = Some(soundcraft_playback::Player::new(app.engine.session_arc()));
+            app.replace_player();
         }
         if in_changed && !app.engine.transport.recording {
             app.recorder = None;

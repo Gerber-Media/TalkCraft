@@ -158,7 +158,9 @@ type Reply = (u16, &'static str, Vec<u8>);
 /// Handles one request. `path` has the token already removed.
 fn route(method: &str, path: &str, body: &[u8], srv: &Server, tx: &Sender<Upload>) -> Reply {
     let (path, q) = path.split_once('?').unwrap_or((path, ""));
-    let Ok(mut sh) = srv.shared.lock() else { return (500, "text/plain", b"busy".to_vec()) };
+    // The shared state is locked only for a moment: the UI thread takes it every frame, so slow
+    // work (writing an upload) happens outside.
+    let busy = || (500, "text/plain", b"busy".to_vec());
     match (method, path) {
         ("GET", "" | "/") => {
             let page = HOST_PAGE.replace("{{ROOM}}", &srv.room).replace("{{TOKEN}}", &srv.token).replace("{{GUEST_URL}}", GUEST_PAGE);
@@ -168,12 +170,14 @@ fn route(method: &str, path: &str, body: &[u8], srv: &Server, tx: &Sender<Upload
         ("GET", "/favicon.ico") => (200, "image/x-icon", FAVICON.to_vec()),
         ("GET", "/favicon-32.png") => (200, "image/png", FAVICON_32.to_vec()),
         ("GET", "/state") => {
+            let Ok(mut sh) = srv.shared.lock() else { return busy() };
             let kick = std::mem::take(&mut sh.kick);
             let state = json!({"recording": sh.recording, "take": sh.take, "room": srv.room, "muted": sh.muted, "kick": kick});
             (200, "application/json", state.to_string().into_bytes())
         }
         ("POST", "/guests") => {
             let list: Vec<Value> = serde_json::from_slice(body).unwrap_or_default();
+            let Ok(mut sh) = srv.shared.lock() else { return busy() };
             sh.guests = list
                 .iter()
                 .take(32)
@@ -194,10 +198,11 @@ fn route(method: &str, path: &str, body: &[u8], srv: &Server, tx: &Sender<Upload
             let hq = q.get("kind").is_some_and(|k| k == "hq");
             let take = q.get("take").and_then(|t| t.parse::<u32>().ok()).unwrap_or(0);
             let started_ms = q.get("started").and_then(|t| t.parse::<i64>().ok()).unwrap_or_else(now_ms);
-            if std::fs::create_dir_all(&sh.dir).is_err() {
+            let Ok(dir) = srv.shared.lock().map(|sh| sh.dir.clone()) else { return busy() };
+            if std::fs::create_dir_all(&dir).is_err() {
                 return (500, "text/plain", b"cannot create folder".to_vec());
             }
-            let path = sh.dir.join(format!("{}-take{take}-{}.wav", file_safe(&guest), if hq { "hq" } else { "live" }));
+            let path = dir.join(format!("{}-take{take}-{}.wav", file_safe(&guest), if hq { "hq" } else { "live" }));
             if let Err(e) = std::fs::write(&path, body) {
                 return (500, "text/plain", e.to_string().into_bytes());
             }

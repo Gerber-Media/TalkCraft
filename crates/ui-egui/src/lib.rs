@@ -518,6 +518,8 @@ impl SoundApp {
         if let Some(p) = &self.player {
             p.set_recording(true);
         }
+        // A take is judged stalled only after 1.5 s without input since it began.
+        self.reset_input_watch();
         let already_playing = self.is_playing();
         self.engine.transport.recording = true;
         if already_playing {
@@ -628,6 +630,22 @@ impl SoundApp {
     }
 
     /// Open the input device once (for recording and input monitoring) and feed the player.
+    /// A new output (device lost, reconnected or picked): the open input keeps feeding monitoring.
+    pub(crate) fn replace_player(&mut self) {
+        let p = soundcraft_playback::Player::new(self.engine.session_arc());
+        if let Some(r) = &self.recorder {
+            p.set_input(std::sync::Arc::clone(&r.monitor));
+        }
+        self.player = Some(p);
+    }
+
+    /// The input stall clock starts now (a new input, or a new take).
+    fn reset_input_watch(&mut self) {
+        let calls = self.recorder.as_ref().map_or(0, |r| r.callbacks.load(std::sync::atomic::Ordering::Relaxed));
+        self.device_watch.0 = calls;
+        self.device_watch.1 = std::time::Instant::now();
+    }
+
     fn ensure_input(&mut self) {
         if self.recorder.is_some() || self.recorder_failed || self.player.is_none() {
             return;
@@ -638,6 +656,7 @@ impl SoundApp {
                     p.set_input(std::sync::Arc::clone(&r.monitor));
                 }
                 self.recorder = Some(r);
+                self.reset_input_watch();
             }
             Err(e) => {
                 self.recorder_failed = true;
@@ -696,7 +715,7 @@ impl SoundApp {
             if self.is_playing() {
                 self.stop_play();
             }
-            self.player = Some(soundcraft_playback::Player::new(self.engine.session_arc()));
+            self.replace_player();
             let new = self.player.as_ref().map(|p| p.device_name.clone()).unwrap_or_default();
             self.ui.status = if de {
                 format!("Ausgang „{old}“ getrennt – jetzt über „{new}“")
@@ -716,7 +735,8 @@ impl SoundApp {
                     && p.device_name != *want
                     && outs.iter().any(|d| d.name == *want)
                 {
-                    self.player = Some(soundcraft_playback::Player::new(self.engine.session_arc()));
+                    let want = want.clone();
+                    self.replace_player();
                     self.ui.status = if de { format!("„{want}“ wieder verbunden") } else { format!("\"{want}\" reconnected") };
                 }
                 if let (Some(want), Some(r)) = (&self.ui.input_device, &self.recorder)

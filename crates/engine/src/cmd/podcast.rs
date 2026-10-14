@@ -302,6 +302,40 @@ fn file_span(s: &soundcraft_model::Session, c: &soundcraft_model::Clip) -> (Samp
     (first, first.saturating_add(frames))
 }
 
+/// How far a clip's edge can be pulled out on its own track: never past its recording, never
+/// further than the cut to the next piece of the same recording (that audio already plays there),
+/// and, unless the rest of the track moves along (`ripple`), never into the neighbouring clip.
+fn edge_room(s: &soundcraft_model::Session, track: soundcraft_model::TrackId, c: &soundcraft_model::Clip, end: bool, ripple: bool) -> Samples {
+    let (first, last) = file_span(s, c);
+    let others: Vec<&soundcraft_model::Clip> = s.track(track).map(|t| t.clips().iter().filter(|o| o.id != c.id).collect()).unwrap_or_default();
+    let same = |o: &soundcraft_model::Clip| o.source().is_some() && o.source() == c.source();
+    let mut room = if end { last - c.end() } else { c.start - first };
+    if end {
+        let our_end = c.source_offset() + c.length;
+        if let Some(n) =
+            others.iter().filter(|o| same(o) && o.start == c.end() && o.source_offset() >= our_end).map(|o| o.source_offset() - our_end).min()
+        {
+            room = room.min(n);
+        }
+        if !ripple && let Some(next) = others.iter().filter(|o| o.start >= c.end()).map(|o| o.start).min() {
+            room = room.min(next - c.end());
+        }
+    } else {
+        if let Some(n) = others
+            .iter()
+            .filter(|o| same(o) && o.end() == c.start && o.source_offset() + o.length <= c.source_offset())
+            .map(|o| c.source_offset() - (o.source_offset() + o.length))
+            .min()
+        {
+            room = room.min(n);
+        }
+        if !ripple && let Some(prev) = others.iter().filter(|o| o.end() <= c.start).map(|o| o.end()).max() {
+            room = room.min(c.start - prev);
+        }
+    }
+    room.max(0)
+}
+
 fn extend_clip(e: &mut Engine, p: &Value) -> Result<Value> {
     const ID: &str = "edit.extend_clip";
     let id = soundcraft_model::ClipId(p.get("clip").and_then(Value::as_u64).ok_or_else(|| bad(ID, "`clip` required"))?);
@@ -315,88 +349,63 @@ fn extend_clip(e: &mut Engine, p: &Value) -> Result<Value> {
     let all = bool_or(p, "all_tracks", false);
     let s = e.session_mut();
     let (track, c) = s.find_clip(id).map(|(t, c)| (t, c.clone())).ok_or_else(|| bad(ID, "no such clip"))?;
-    let (first, last) = file_span(s, &c);
     let tracks: Vec<soundcraft_model::TrackId> = if all { s.tracks.iter().map(|t| t.id).collect() } else { vec![track] };
-    // Clips on the other tracks cut at the same point open up with this one.
-    let partners: Vec<soundcraft_model::Clip> = if all {
+    let wanted = if end { to - c.end() } else { c.start - to };
+    let delta = wanted.min(edge_room(s, track, &c, end, ripple));
+    if delta <= 0 {
+        return Ok(json!({"extended": 0}));
+    }
+    // Clips on the other tracks cut at the same point open up with this one, each within its own
+    // limits (measured before anything moves).
+    let partners: Vec<(soundcraft_model::Clip, Samples)> = if all {
         s.tracks
             .iter()
             .filter(|t| t.id != track)
-            .flat_map(|t| t.clips().iter())
-            .filter(|o| if end { o.end() == c.end() } else { o.start == c.start })
-            .cloned()
+            .flat_map(|t| t.clips().iter().map(move |o| (t.id, o)))
+            .filter(|(_, o)| if end { o.end() == c.end() } else { o.start == c.start })
+            .map(|(t, o)| (o.clone(), delta.min(edge_room(s, t, o, end, ripple))))
             .collect()
     } else {
         Vec::new()
     };
-    // The neighbour that continues the same recording after a cut: pulling the edge brings back
-    // exactly what was cut, never audio that already plays in the neighbour.
-    let same_source = |o: &soundcraft_model::Clip| o.id != id && o.source().is_some() && o.source() == c.source();
-    let on_track: Vec<soundcraft_model::Clip> = s.track(track).map(|t| t.clips().to_vec()).unwrap_or_default();
     if end {
-        let our_end = c.source_offset() + c.length;
-        let cut = on_track
-            .iter()
-            .filter(|o| same_source(o) && o.start == c.end() && o.source_offset() >= our_end)
-            .map(|o| o.source_offset() - our_end)
-            .min();
-        let mut to = to.min(last).min(cut.map_or(i64::MAX, |n| c.end() + n));
-        if to <= c.end() {
-            return Ok(json!({"extended": 0}));
-        }
-        if !ripple {
-            let next = s.track(track).and_then(|t| t.clips().iter().filter(|o| o.id != id && o.start >= c.end()).map(|o| o.start).min());
-            to = to.min(next.unwrap_or(i64::MAX));
-        }
-        let delta = to - c.end();
         if ripple {
             let later = clips_from(s, &tracks, c.end(), id);
             crate::edit::move_clips(s, &later, delta, None);
         }
         if let Some(x) = s.find_clip_mut(id) {
-            x.trim_end_to(to);
+            x.trim_end_to(c.end() + delta);
         }
-        for o in &partners {
-            let lim = file_span(s, o).1;
+        for (o, d) in &partners {
             if let Some(x) = s.find_clip_mut(o.id) {
-                x.trim_end_to((o.end() + delta).min(lim));
+                x.trim_end_to(o.end() + d);
             }
         }
-        Ok(json!({"extended": delta, "extended_s": s.sample_rate.seconds(delta)}))
+    } else if ripple {
+        // The clip keeps its place; what is revealed pushes it and everything after it later.
+        let mut later = clips_from(s, &tracks, c.start, id);
+        later.push(id);
+        crate::edit::move_clips(s, &later, delta, None);
+        if let Some(x) = s.find_clip_mut(id) {
+            x.trim_start_to(c.start);
+        }
+        for (o, d) in &partners {
+            // Moved by `delta` with the rest; reveal what its own limits allow.
+            if let Some(x) = s.find_clip_mut(o.id) {
+                x.trim_start_to(o.start + delta - d);
+            }
+        }
     } else {
-        let cut = on_track
-            .iter()
-            .filter(|o| same_source(o) && o.end() == c.start && o.source_offset() + o.length <= c.source_offset())
-            .map(|o| c.source_offset() - (o.source_offset() + o.length))
-            .min();
-        let mut to = to.max(first).max(cut.map_or(i64::MIN, |n| c.start - n));
-        if to >= c.start {
-            return Ok(json!({"extended": 0}));
+        if let Some(x) = s.find_clip_mut(id) {
+            x.trim_start_to(c.start - delta);
         }
-        if !ripple {
-            let prev = s.track(track).and_then(|t| t.clips().iter().filter(|o| o.id != id && o.end() <= c.start).map(|o| o.end()).max());
-            to = to.max(prev.unwrap_or(0));
-        }
-        let delta = c.start - to;
-        if ripple {
-            // The clip keeps its place; what is revealed pushes it and everything after it later.
-            let mut later = clips_from(s, &tracks, c.start, id);
-            later.push(id);
-            crate::edit::move_clips(s, &later, delta, None);
-            if let Some(x) = s.find_clip_mut(id) {
-                x.trim_start_to(c.start);
+        for (o, d) in &partners {
+            if let Some(x) = s.find_clip_mut(o.id) {
+                x.trim_start_to(o.start - d);
             }
-            for o in &partners {
-                let lim = file_span(s, o).0;
-                if let Some(x) = s.find_clip_mut(o.id) {
-                    x.trim_start_to(o.start.max(lim + delta));
-                }
-            }
-        } else if let Some(x) = s.find_clip_mut(id) {
-            x.trim_start_to(to);
         }
-        Ok(json!({"extended": delta, "extended_s": s.sample_rate.seconds(delta)}))
     }
+    Ok(json!({"extended": delta, "extended_s": s.sample_rate.seconds(delta)}))
 }
 
 /// Track named `name`, made as a mono audio track when there is none.
@@ -929,6 +938,11 @@ mod tests {
         // Slip: the neighbour stops the edge.
         e.execute("edit.extend_clip", &json!({"clip": left, "edge": "end", "to": {"seconds": 2.5}})).unwrap();
         assert_eq!(clips(&e, "Gast 1")[0], (0, 2 * sec));
+        // Slip with Alt: every track's edge stops at its own neighbour too, nothing overlaps.
+        e.execute("edit.extend_clip", &json!({"clip": left, "edge": "end", "to": {"seconds": 2.5}, "all_tracks": true})).unwrap();
+        for t in ["Moderation", "Gast 1"] {
+            assert_eq!(clips(&e, t), vec![(0, 2 * sec), (2 * sec, 4 * sec)], "{t}");
+        }
         // Ripple on all tracks: the cut second comes back everywhere, in sync.
         let v =
             e.execute("edit.extend_clip", &json!({"clip": left, "edge": "end", "to": {"seconds": 9.0}, "ripple": true, "all_tracks": true})).unwrap();
@@ -944,6 +958,15 @@ mod tests {
         assert_eq!(clips(&e, "Gast 1"), vec![(0, 2 * sec), (2 * sec, 4 * sec + sec / 2)]);
         let r = e.session().track_by_name("Gast 1").unwrap().clips()[1].clone();
         assert_eq!(r.source_offset(), 3 * sec - sec / 2, "half a second of the cut came back");
+        // Slip with Alt where only one track has room: the other stops at its neighbour.
+        e.execute("edit.undo", &json!({})).unwrap();
+        let s = e.session_mut();
+        let gast = s.track_by_name("Gast 1").unwrap().id;
+        let right_id = s.track(gast).unwrap().clips()[1].id;
+        crate::edit::move_clips(s, &[right_id], sec, None);
+        e.execute("edit.extend_clip", &json!({"clip": left, "edge": "end", "to": {"seconds": 2.5}, "all_tracks": true})).unwrap();
+        assert_eq!(clips(&e, "Gast 1")[0], (0, 2 * sec + sec / 2));
+        assert_eq!(clips(&e, "Moderation"), vec![(0, 2 * sec), (2 * sec, 4 * sec)], "no overlap on the other track");
         assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 

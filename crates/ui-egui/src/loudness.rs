@@ -91,11 +91,16 @@ pub fn measure(s: &soundcraft_model::Session) -> Option<(f32, f32)> {
     if end <= 0 || end > s.sample_rate.samples(4.0 * 3600.0) {
         return None;
     }
-    let ch = soundcraft_mix::render_range(s, soundcraft_time::Range::new(0, end), 4096);
-    let ch = if ch.len() > 2 { soundcraft_mix::fold_down_stereo(s.main_format(), &ch) } else { ch };
-    let frames = ch.iter().map(Vec::len).min().unwrap_or(0);
-    let mut m = soundcraft_dsp::meter::LoudnessMeter::new(s.sample_rate.as_f64() as f32, ch.len());
-    m.process(&ch, frames);
+    // Block by block: an hour of stereo would otherwise be rendered into about 1.4 GB first.
+    let nch = soundcraft_mix::main_channels(s).min(2);
+    let mut m = soundcraft_dsp::meter::LoudnessMeter::new(s.sample_rate.as_f64() as f32, nch);
+    soundcraft_mix::render_range_each(s, soundcraft_time::Range::new(0, end), 4096, |ch, frames| {
+        if ch.len() > 2 {
+            m.process(&soundcraft_mix::fold_down_stereo(s.main_format(), ch), frames);
+        } else {
+            m.process(ch, frames);
+        }
+    });
     let lufs = m.integrated_lufs();
     lufs.is_finite().then(|| (lufs, m.true_peak_db()))
 }
@@ -103,6 +108,25 @@ pub fn measure(s: &soundcraft_model::Session) -> Option<(f32, f32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The way it was measured before: the whole mix rendered first.
+    fn measure_all_at_once(s: &soundcraft_model::Session) -> Option<(f32, f32)> {
+        let end = s.content_end();
+        let ch = soundcraft_mix::render_range(s, soundcraft_time::Range::new(0, end), 4096);
+        let ch = if ch.len() > 2 { soundcraft_mix::fold_down_stereo(s.main_format(), &ch) } else { ch };
+        let frames = ch.iter().map(Vec::len).min().unwrap_or(0);
+        let mut m = soundcraft_dsp::meter::LoudnessMeter::new(s.sample_rate.as_f64() as f32, ch.len());
+        m.process(&ch, frames);
+        let lufs = m.integrated_lufs();
+        lufs.is_finite().then(|| (lufs, m.true_peak_db()))
+    }
+
+    #[test]
+    fn block_by_block_measures_the_same_as_rendering_everything_first() {
+        let e = soundcraft_engine::demo::demo_engine();
+        let (a, b) = (measure(e.session()).unwrap(), measure_all_at_once(e.session()).unwrap());
+        assert!((a.0 - b.0).abs() < 1e-4 && (a.1 - b.1).abs() < 1e-4, "{a:?} vs {b:?}");
+    }
 
     #[test]
     fn measures_the_mix_and_only_remeasures_when_the_audio_changes() {

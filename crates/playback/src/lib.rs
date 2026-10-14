@@ -277,8 +277,9 @@ impl AudioState {
         let speed = f64::from(self.shared.speed.load(Ordering::Relaxed)) / 1000.0;
         let step = self.session.sample_rate.as_f64() / self.device_rate.max(1.0) * speed.clamp(0.1, 4.0);
         let rate = f64::from(self.shared.rate.load(Ordering::Relaxed)) / 1000.0;
-        // Only while playing: monitoring an input never runs ahead or behind.
-        let stretching = self.playing && (rate - 1.0).abs() > 0.005;
+        // Only for listening back: while recording or monitoring an input, time runs at the wall
+        // clock (a take must land where it was played, and the input ring must not run dry).
+        let stretching = self.playing && !self.recording && !monitoring && (rate - 1.0).abs() > 0.005;
         let callback_frames = out.len() / channels;
         let quantum = ((callback_frames as f64 * step * if stretching { rate.clamp(0.25, 4.0) } else { 1.0 }).ceil() as usize).clamp(1, BLOCK);
         let nch = self.pending.len().min(MAX_CHANNELS);
@@ -841,6 +842,36 @@ mod tests {
         st.fill(&mut out, 2);
         assert!(shared.position.load(Ordering::Relaxed) >= 1000);
         assert!(!shared.playing.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn the_listening_rate_never_applies_while_recording() {
+        let s = Arc::new(soundcraft_model::Session::default());
+        let shared = Arc::new(Shared {
+            position: AtomicI64::new(0),
+            playing: AtomicBool::new(false),
+            speed: AtomicU32::new(1000),
+            rate: AtomicU32::new(1500),
+            meters: Mutex::new(MeterSnapshot::default()),
+            device_lost: AtomicBool::new(false),
+        });
+        let (tx, rx) = channel();
+        let mut st = AudioState::new(rx, Arc::clone(&shared), s, 48_000.0, channel().0);
+        tx.send(Cmd::Play { from: 0, end: None, looped: None }).unwrap();
+        let mut out = vec![0.0f32; 2 * 4_800];
+        for _ in 0..10 {
+            st.fill(&mut out, 2);
+        }
+        let listening = shared.position.load(Ordering::Relaxed);
+        assert!(listening > 60_000, "1.5× while listening: {listening}");
+        tx.send(Cmd::Recording(true)).unwrap();
+        tx.send(Cmd::Play { from: 0, end: None, looped: None }).unwrap();
+        for _ in 0..10 {
+            st.fill(&mut out, 2);
+        }
+        let recording = shared.position.load(Ordering::Relaxed);
+        // The mix renders up to one block ahead of what was played.
+        assert!((48_000..=48_000 + BLOCK as i64).contains(&recording), "recording runs at the wall clock: {recording}");
     }
 
     #[test]

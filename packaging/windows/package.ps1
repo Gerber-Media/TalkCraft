@@ -40,8 +40,13 @@ if (-not $Version) {
   foreach ($line in Get-Content (Join-Path $Root 'packaging\version.env')) {
     if ($line -match '^\s*(TALKCRAFT_[A-Z_]+)=(.+)$') { $vars[$Matches[1]] = $Matches[2].Trim() }
   }
-  $count = & git -C $Root rev-list --count "$($vars['TALKCRAFT_FORK_BASE'])..HEAD" 2>$null
-  if ($LASTEXITCODE -ne 0 -or -not $count) { $count = '0' }
+  $base = $vars['TALKCRAFT_FORK_BASE']
+  # CI checks out shallowly by default: the count needs the history back to the fork.
+  & git -C $Root cat-file -e "$base^{commit}" 2>$null
+  if ($LASTEXITCODE -ne 0 -and (& git -C $Root rev-parse --is-shallow-repository) -eq 'true') { & git -C $Root fetch --quiet --unshallow }
+  $count = & git -C $Root rev-list --count "$base..HEAD" 2>$null
+  # Never ship a made-up number: every installer would carry the same one.
+  if ($LASTEXITCODE -ne 0 -or -not $count) { throw 'could not count the commits since the fork (packaging\version.env); fetch the full history or set TALKCRAFT_VERSION' }
   $Version = "$($vars['TALKCRAFT_MINOR']).$($count.Trim())"
 }
 if (-not $Version) { throw 'could not work out the version from packaging\version.env' }

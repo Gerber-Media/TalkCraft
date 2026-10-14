@@ -7,12 +7,14 @@
 fn main() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let env_file = root.join("packaging/version.env");
-    println!("cargo::rerun-if-changed={}", env_file.display());
     println!("cargo::rerun-if-env-changed=TALKCRAFT_VERSION");
     let generated = root.join("packaging/talkcraft-version");
-    println!("cargo::rerun-if-changed={}", generated.display());
-    for f in [".git/HEAD", ".git/refs/heads", ".git/packed-refs"] {
-        println!("cargo::rerun-if-changed={}", root.join(f).display());
+    // Cargo treats a watched file that does not exist as always changed (a rebuild every time),
+    // so only existing files are watched.
+    for f in [env_file.clone(), generated.clone(), root.join(".git/HEAD"), root.join(".git/refs/heads"), root.join(".git/packed-refs")] {
+        if f.exists() {
+            println!("cargo::rerun-if-changed={}", f.display());
+        }
     }
     let text = std::fs::read_to_string(&env_file).unwrap_or_default();
     let get = |key: &str| text.lines().find_map(|l| l.trim().strip_prefix(key)?.strip_prefix('=').map(|v| v.trim().to_string()));
@@ -31,7 +33,10 @@ fn main() {
         .filter(|v| !v.trim().is_empty())
         .or_else(|| build.map(|n| format!("{minor}.{n}")))
         .or_else(|| std::fs::read_to_string(&generated).ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty()))
-        .unwrap_or_else(|| format!("{minor}.0-dev"));
+        .unwrap_or_else(|| {
+            println!("cargo::warning=TalkCraft version: the fork commit is not in this checkout (shallow clone?); building as {minor}.0-dev");
+            format!("{minor}.0-dev")
+        });
     let build = build.unwrap_or(0);
     let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default()).join("talkcraft_version.rs");
     let code = format!(

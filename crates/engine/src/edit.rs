@@ -431,6 +431,9 @@ pub fn cut_time(s: &mut Session, r: Range, keep_markers: bool) {
         if m.start >= r.end {
             m.start -= r.len();
             m.end -= r.len();
+        } else if m.start < r.start && m.end > r.start {
+            // A range running into or across the cut gets shorter by what was cut out of it.
+            m.end = if m.end >= r.end { m.end - r.len() } else { r.start };
         }
     }
     crate::subtitles::cut_time(s, r);
@@ -450,6 +453,18 @@ pub fn gap_at(s: &soundcraft_model::Session, track: soundcraft_model::TrackId, a
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn cutting_time_shortens_a_range_marker_across_the_cut() {
+        use soundcraft_model::MarkerKind;
+        let mut s = Session::default();
+        s.add_marker("Kapitel", MarkerKind::Marker, 0, 60 * 48_000);
+        s.add_marker("Ende", MarkerKind::Marker, 0, 11 * 48_000);
+        cut_time(&mut s, soundcraft_time::Range::new(10 * 48_000, 12 * 48_000), true);
+        let end = |n: &str| s.markers.iter().find(|m| m.name == n).map(|m| m.end);
+        assert_eq!(end("Kapitel"), Some(58 * 48_000), "two seconds shorter");
+        assert_eq!(end("Ende"), Some(10 * 48_000), "ends where the cut began");
+    }
+
     use super::*;
     use soundcraft_model::{ChannelFormat, Source, SourceId, TrackKind};
 

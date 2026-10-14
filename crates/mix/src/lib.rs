@@ -1776,6 +1776,40 @@ pub fn render_range(s: &Session, range: Range, block: usize) -> Vec<Vec<f32>> {
     out
 }
 
+/// The same audio as `render_range`, handed to `each` block by block (planar, main channels, the
+/// block's frame count) instead of collected: memory stays at one block, however long the range.
+pub fn render_range_each(s: &Session, range: Range, block: usize, mut each: impl FnMut(&[Vec<f32>], usize)) {
+    let nch = main_channels(s);
+    let len = usize::try_from(range.len().max(0)).unwrap_or(0).min(MAX_RENDER_SAMPLES / nch.max(1));
+    let latency = {
+        let mut probe = MixEngine::new(s.sample_rate.as_f64() as f32, block);
+        let b = probe.max_block();
+        let mut tmp = vec![vec![0.0f32; b]; nch];
+        probe.render(s, range.start, b.min(len.max(1)), &mut tmp);
+        probe.latency
+    };
+    let total = len.saturating_add(latency);
+    let mut eng = MixEngine::new(s.sample_rate.as_f64() as f32, block);
+    let b = eng.max_block();
+    let mut tmp = vec![vec![0.0f32; b]; nch];
+    let mut part = vec![Vec::with_capacity(b); nch];
+    let mut done = 0usize;
+    while done < total {
+        let n = (total - done).min(b);
+        eng.render(s, range.start + done as i64, n, &mut tmp);
+        // The first `latency` frames are the plugins' delay, dropped as in `render_range`.
+        let skip = latency.saturating_sub(done).min(n);
+        if skip < n {
+            for (p, t) in part.iter_mut().zip(tmp.iter()) {
+                p.clear();
+                p.extend_from_slice(t.get(skip..n).unwrap_or(&[]));
+            }
+            each(&part, n - skip);
+        }
+        done += n;
+    }
+}
+
 /// Offline render of one bus over `range` (planar, the bus format's channel count).
 /// Track-insert compensation is removed, so a bus fed by tracks lines up with the timeline.
 /// An unknown bus is silent.
