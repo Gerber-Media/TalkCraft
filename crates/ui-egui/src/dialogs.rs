@@ -1053,24 +1053,73 @@ fn export_episode_ui(
 
 /// Setup > Preferences: everything a podcast session keeps, plus where audio and transcription
 /// stand. True when Save was pressed.
+/// The Settings' tabs: the episode (saved with the session) and the app's own settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PrefTab {
+    Episode,
+    General,
+    Appearance,
+    Audio,
+    Transcription,
+}
+
 fn preferences_ui(app: &mut SoundApp, ui: &mut egui::Ui, s: &mut soundcraft_model::PodcastSettings, enter: bool) -> bool {
     let dim = Tokens::current().text_dim;
-    egui::ScrollArea::vertical().max_height(ui.ctx().content_rect().height() * 0.7).show(ui, |ui| {
-        episode_ui(ui, &app.services, &mut s.episode);
-        ui.separator();
-        export_settings_ui(ui, &app.services, None, s, true);
-        ui.separator();
+    let tr = crate::i18n::tr;
+    let id = egui::Id::new("preferences_tab");
+    let mut tab = ui.data(|d| d.get_temp::<PrefTab>(id)).unwrap_or(PrefTab::Episode);
+    // One size for every tab, so the dialog does not jump when switching.
+    let height = (ui.ctx().content_rect().height() * 0.6).min(560.0);
+    ui.set_min_width(520.0);
+    ui.horizontal(|ui| {
+        for (t, label) in [
+            (PrefTab::Episode, "Episode"),
+            (PrefTab::General, "General"),
+            (PrefTab::Appearance, "Appearance"),
+            (PrefTab::Audio, "Audio"),
+            (PrefTab::Transcription, "Transcription"),
+        ] {
+            if ui.selectable_label(tab == t, tr(label)).clicked() {
+                tab = t;
+            }
+        }
+    });
+    ui.data_mut(|d| d.insert_temp(id, tab));
+    ui.separator();
+    egui::ScrollArea::vertical().max_height(height).min_scrolled_height(height).auto_shrink([false, false]).show(ui, |ui| match tab {
+        PrefTab::Episode => {
+            episode_ui(ui, &app.services, &mut s.episode);
+            ui.separator();
+            export_settings_ui(ui, &app.services, None, s, true);
+            ui.label(egui::RichText::new(tr("Saved with the session.")).small().color(dim));
+        }
+        PrefTab::General => general_prefs(app, ui),
+        PrefTab::Appearance => crate::extra_windows::appearance_ui(app, ui),
+        PrefTab::Audio => audio_prefs(app, ui),
+        PrefTab::Transcription => transcription_prefs(ui),
+    });
+    buttons(ui, "Save", enter && !ui.ctx().egui_wants_keyboard_input())
+}
+
+fn audio_prefs(app: &mut SoundApp, ui: &mut egui::Ui) {
+    let dim = Tokens::current().text_dim;
+    {
         ui.label(egui::RichText::new(crate::i18n::tr("Recording")).strong());
         ui.label(
-            egui::RichText::new(
+            egui::RichText::new(crate::i18n::tr(
                 "Record (Cmd+Space) records every speaker track except locked ones; a track's own record button records just that speaker.",
-            )
+            ))
             .color(dim),
         );
         if ui.button(crate::i18n::tr("Audio devices and buffer…")).clicked() {
             let _ = app.run("window.playback_engine", json!({"value": true}));
         }
-        ui.separator();
+    }
+}
+
+fn general_prefs(app: &mut SoundApp, ui: &mut egui::Ui) {
+    let dim = Tokens::current().text_dim;
+    {
         ui.horizontal(|ui| {
             ui.label(egui::RichText::new(crate::i18n::tr("Interface language")).strong());
             let label = |v: &str| match v {
@@ -1084,23 +1133,25 @@ fn preferences_ui(app: &mut SoundApp, ui: &mut egui::Ui, s: &mut soundcraft_mode
                 }
             });
         });
-        ui.label(egui::RichText::new("The macOS menu bar follows after a restart.").small().color(dim));
+        ui.label(egui::RichText::new(crate::i18n::tr("The macOS menu bar follows after a restart.")).small().color(dim));
         ui.checkbox(&mut app.ui.ask_workspace, crate::i18n::tr("Ask at start what I want to do (otherwise start with everything)"));
-        ui.separator();
-        ui.label(egui::RichText::new(crate::i18n::tr("Transcription")).strong());
+    }
+}
+
+fn transcription_prefs(ui: &mut egui::Ui) {
+    let dim = Tokens::current().text_dim;
+    {
         use soundcraft_engine::transcribe;
         match transcribe::find_cli() {
             Some(cli) => ui.label(format!("whisper.cpp: {}", cli.display())),
             None => ui.label(egui::RichText::new(transcribe::install_hint()).color(dim)),
         };
         match transcribe::find_model(None) {
-            Some(m) => ui.label(format!("Speech model: {}", m.file_name().map(|n| n.to_string_lossy()).unwrap_or_default())),
-            None => ui.label(egui::RichText::new("No speech model yet: Window > Subtitles offers to download one.").color(dim)),
+            Some(m) => ui.label(format!("{} {}", crate::i18n::tr("Speech model:"), m.file_name().map(|n| n.to_string_lossy()).unwrap_or_default())),
+            None => ui.label(egui::RichText::new(crate::i18n::tr("No speech model yet: Window > Subtitles offers to download one.")).color(dim)),
         };
-        ui.label(egui::RichText::new("Transcription listens for the episode's language.").small().color(dim));
-    });
-    ui.label(egui::RichText::new(crate::i18n::tr("Saved with the session.")).small().color(dim));
-    buttons(ui, "Save", enter && !ui.ctx().egui_wants_keyboard_input())
+        ui.label(egui::RichText::new(crate::i18n::tr("Transcription listens for the episode's language.")).small().color(dim));
+    }
 }
 
 /// Format, loudness and side files; with `path`, its extension follows the format. The episode

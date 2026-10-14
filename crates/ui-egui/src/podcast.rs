@@ -53,6 +53,9 @@ const HIDDEN_PARTS: &[&str] = &[
 /// big-studio views (mic preamps, object, ten sends).
 const HIDDEN_EXACT: &[&str] = &[
     "Setup > Hardware...",
+    // Appearance is a tab of the Settings.
+    "Setup > Appearance",
+    "Window > UI Customization",
     "AudioSuite > Delay > Mod Delay III",
     "AudioSuite > Harmonic > Eleven Lite",
     "AudioSuite > Harmonic > Lo-Fi",
