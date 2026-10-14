@@ -569,6 +569,21 @@ const DE: &[(&str, &str)] = &[
     ("Quit TalkCraft", "TalkCraft beenden"),
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
+    ("Suggest Chapters…", "Kapitel vorschlagen …"),
+    (
+        "Where the conversation pauses longest (and the speaker changes), titled with the next words; you choose and edit them",
+        "Wo das Gespräch am längsten pausiert (und der Sprecher wechselt), benannt nach den nächsten Worten; du wählst aus und änderst sie",
+    ),
+    ("No clear topic changes found", "Keine klaren Themenwechsel gefunden"),
+    ("Suggested Chapters", "Kapitelvorschläge"),
+    ("Tick the chapters to keep and give them a title.", "Die gewünschten Kapitel abhaken und betiteln."),
+    ("Add as Chapters", "Als Kapitel übernehmen"),
+    ("Added {} chapter(s)", "{} Kapitel hinzugefügt"),
+    ("Suggest Chapters", "Kapitel vorschlagen"),
+    (
+        "no transcript yet: transcribe the episode first (Window › Subtitles › Transcribe)",
+        "noch kein Transkript: zuerst die Folge transkribieren (Fenster › Untertitel › Transkribieren)",
+    ),
     ("Edit by Text", "Schnitt am Text"),
     (
         "{} s · click: select for cutting · Shift-click: select up to here · right-click: listen · Delete: cut",

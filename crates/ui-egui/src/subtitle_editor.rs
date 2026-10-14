@@ -34,6 +34,8 @@ pub struct SubtitleEditor {
     pub selected: Option<u64>,
     initialized: bool,
     task: Option<Task>,
+    /// Chapter suggestions from the transcript: (take it, position, title).
+    pub chapters: Option<Vec<(bool, i64, String)>>,
 }
 
 /// A copy never owns the running program.
@@ -47,6 +49,7 @@ impl Clone for SubtitleEditor {
             selected: self.selected,
             initialized: self.initialized,
             task: None,
+            chapters: self.chapters.clone(),
         }
     }
 }
@@ -226,8 +229,49 @@ fn transcription_ui(ui: &mut egui::Ui, ed: &mut SubtitleEditor, t: &Tokens, star
     }
 }
 
+/// The chapter suggestions to pick from: tick, retitle, then add them as chapter markers.
+fn chapter_picker(app: &mut SoundApp, ctx: &egui::Context) {
+    let Some(mut list) = app.extra.subtitles.chapters.take() else { return };
+    let sr = app.engine.session().sample_rate;
+    let mut open = true;
+    let mut apply = false;
+    let mut cancel = false;
+    egui::Window::new(crate::i18n::tr("Suggested Chapters")).open(&mut open).collapsible(false).default_width(460.0).show(ctx, |ui| {
+        ui.label(RichText::new(crate::i18n::tr("Tick the chapters to keep and give them a title.")).small());
+        for (keep, at, title) in &mut list {
+            ui.horizontal(|ui| {
+                ui.checkbox(keep, "");
+                let s = sr.seconds(*at).max(0.0) as u64;
+                ui.monospace(format!("{}:{:02}:{:02}", s / 3600, s / 60 % 60, s % 60));
+                ui.add(egui::TextEdit::singleline(title).desired_width(320.0));
+            });
+        }
+        ui.separator();
+        ui.horizontal(|ui| {
+            if ui.button(crate::i18n::tr("Cancel")).clicked() {
+                cancel = true;
+            }
+            if ui.button(crate::i18n::tr("Add as Chapters")).clicked() {
+                apply = true;
+            }
+        });
+    });
+    if apply {
+        let mut n = 0;
+        for (_, at, title) in list.iter().filter(|(k, _, _)| *k) {
+            if app.run("markers.add", json!({"at": at, "name": title})).is_ok() {
+                n += 1;
+            }
+        }
+        app.ui.status = crate::i18n::trf("Added {} chapter(s)", &[&n]);
+    } else if open && !cancel {
+        app.extra.subtitles.chapters = Some(list);
+    }
+}
+
 pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     poll(app, ctx);
+    chapter_picker(app, ctx);
     if !app.extra.subtitles.show {
         return;
     }
@@ -282,7 +326,18 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 ui.add(egui::TextEdit::singleline(&mut ed.filter).hint_text(crate::i18n::tr("Search")).desired_width(140.0));
                 ui.label(RichText::new(crate::i18n::trf("{} cue(s)", &[&cues.len()])).color(t.text_dim));
             });
-            ui.horizontal(|ui| transcription_ui(ui, ed, &t, &mut transcribe_now, &mut error));
+            ui.horizontal(|ui| {
+                transcription_ui(ui, ed, &t, &mut transcribe_now, &mut error);
+                if ui
+                    .add_enabled(!cues.is_empty(), egui::Button::new(crate::i18n::tr("Suggest Chapters…")))
+                    .on_hover_text(crate::i18n::tr(
+                        "Where the conversation pauses longest (and the speaker changes), titled with the next words; you choose and edit them",
+                    ))
+                    .clicked()
+                {
+                    run.push(("podcast.suggest_chapters".into(), json!({})));
+                }
+            });
             ui.separator();
             if cues.is_empty() {
                 ui.add_space(24.0);
@@ -403,6 +458,17 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
         match app.run(&id, params) {
             Ok(v) if id == "subtitle.segment" => app.ui.status = crate::i18n::trf("Created {} empty cue(s) along the speech", &[&(v["created"])]),
             Ok(v) if id == "subtitle.add" => app.extra.subtitles.selected = v["id"].as_u64(),
+            Ok(v) if id == "podcast.suggest_chapters" => {
+                let list: Vec<(bool, i64, String)> = v["chapters"]
+                    .as_array()
+                    .map(|a| a.iter().map(|c| (true, c["at"].as_i64().unwrap_or(0), c["title"].as_str().unwrap_or_default().to_string())).collect())
+                    .unwrap_or_default();
+                if list.is_empty() {
+                    app.ui.status = crate::i18n::tr("No clear topic changes found").to_string();
+                } else {
+                    app.extra.subtitles.chapters = Some(list);
+                }
+            }
             Ok(_) => {}
             Err(e) => app.ui.status = e,
         }

@@ -84,6 +84,15 @@ pub fn specs() -> Vec<CommandSpec> {
             sync_clip
         ),
         cmd!(
+            "podcast.suggest_chapters",
+            "Suggest Chapters",
+            [],
+            None,
+            "{min_gap_s?: 1.5, min_chapter_s?: 120, apply?: false} — chapter marks where the conversation pauses longest (a change of speaker counts extra), titled with the first words after the pause; from the subtitles/transcript. With `apply`, adds them as markers",
+            always,
+            suggest_chapters
+        ),
+        cmd!(
             "podcast.add_speaker",
             "Add Speaker",
             [],
@@ -415,6 +424,55 @@ fn extend_clip(e: &mut Engine, p: &Value) -> Result<Value> {
         }
     }
     Ok(json!({"extended": delta, "extended_s": s.sample_rate.seconds(delta)}))
+}
+
+/// Topic changes in a conversation show as longer pauses, more so where the speaker changes:
+/// each gap between subtitle cues gets a score (its length, ×1.5 on a change of speaker); the
+/// best ones at least `min_chapter_s` apart become chapters titled with the next words said.
+fn suggest_chapters(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "podcast.suggest_chapters";
+    let min_gap = f64_or(p, "min_gap_s", 1.5).clamp(0.3, 30.0);
+    let min_len = f64_or(p, "min_chapter_s", 120.0).clamp(10.0, 3600.0);
+    let s = e.session();
+    let sr = s.sample_rate;
+    let mut cues: Vec<&soundcraft_model::SubtitleCue> = s.subtitles.iter().filter(|c| !c.text.trim().is_empty()).collect();
+    if cues.is_empty() {
+        return Err(bad(ID, "no transcript yet: transcribe the episode first (Window › Subtitles › Transcribe)"));
+    }
+    cues.sort_by_key(|c| c.start);
+    let mut gaps: Vec<(f64, Samples, &soundcraft_model::SubtitleCue)> = cues
+        .windows(2)
+        .filter_map(|w| {
+            let (a, b) = (w.first()?, w.get(1)?);
+            let gap = sr.seconds(b.start - a.end);
+            let change = !a.speaker.is_empty() && !b.speaker.is_empty() && a.speaker != b.speaker;
+            (gap >= min_gap).then_some((gap * if change { 1.5 } else { 1.0 }, b.start, *b))
+        })
+        .collect();
+    gaps.sort_by(|a, b| b.0.total_cmp(&a.0));
+    let first = cues.first().map_or(0, |c| c.start);
+    let min_len_s = sr.samples(min_len);
+    let mut picked: Vec<(Samples, String)> = Vec::new();
+    for (_, at, cue) in gaps {
+        if at - first < min_len_s / 2 || picked.iter().any(|(t, _)| (t - at).abs() < min_len_s) {
+            continue;
+        }
+        let words: Vec<&str> = cue.text.split_whitespace().take(6).collect();
+        let mut title = words.join(" ").trim_end_matches([',', '.', '!', '?', ';', ':']).to_string();
+        if cue.text.split_whitespace().count() > 6 {
+            title.push('…');
+        }
+        picked.push((at, title));
+    }
+    picked.sort_by_key(|(t, _)| *t);
+    if bool_or(p, "apply", false) {
+        let s = e.session_mut();
+        for (at, title) in &picked {
+            s.add_marker(title, MarkerKind::Marker, *at, *at);
+        }
+    }
+    let list: Vec<Value> = picked.iter().map(|(at, title)| json!({"at": at, "seconds": sr.seconds(*at), "title": title})).collect();
+    Ok(json!({"chapters": list}))
 }
 
 fn add_speaker(e: &mut Engine, p: &Value) -> Result<Value> {
@@ -1047,6 +1105,34 @@ mod tests {
         e.execute("markers.previous_cut", &json!({})).unwrap();
         assert_eq!(e.session().edit.selection.start, 2 * 48_000);
         assert!(e.execute("markers.done_cut", &json!({"at": {"seconds": 8.0}})).is_err(), "nothing there");
+    }
+
+    #[test]
+    fn chapters_are_suggested_at_the_longest_pauses_and_speaker_changes() {
+        let mut e = Engine::default();
+        e.execute("session.new", &json!({"name": "S", "template": "podcast", "speakers": 2})).unwrap();
+        assert!(e.execute("podcast.suggest_chapters", &json!({})).is_err(), "no transcript yet");
+        // A cue every 10 s for 10 minutes, with a long pause at 3 min (speaker change) and 7 min.
+        let mut t = 0.0;
+        for i in 0..60 {
+            let pause = match i {
+                18 => 3.0,
+                42 => 2.5,
+                _ => 0.5,
+            };
+            t += pause;
+            let speaker = if i < 18 { "Moderation" } else { "Gast 1" };
+            let text = if i == 18 { "Kommen wir zur Energiewende in Dänemark und Deutschland" } else { "bla" };
+            e.execute("subtitle.add", &json!({"start": {"seconds": t}, "end": {"seconds": t + 9.5}, "text": text, "speaker": speaker})).unwrap();
+            t += 9.5;
+        }
+        let v = e.execute("podcast.suggest_chapters", &json!({"min_chapter_s": 120})).unwrap();
+        let ch = v["chapters"].as_array().unwrap();
+        assert_eq!(ch.len(), 2, "{v}");
+        assert_eq!(ch[0]["title"], "Kommen wir zur Energiewende in Dänemark…");
+        assert!(e.session().markers.iter().all(|m| m.name != "Kommen wir zur Energiewende in Dänemark…"), "only suggested");
+        e.execute("podcast.suggest_chapters", &json!({"apply": true})).unwrap();
+        assert!(e.session().markers.iter().any(|m| m.name.starts_with("Kommen wir")));
     }
 
     #[test]
