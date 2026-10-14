@@ -155,7 +155,8 @@ pub fn toolbar_switch(app: &mut SoundApp, ui: &mut egui::Ui) {
         ui.spacing_mut().button_padding = vec2(6.0, 1.0);
         for w in Workspace::ALL {
             let on = now == w;
-            let text = RichText::new(w.label()).size(11.0).color(if on { t.text } else { t.text_dim });
+            // On the accent: the theme's text colour for selections (white).
+            let text = RichText::new(w.label()).size(11.0).color(if on { ui.visuals().selection.stroke.color } else { t.text_dim });
             if ui.add(egui::Button::selectable(on, text).min_size(vec2(84.0, 18.0))).clicked() && !on {
                 switch(app, w);
             }

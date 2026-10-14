@@ -328,7 +328,13 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                     frame.show(ui, |ui| {
                         ui.horizontal_top(|ui| {
                             let num = RichText::new(format!("{}", n + 1)).font(mono(11.0));
-                            let num = if current { num.color(Color32::from_rgb(250, 210, 90)).strong() } else { num.color(t.text_dim) };
+                            let num = if current {
+                                num.color(Color32::from_rgb(250, 210, 90)).strong()
+                            } else if selected {
+                                num.color(ui.visuals().selection.stroke.color)
+                            } else {
+                                num.color(t.text_dim)
+                            };
                             let row = ui.add_sized([NUM_W, 22.0], egui::Button::selectable(selected, num));
                             if row.clicked() {
                                 ed.selected = Some(c.id);

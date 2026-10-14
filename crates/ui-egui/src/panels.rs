@@ -351,11 +351,14 @@ pub(crate) fn undo_history(app: &mut SoundApp, ui: &mut Ui) {
             let rows = std::iter::once(crate::i18n::tr("Opened").to_string()).chain(done.iter().chain(&ahead).map(|l| history_label(l)));
             for (step, label) in rows.enumerate() {
                 let future = step > now;
-                let text = egui::RichText::new(if step == 0 { label } else { format!("{step}  {label}") }).size(11.5).color(if future {
+                let color = if step == now {
+                    ui.visuals().selection.stroke.color
+                } else if future {
                     t.text_dim
                 } else {
                     t.text
-                });
+                };
+                let text = egui::RichText::new(if step == 0 { label } else { format!("{step}  {label}") }).size(11.5).color(color);
                 let r = ui.add(egui::Button::selectable(step == now, text).wrap_mode(egui::TextWrapMode::Truncate));
                 if r.clicked() && step != now {
                     go = Some(step);

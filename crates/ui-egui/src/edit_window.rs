@@ -1033,7 +1033,8 @@ fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, sele
         if track.kind.has_playlist() && !track.kind.is_midi() { &[("waveform", "Waveform"), ("volume", "Volume")] } else { &[("volume", "Volume")] };
     for (view, label) in views {
         let on = track.view == *view;
-        let text = egui::RichText::new(crate::i18n::tr(label)).size(10.5).color(if on { t.text } else { t.text_dim });
+        let on_color = c2.visuals().selection.stroke.color;
+        let text = egui::RichText::new(crate::i18n::tr(label)).size(10.5).color(if on { on_color } else { t.text_dim });
         if c2.add(egui::Button::selectable(on, text).min_size(vec2(56.0, 16.0))).on_hover_text(crate::i18n::tr(view_hint(view))).clicked() && !on {
             let _ = app.run("track.view", json!({"track": id.0, "view": view}));
         }
