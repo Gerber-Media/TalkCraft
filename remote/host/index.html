@@ -233,6 +233,7 @@ function addGuest(conn) {
 function onCall(call) {
   const g = guests.get(call.peer);
   if (!g) { call.close(); return; }
+  g.call = call;
   g.dest = ctx.createMediaStreamDestination();
   micSource.connect(g.dest);
   call.answer(g.dest.stream);
@@ -276,8 +277,29 @@ async function playJingle(pad, file) {
   src.start();
 }
 
+// Connection quality from WebRTC statistics: round trip, lost packets and jitter of the guest's audio.
+async function measure(g) {
+  const pc = g.call && g.call.peerConnection;
+  if (!pc) return;
+  let rtt = null, lost = 0, received = 0, jitter = null;
+  (await pc.getStats()).forEach((r) => {
+    // The pair in use: nominated (Chrome), selected (Firefox), or at least one that succeeded.
+    if (r.type === "candidate-pair" && r.currentRoundTripTime != null && (r.nominated || r.selected || (rtt === null && r.state === "succeeded"))) rtt = r.currentRoundTripTime * 1000;
+    if (r.type === "inbound-rtp" && r.kind === "audio") { lost = r.packetsLost || 0; received = r.packetsReceived || 0; jitter = (r.jitter || 0) * 1000; }
+  });
+  // Loss over the last interval, not since the start.
+  const prev = g.stats || { lost: 0, received: 0 };
+  const dl = Math.max(0, lost - prev.lost), dr = Math.max(0, received - prev.received);
+  g.stats = { lost, received, rtt, jitter, loss: dl + dr > 0 ? (100 * dl) / (dl + dr) : 0 };
+}
+setInterval(() => { for (const g of guests.values()) measure(g).catch(() => {}); }, 2000);
+
 async function report() {
-  const list = [...guests.values()].map((g) => ({ name: g.name, level: g.selfMuted ? -60 : g.level, connected: !!g.src, self_muted: !!g.selfMuted }));
+  const list = [...guests.values()].map((g) => ({
+    name: g.name, level: g.selfMuted ? -60 : g.level, connected: !!g.src, self_muted: !!g.selfMuted,
+    rtt_ms: g.stats ? g.stats.rtt : null, loss_pct: g.stats ? g.stats.loss : null, jitter_ms: g.stats ? g.stats.jitter : null,
+    upload_pct: g.file ? Math.round((100 * g.file.got) / Math.max(1, g.file.bytes)) : null,
+  }));
   try { await fetch(api("guests"), { method: "POST", body: JSON.stringify(list) }); } catch { /* TalkCraft closed */ }
 }
 

@@ -569,6 +569,15 @@ const DE: &[(&str, &str)] = &[
     ("Quit TalkCraft", "TalkCraft beenden"),
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
+    ("good connection", "gute Verbindung"),
+    ("shaky connection", "wackelige Verbindung"),
+    ("poor connection", "schlechte Verbindung"),
+    (
+        "{} ms round trip · {} % lost · {} ms jitter. Their own recording stays clean; only the call suffers.",
+        "{} ms Laufzeit · {} % verloren · {} ms Jitter. Die eigene Aufnahme des Gastes bleibt sauber; nur das Gespräch leidet.",
+    ),
+    ("receiving recording … {} %", "Aufnahme kommt an … {} %"),
+    ("{}: poor connection (the call may drop out)", "{}: schlechte Verbindung (das Gespräch kann aussetzen)"),
     ("No audio input is open (Setup › Audio Interface)", "Kein Audioeingang geöffnet (Einstellungen › Audio-Interface)"),
     ("{} is connected", "{} ist verbunden"),
     ("{} is not connected", "{} ist nicht verbunden"),

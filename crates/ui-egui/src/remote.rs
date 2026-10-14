@@ -49,6 +49,35 @@ pub struct Guest {
     pub connected: bool,
     /// The guest muted themselves.
     pub self_muted: bool,
+    /// Connection: round trip (ms), packets lost in the last seconds (%), jitter (ms).
+    pub rtt_ms: Option<f32>,
+    pub loss_pct: Option<f32>,
+    pub jitter_ms: Option<f32>,
+    /// Their recording arriving after Stop (%).
+    pub upload_pct: Option<f32>,
+}
+
+/// How a guest's connection is doing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Quality {
+    Good,
+    Shaky,
+    Poor,
+}
+
+impl Guest {
+    /// Poor: over 5 % lost or over 400 ms round trip; shaky: over 1 % or 200 ms or 30 ms jitter.
+    /// The guest's own recording is unaffected: only the call (and the backup) suffer.
+    pub fn quality(&self) -> Option<Quality> {
+        let (rtt, loss, jitter) = (self.rtt_ms?, self.loss_pct.unwrap_or(0.0), self.jitter_ms.unwrap_or(0.0));
+        Some(if loss > 5.0 || rtt > 400.0 {
+            Quality::Poor
+        } else if loss > 1.0 || rtt > 200.0 || jitter > 30.0 {
+            Quality::Shaky
+        } else {
+            Quality::Good
+        })
+    }
 }
 
 #[derive(Debug, Default)]
@@ -208,6 +237,10 @@ fn route(method: &str, path: &str, body: &[u8], srv: &Server, tx: &Sender<Upload
                     level_db: g["level"].as_f64().unwrap_or(-60.0) as f32,
                     connected: g["connected"].as_bool().unwrap_or(false),
                     self_muted: g["self_muted"].as_bool().unwrap_or(false),
+                    rtt_ms: g["rtt_ms"].as_f64().map(|v| v as f32),
+                    loss_pct: g["loss_pct"].as_f64().map(|v| v as f32),
+                    jitter_ms: g["jitter_ms"].as_f64().map(|v| v as f32),
+                    upload_pct: g["upload_pct"].as_f64().map(|v| v as f32),
                 })
                 .collect();
             sh.guests_seen = Some(Instant::now());
@@ -516,6 +549,25 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                         } else if g.self_muted {
                             ui.label(RichText::new(tr("muted themselves")).color(t.text_dim));
                         }
+                        if let Some(q) = g.quality() {
+                            let (text, color) = match q {
+                                Quality::Good => (tr("good connection"), egui::Color32::from_rgb(60, 175, 90)),
+                                Quality::Shaky => (tr("shaky connection"), egui::Color32::from_rgb(225, 170, 40)),
+                                Quality::Poor => (tr("poor connection"), egui::Color32::from_rgb(210, 60, 55)),
+                            };
+                            let detail = crate::i18n::trf(
+                                "{} ms round trip · {} % lost · {} ms jitter. Their own recording stays clean; only the call suffers.",
+                                &[
+                                    &(g.rtt_ms.unwrap_or(0.0) as u32),
+                                    &format!("{:.1}", g.loss_pct.unwrap_or(0.0)),
+                                    &(g.jitter_ms.unwrap_or(0.0) as u32),
+                                ],
+                            );
+                            ui.label(RichText::new(format!("● {text}")).color(color).small()).on_hover_text(detail);
+                        }
+                        if let Some(p) = g.upload_pct {
+                            ui.label(RichText::new(crate::i18n::trf("receiving recording … {} %", &[&(p as u32)])).small());
+                        }
                         let on = muted(&g.name);
                         if ui.selectable_label(on, tr("Mute")).on_hover_text(tr("Mutes the guest in the call (same as M on their track)")).clicked() {
                             mute = Some((g.name.clone(), !on));
@@ -561,6 +613,18 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn connection_quality_from_round_trip_loss_and_jitter() {
+        let g = |rtt: f32, loss: f32, jitter: f32| Guest { rtt_ms: Some(rtt), loss_pct: Some(loss), jitter_ms: Some(jitter), ..Default::default() };
+        assert_eq!(g(40.0, 0.0, 5.0).quality(), Some(Quality::Good));
+        assert_eq!(g(250.0, 0.0, 5.0).quality(), Some(Quality::Shaky));
+        assert_eq!(g(40.0, 2.0, 5.0).quality(), Some(Quality::Shaky));
+        assert_eq!(g(40.0, 0.0, 40.0).quality(), Some(Quality::Shaky));
+        assert_eq!(g(500.0, 0.0, 5.0).quality(), Some(Quality::Poor));
+        assert_eq!(g(40.0, 8.0, 5.0).quality(), Some(Quality::Poor));
+        assert_eq!(Guest::default().quality(), None, "nothing measured yet");
+    }
 
     #[test]
     fn late_files_move_later_on_the_timeline() {

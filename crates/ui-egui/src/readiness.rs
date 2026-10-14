@@ -121,6 +121,9 @@ pub fn checks(app: &mut SoundApp) -> Vec<(Light, String)> {
         let Some(t) = s.track(*id) else { continue };
         if let Some(guest) = t.name.strip_prefix(crate::remote::TRACK_PREFIX) {
             match guests.iter().find(|g| g.name == guest) {
+                Some(g) if g.connected && g.quality() == Some(crate::remote::Quality::Poor) => {
+                    out.push((Light::Yellow, trf("{}: poor connection (the call may drop out)", &[&t.name])))
+                }
                 Some(g) if g.connected => out.push((Light::Green, trf("{} is connected", &[&t.name]))),
                 _ => out.push((Light::Red, trf("{} is not connected", &[&t.name]))),
             }
