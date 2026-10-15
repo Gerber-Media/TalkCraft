@@ -624,9 +624,18 @@ fn draw_rulers(app: &mut SoundApp, ui: &mut Ui, area: Rect, tl: Rect, rulers: &[
                 // Click on the marker ruler: recall a marker; double-click adds one.
                 let resp = ui.interact(row, ui.id().with(("marker_ruler", lane)), Sense::click());
                 if let Some(p) = resp.interact_pointer_pos() {
+                    // Double-click on a marker renames it (a chapter title); on free space adds one.
+                    let under =
+                        s.markers.iter().filter(|m| m.ruler == lane || (lane == 1 && m.ruler == 0)).find(|m| {
+                            (x_of(&s, tl, m.start) - p.x).abs() < 8.0 || (p.x > x_of(&s, tl, m.start) && p.x < x_of(&s, tl, m.start) + 90.0)
+                        });
                     if resp.double_clicked() {
-                        let at = sample_at(&s, tl, p.x).max(0);
-                        let _ = app.run("markers.add", json!({"at": at, "ruler": lane}));
+                        if let Some(m) = under {
+                            app.dialogs.open_rename_marker(m.id, &m.name);
+                        } else {
+                            let at = sample_at(&s, tl, p.x).max(0);
+                            let _ = app.run("markers.add", json!({"at": at, "ruler": lane}));
+                        }
                     } else if resp.clicked()
                         && let Some(m) = s
                             .markers
@@ -775,10 +784,10 @@ fn timebase_ruler(_ui: &Ui, painter: &egui::Painter, s: &Session, tl: Rect, row:
                     if secs.fract().abs() < 1e-9 {
                         format!("{}:{:02}", (secs / 60.0) as i64, (secs as i64) % 60)
                     } else {
-                        format_position(at, f, sr, &s.tempo, s.frame_rate, s.timecode_start)
+                        format_position(at, f, sr, &s.tempo, s.frame_rate, s.timecode_start, s.feet_frames_start())
                     }
                 }
-                _ => format_position(at, f, sr, &s.tempo, s.frame_rate, s.timecode_start),
+                _ => format_position(at, f, sr, &s.tempo, s.frame_rate, s.timecode_start, s.feet_frames_start()),
             };
             painter.text(pos2(x + 3.0, row.center().y), Align2::LEFT_CENTER, label, regular(11.0), t.ruler_text);
         } else {
@@ -850,38 +859,22 @@ fn track_row(app: &mut SoundApp, ui: &mut Ui, id: TrackId, row: Rect, tl: Rect) 
 }
 
 /// The take being recorded on `track`: a red clip from where recording started to the playhead,
-/// with the waveform recorded so far.
+/// The take `track` is recording, drawn in red as it grows, as in Pro Tools.
 fn draw_live_take(app: &SoundApp, painter: &egui::Painter, s: &Session, track: &Track, tl: Rect, lane: Rect) {
-    let now = app.position();
-    let start = app.record_start;
-    let x0 = x_of(s, tl, start).max(lane.min.x);
-    let x1 = x_of(s, tl, now).min(lane.max.x);
-    if x1 <= x0 {
-        return;
-    }
-    let body = Rect::from_min_max(pos2(x0, lane.min.y + 1.0), pos2(x1, lane.max.y - 1.0));
-    painter.rect_filled(body, 2.0, Color32::from_rgba_unmultiplied(170, 40, 40, 110));
-    painter.rect_stroke(body, 2.0, Stroke::new(1.0, Color32::from_rgb(230, 70, 70)), egui::StrokeKind::Inside);
     let Some(rec) = &app.recorder else { return };
-    let Ok(live) = rec.live.lock() else { return };
-    let Some((_, peaks)) = live.iter().find(|(id, _)| *id == track.id) else { return };
-    // Session samples per live peak (the input device may run at another rate).
-    let per_peak = soundcraft_playback::record::LIVE_PEAK_FRAMES as f64 * s.sample_rate.as_f64() / f64::from(rec.sample_rate.max(1));
-    let mid = body.center().y;
-    let half = body.height() * 0.45;
-    let wave = Color32::from_rgb(255, 210, 210);
-    let mut x = x0.floor();
-    while x < x1 {
-        let a = ((sample_at(s, tl, x) - start) as f64 / per_peak).floor().max(0.0) as usize;
-        let b = (((sample_at(s, tl, x + 1.0) - start) as f64 / per_peak).ceil() as usize).max(a + 1);
-        let v = peaks.get(a.min(peaks.len())..b.min(peaks.len())).map_or(0.0, |p| p.iter().copied().fold(0.0f32, f32::max));
-        if v > 0.0 {
-            let h = (v.min(1.0) * half).max(0.5);
-            painter.line_segment([pos2(x + 0.5, mid - h), pos2(x + 0.5, mid + h)], Stroke::new(1.0, wave));
-        }
-        x += 1.0;
+    let Some(take) = rec.live_take(track.id) else { return };
+    let block_len = soundcraft_playback::record::LIVE_BLOCK as f64 * s.sample_rate.as_f64() / f64::from(rec.sample_rate.max(1));
+    let len = soundcraft_time::to_samples(take.first().map_or(0, Vec::len) as f64 * block_len);
+    let sel = s.edit.selection;
+    let (start, pass) = if s.edit.loop_record && !sel.is_empty() { (sel.start, Some(sel.len())) } else { (app.record_start, None) };
+    let Some((origin, span)) = soundcraft_engine::io::live_span(start, pass, app.punch, len) else { return };
+    let r = Rect::from_min_max(pos2(x_of(s, tl, span.start), lane.min.y + 1.0), pos2(x_of(s, tl, span.end), lane.max.y - 1.0));
+    let t = Tokens::current();
+    let (body, _, wave) = clip_colors([t.rec.r(), t.rec.g(), t.rec.b()], false);
+    painter.rect(r, CornerRadius::same(2), body, Stroke::new(1.0, Color32::from_rgb(10, 10, 10)), StrokeKind::Inside);
+    if track.view != "blocks" {
+        crate::waveform::draw_live(&painter.with_clip_rect(r.intersect(lane)), s, tl, origin as f64, block_len, &take, r, wave);
     }
-    painter.text(pos2(x0 + 4.0, body.min.y + 2.0), egui::Align2::LEFT_TOP, "REC", crate::theme::bold(10.0), Color32::WHITE);
 }
 
 /// Alternate playlists as lanes under the main one; clicking a clip promotes it (comping).
@@ -1122,7 +1115,8 @@ fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, sele
     let info = format!("vol {}  pan {}", crate::widgets::db_text(m.volume_db), m.pan.first().map_or("-".into(), |p| crate::widgets::pan_text(*p)));
     // After the view buttons as drawn: wider labels (other languages, fonts) push it along.
     let info_x = view_r.max.x.max(c2.min_rect().max.x) + 8.0;
-    ui.painter().text(pos2(info_x, view_r.center().y), Align2::LEFT_CENTER, info, regular(10.0), t.text_dim);
+    // Full text colour: the dimmed one fell short of 4.5:1 on the dark header.
+    ui.painter().text(pos2(info_x, view_r.center().y), Align2::LEFT_CENTER, info, regular(10.0), t.text);
     let ins: Vec<&str> = m.inserts.iter().flatten().filter_map(|i| soundcraft_dsp::plugin_info(&i.plugin).map(|p| p.short_name)).collect();
     if !ins.is_empty() {
         ui.painter().with_clip_rect(Rect::from_min_max(pos2(am_r.max.x + 6.0, am_r.min.y), pos2(head.max.x - 20.0, am_r.max.y))).text(
@@ -1205,6 +1199,18 @@ fn view_hint(view: &str) -> &'static str {
     if view == "volume" { "Show the volume line (draw it with the pencil; auto-ducking writes it)" } else { "Show the waveform" }
 }
 
+/// Pro Tools' rule for track height: Alt reaches every shown track, Alt+Shift the selected ones too.
+pub(crate) fn height_targets(s: &Session, m: egui::Modifiers, own: &[TrackId]) -> Vec<u64> {
+    let extra = |t: &Track| if m.shift { s.edit.selected_tracks.contains(&t.id) } else { !t.hidden };
+    s.tracks.iter().filter(|t| own.contains(&t.id) || (m.alt && extra(t))).map(|t| t.id.0).collect()
+}
+
+/// Zoom Toggle sized to the track area on screen.
+pub fn zoom_toggle(app: &mut SoundApp) {
+    let [x0, y0, x1, y1] = app.edit_layout.timeline;
+    let _ = app.run("view.zoom_toggle", json!({"width_px": x1 - x0, "height_px": y1 - y0}));
+}
+
 /// Track menu › Name Plate Colour: swatches, a free picker, and the option to colour the track too.
 pub fn plate_color_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
     let (current, track_color) = app.engine.session().track(id).map(|t| (t.label_color, t.color)).unwrap_or((None, [128, 128, 128]));
@@ -1236,7 +1242,7 @@ pub fn plate_color_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
     });
 }
 
-fn track_context_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
+pub(crate) fn track_context_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
     let tid = id.0;
     let items: [(&str, &str); 9] = [
         ("Rename...", "ui.rename_track"),
@@ -1336,58 +1342,15 @@ fn draw_clip(app: &SoundApp, painter: &egui::Painter, s: &Session, track: &Track
     let body_r = Rect::from_min_max(pos2(r.min.x, r.min.y + name_h), r.max);
     let vis = body_r.intersect(lane);
     match &clip.content {
-        ClipContent::Audio { source, offset } => {
+        ClipContent::Audio { source, .. } => {
             if let Some(audio) = s.pool.get(*source) {
                 let nch = track.channels().min(audio.peaks.len().max(1)).max(1);
-                let ch_h = body_r.height() / nch as f32;
-                let zoom = s.edit.zoom.waveform_zoom;
-                let rectified = s.edit.flag("waveform.rectified");
-                let power = s.edit.flag("waveform.power");
-                let outlines = s.edit.flag("waveform.outlines");
-                let cols = vis.width().max(0.0) as usize;
-                if cols > 0 && vis.height() > 2.0 {
-                    let a = (offset + sample_at(s, tl, vis.min.x) - clip.start) as f64;
-                    let b = (offset + sample_at(s, tl, vis.max.x) - clip.start) as f64;
-                    for ch in 0..nch {
-                        let Some(pk) = audio.peaks.get(ch % audio.peaks.len().max(1)) else { continue };
-                        let cy = body_r.min.y + ch_h * (ch as f32 + 0.5);
-                        let half = ch_h * 0.46;
-                        let colsv = pk.columns(a, b, cols);
-                        let mut mesh = egui::Mesh::default();
-                        for (i, (mn, mx)) in colsv.iter().enumerate() {
-                            let x = vis.min.x + i as f32;
-                            let rel = sample_at(s, tl, x) - clip.start;
-                            let g = clip.gain_at(rel.clamp(0, clip.length));
-                            let (mut top, mut bot) = if rectified {
-                                let a = (mx.abs().max(mn.abs()) * g * zoom).clamp(0.0, 1.0);
-                                let b = cy + half;
-                                (b - a * half * 2.0, b)
-                            } else {
-                                (cy - (mx * g * zoom).clamp(-1.0, 1.0) * half, cy - (mn * g * zoom).clamp(-1.0, 1.0) * half)
-                            };
-                            if power {
-                                // Power view: compress peaks logarithmically around the centre.
-                                let k = |y: f32| cy + (y - cy).signum() * ((y - cy).abs() / half).sqrt() * half;
-                                top = k(top);
-                                bot = k(bot);
-                            }
-                            if outlines {
-                                bot = top + 1.0;
-                            }
-                            let bot = if (bot - top) < 1.0 { top + 1.0 } else { bot };
-                            let idx = mesh.vertices.len() as u32;
-                            mesh.colored_vertex(pos2(x, top), wave);
-                            mesh.colored_vertex(pos2(x + 1.0, top), wave);
-                            mesh.colored_vertex(pos2(x + 1.0, bot), wave);
-                            mesh.colored_vertex(pos2(x, bot), wave);
-                            mesh.add_triangle(idx, idx + 1, idx + 2);
-                            mesh.add_triangle(idx, idx + 2, idx + 3);
-                        }
-                        painter.with_clip_rect(vis).add(Shape::mesh(mesh));
-                        if nch > 1 && ch + 1 < nch {
-                            let y = body_r.min.y + ch_h * (ch as f32 + 1.0);
-                            painter.line_segment([pos2(vis.min.x, y), pos2(vis.max.x, y)], Stroke::new(1.0, body.gamma_multiply(0.7)));
-                        }
+                if vis.width() > 0.0 && vis.height() > 2.0 {
+                    crate::waveform::draw(&painter.with_clip_rect(vis), s, tl, clip, audio, nch, body_r, wave);
+                    let ch_h = body_r.height() / nch as f32;
+                    for ch in 1..nch {
+                        let y = body_r.min.y + ch_h * ch as f32;
+                        painter.line_segment([pos2(vis.min.x, y), pos2(vis.max.x, y)], Stroke::new(1.0, body.gamma_multiply(0.7)));
                     }
                 }
             } else {
@@ -1497,7 +1460,7 @@ fn draw_clip(app: &SoundApp, painter: &egui::Painter, s: &Session, track: &Track
         painter.line_segment([pos2(x, r.min.y + name_h), pos2(x, r.max.y)], Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 90)));
     }
     let time_text = if s.edit.flag("view.clip.time.current") {
-        Some(format_position(clip.start, s.edit.main_counter, s.sample_rate, &s.tempo, s.frame_rate, s.timecode_start))
+        Some(format_position(clip.start, s.edit.main_counter, s.sample_rate, &s.tempo, s.frame_rate, s.timecode_start, s.feet_frames_start()))
     } else if s.edit.flag("view.clip.time.original") || s.edit.flag("view.clip.time.user") {
         clip.source().and_then(|src| s.source(src)).map(|src| {
             format_position(
@@ -1507,6 +1470,7 @@ fn draw_clip(app: &SoundApp, painter: &egui::Painter, s: &Session, track: &Track
                 &s.tempo,
                 s.frame_rate,
                 0,
+                s.feet_frames_start(),
             )
         })
     } else {
@@ -1625,8 +1589,14 @@ fn magnet(s: &Session, moving: &[ClipId], edges: &[Samples], offset: Samples) ->
     offset + best.unwrap_or(0)
 }
 
+/// The grid position for `at` in Grid mode, or with Snap to Grid on (Shift-click a mode in the
+/// toolbar) for the edit cursor in the other modes; clip moves outside Grid stay free.
 fn snap(s: &Session, at: Samples) -> Samples {
-    if s.edit.edit_mode.is_grid() { s.edit.grid.snap(at, s.sample_rate, &s.tempo, s.frame_rate) } else { at }
+    if s.edit.edit_mode.is_grid() || s.edit.flag(soundcraft_engine::edit::SNAP_TO_GRID) {
+        s.edit.grid.snap(at, s.sample_rate, &s.tempo, s.frame_rate)
+    } else {
+        at
+    }
 }
 
 fn clip_at(track: &Track, at: Samples) -> Option<&Clip> {

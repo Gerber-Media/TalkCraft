@@ -26,10 +26,11 @@ mod options;
 mod plugin_state;
 pub mod podcast;
 mod query;
-mod sampler;
+pub(crate) mod sampler;
 mod setup_more;
 pub mod subtitles;
 mod surround;
+mod tab;
 mod track;
 mod track_more;
 mod transport;
@@ -37,6 +38,11 @@ mod video;
 mod view;
 mod view_more;
 mod vst3;
+mod zoom_toggle;
+
+pub use file::bounce_job;
+
+pub(crate) use edit::remember_selection;
 
 pub type Run = fn(&mut Engine, &Value) -> Result<Value>;
 /// `Err(reason)` = disabled.
@@ -114,6 +120,7 @@ pub fn command_specs() -> &'static [CommandSpec] {
         v.extend(mix::specs());
         v.extend(options::specs());
         v.extend(transport::specs());
+        v.extend(tab::specs());
         v.extend(query::specs());
         v.extend(health::specs());
         v.extend(audiosuite::specs());
@@ -132,6 +139,7 @@ pub fn command_specs() -> &'static [CommandSpec] {
         v.extend(instrument::specs());
         v.extend(sampler::specs());
         v.extend(video::specs());
+        v.extend(zoom_toggle::specs());
         v
     })
 }
@@ -242,9 +250,7 @@ pub fn tracks_required(e: &Engine, cmd: &str, p: &Value) -> Result<Vec<TrackId>>
     if t.is_empty() { Err(bad(cmd, "no tracks: pass `track`/`tracks` or select tracks")) } else { Ok(t) }
 }
 
-/// Largest position accepted from parameters: 2^40 samples (about 265 days at 48 kHz). Clamping
-/// here keeps every later addition and subtraction on positions far away from overflow.
-pub const MAX_POSITION: Samples = 1 << 40;
+pub use soundcraft_time::MAX_POSITION;
 
 /// Position from `key`: a number of samples, or `{"seconds": x}`, or a string in the main counter format.
 /// Values are clamped to ±[`MAX_POSITION`].
@@ -279,7 +285,7 @@ fn position_param_raw(e: &Engine, cmd: &str, p: &Value, key: &str) -> Result<Opt
             }
         };
         for f in fmts {
-            if let Ok(x) = soundcraft_time::parse_position(body, f, s.sample_rate, &s.tempo, s.frame_rate, s.timecode_start) {
+            if let Ok(x) = s.parse_position(body, f) {
                 return Ok(Some(x));
             }
         }
@@ -299,6 +305,10 @@ pub fn range_param(e: &Engine, cmd: &str, p: &Value) -> Result<Range> {
         (Some(a), None, None) => Ok(Range::point(a)),
         _ => Ok(e.session().edit.selection),
     }
+}
+
+pub fn clip_id(p: &Value, cmd: &str) -> Result<ClipId> {
+    p.get("clip").and_then(Value::as_u64).map(ClipId).ok_or_else(|| bad(cmd, "`clip` id required"))
 }
 
 pub fn clip_ids_param(e: &Engine, p: &Value) -> Vec<ClipId> {

@@ -165,11 +165,11 @@ fn delete(e: &mut Engine, p: &Value) -> Result<Value> {
 fn import(e: &mut Engine, p: &Value) -> Result<Value> {
     const ID: &str = "subtitle.import";
     let path = str_param(p, "path").ok_or_else(|| bad(ID, "`path` required"))?.to_string();
-    let len = std::fs::metadata(&path).map_err(|err| bad(ID, format!("{path}: {err}")))?.len();
+    let len = crate::io::file_size(&path)?;
     if len > MAX_FILE_BYTES {
         return Err(bad(ID, format!("{path} is larger than 20 MB")));
     }
-    let bytes = std::fs::read(&path).map_err(|err| bad(ID, format!("{path}: {err}")))?;
+    let bytes = crate::io::read_file(&path)?;
     let text = String::from_utf8_lossy(&bytes);
     let cues = subs::parse(&text);
     if cues.is_empty() {
@@ -306,7 +306,7 @@ fn words(e: &mut Engine, p: &Value) -> Result<Value> {
     let r = full_range(e, range_param(e, ID, p)?);
     let language = transcribe_language(e, p);
     let cues = if let Some(srt) = str_param(p, "srt") {
-        let bytes = std::fs::read(srt).map_err(|err| bad(ID, format!("{srt}: {err}")))?;
+        let bytes = crate::io::read_file(srt)?;
         subs::parse(&String::from_utf8_lossy(&bytes))
     } else {
         let mut job = crate::transcribe::prepare(e, r, &language, str_param(p, "model"), ID)?;
@@ -322,7 +322,7 @@ fn transcribe(e: &mut Engine, p: &Value) -> Result<Value> {
     const ID: &str = "subtitle.transcribe";
     let r = full_range(e, range_param(e, ID, p)?);
     let cues = if let Some(srt) = str_param(p, "srt") {
-        let bytes = std::fs::read(srt).map_err(|err| bad(ID, format!("{srt}: {err}")))?;
+        let bytes = crate::io::read_file(srt)?;
         subs::parse(&String::from_utf8_lossy(&bytes))
     } else {
         let job = crate::transcribe::prepare(e, r, &transcribe_language(e, p), str_param(p, "model"), ID)?;

@@ -44,7 +44,7 @@ impl eframe::App for App {
         if let Some(menu) = &mut self.2 {
             menu.process(&mut self.0);
         }
-        self.0.logic(ctx);
+        self.0.guarded(|app| app.logic(ctx));
         #[cfg(target_os = "macos")]
         {
             // The system menu bar is built for one work mode: rebuild it when the mode changes.
@@ -59,9 +59,10 @@ impl eframe::App for App {
                 menu.sync(&self.0);
             }
         }
-        // Files dropped on the window: sessions open, audio/MIDI import.
+        // Files dropped on the window: audio on an instrument track or a Sampler window loads
+        // the sampler; otherwise sessions open and audio/MIDI import.
         let dropped: Vec<String> =
-            ctx.input(|i| i.raw.dropped_files.iter().map(|f| f.path().to_string_lossy().into_owned()).filter(|s| !s.is_empty()).collect());
+            self.0.take_dropped_files(ctx).iter().map(|f| f.path().to_string_lossy().into_owned()).filter(|s| !s.is_empty()).collect();
         for p in dropped {
             open_path(&mut self.0, &p);
         }
@@ -96,9 +97,10 @@ impl eframe::App for App {
         self.0.raw_input_hook(raw);
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        self.0.ui(ui);
+        self.0.guarded(|app| app.ui(ui));
     }
     fn on_exit(&mut self) {
+        self.0.close_autosave();
         save_prefs(&self.0.ui);
         if let Some(logger) = self.1 {
             logger.report_audio_thread();
@@ -206,7 +208,7 @@ fn services() -> Services {
                 "subtitle.import" => d.add_filter("Subtitles", &["srt", "vtt"]),
                 _ => d.add_filter(
                     "Audio",
-                    &["wav", "wave", "bwf", "aif", "aiff", "aifc", "flac", "mp3", "ogg", "oga", "m4a", "aac", "mp4", "caf", "mkv", "webm"],
+                    &["wav", "wave", "bwf", "aif", "aiff", "aifc", "flac", "mp3", "ogg", "oga", "m4a", "m4b", "aac", "mp4", "caf", "mkv", "webm"],
                 ),
             };
             d.pick_file().map(|p| p.to_string_lossy().into_owned())
@@ -318,11 +320,20 @@ fn main() -> eframe::Result {
         "TalkCraft",
         options,
         Box::new(move |cc| {
-            // The interface picked in Setup > Audio Interface, when it is connected.
+            // The interface picked in Setup > Audio Interface, when it is connected; the audio
+            // device settings (system, rate, buffer) come from Setup > Playback Engine.
             soundcraft_playback::record::set_preferred_devices(prefs_devices.0.clone(), prefs_devices.1.clone());
-            let player = if no_audio { None } else { Some(soundcraft_playback::Player::new(Arc::new(engine.session().clone()))) };
+            let mut audio = prefs.audio.clone();
+            if audio.output.is_none() {
+                audio.output = prefs_devices.0.clone();
+            }
+            if audio.input.is_none() {
+                audio.input = prefs_devices.1.clone();
+            }
+            let player = if no_audio { None } else { Some(soundcraft_playback::Player::with_config(Arc::new(engine.session().clone()), &audio)) };
             let mut app = SoundApp::new(engine, player, services());
             app.autosave_dir = prefs_path().and_then(|p| p.parent().map(|d| d.join("Autosave")));
+            app.leftovers = app.autosave_dir.as_deref().map(soundcraft_engine::autosave::leftovers).unwrap_or_default();
             app.preset_dir = prefs_path().and_then(|p| p.parent().map(|d| d.join("Presets")));
             app.extra.ui_scale = prefs.ui_scale;
             app.ui = prefs;

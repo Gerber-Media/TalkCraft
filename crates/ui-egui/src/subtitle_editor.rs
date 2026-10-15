@@ -337,6 +337,20 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 {
                     run.push(("podcast.suggest_chapters".into(), json!({})));
                 }
+                if ui
+                    .add_enabled(!cues.is_empty(), egui::Button::new(crate::i18n::tr("Name Speakers")))
+                    .on_hover_text(crate::i18n::tr("Each cue gets the name of the track that is loudest while it is spoken"))
+                    .clicked()
+                {
+                    run.push(("subtitle.assign_speakers".into(), json!({"overwrite": true})));
+                }
+                if ui
+                    .add_enabled(!cues.is_empty(), egui::Button::new(crate::i18n::tr("Delete All")))
+                    .on_hover_text(crate::i18n::tr("Removes every subtitle (Undo brings them back)"))
+                    .clicked()
+                {
+                    run.push(("subtitle.clear".into(), json!({})));
+                }
             });
             ui.separator();
             if cues.is_empty() {

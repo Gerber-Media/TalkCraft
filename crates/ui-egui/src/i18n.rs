@@ -569,6 +569,64 @@ const DE: &[(&str, &str)] = &[
     ("Quit TalkCraft", "TalkCraft beenden"),
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
+    ("{}: click to open · {}click to bypass · right-click to change", "{}: Klick öffnet · {}Klick umgeht · Rechtsklick ändert"),
+    ("Bouncing {} ({}%)", "Bounce {} ({} %)"),
+    ("Click to add a MIDI clip to {} at the insertion point.", "Klicken, um auf {} an der Einfügemarke einen MIDI-Clip anzulegen."),
+    ("Delete All", "Alle löschen"),
+    (
+        "Each cue gets the name of the track that is loudest while it is spoken",
+        "Jeder Untertitel bekommt den Namen der Spur, die beim Sprechen am lautesten ist",
+    ),
+    (
+        "Grid mode ({}; again for Relative); Shift-click: Snap to Grid in the other modes",
+        "Raster-Modus ({}; nochmal für relativ); Umschalt-Klick: in den anderen Modi am Raster einrasten",
+    ),
+    ("Name Speakers", "Sprecher benennen"),
+    ("New Tracks… (Cmd+Shift+N)", "Neue Spuren … (Cmd+Umschalt+N)"),
+    ("Removes every subtitle (Undo brings them back)", "Entfernt alle Untertitel (Rückgängig holt sie zurück)"),
+    (
+        "Renders and AudioSuite processes run to completion before returning.",
+        "Renderings und AudioSuite-Bearbeitungen laufen bis zum Ende, bevor es weitergeht.",
+    ),
+    (
+        "Send {} to {}: {} dB\nClick for the send fader · drag vertically to adjust · Shift-drag for fine control · Alt-click for 0 dB · right-click for options",
+        "Send {} an {}: {} dB\nKlick für den Send-Fader · senkrecht ziehen zum Einstellen · Umschalt-Ziehen für fein · Alt-Klick für 0 dB · Rechtsklick für Optionen",
+    ),
+    ("Shuffle is locked ({}-click to unlock)", "Shuffle ist gesperrt ({}-Klick entsperrt)"),
+    ("Shuffle mode ({}); {}-click locks it out", "Shuffle-Modus ({}); {}-Klick sperrt ihn"),
+    ("Slip mode ({}); Shift-click adds Snap to Grid", "Slip-Modus ({}); Umschalt-Klick rastet zusätzlich am Raster ein"),
+    ("Zoom Toggle (E)", "Zoom umschalten (E)"),
+    (
+        "Nothing to record on yet: add a speaker with + under the track list.",
+        "Noch nichts zum Aufnehmen: unter der Spurliste mit + einen Sprecher hinzufügen.",
+    ),
+    ("Recording stopped", "Aufnahme gestoppt"),
+    (
+        "{}. Everything up to this moment is saved on the tracks.\n\n{}",
+        "{}. Alles bis zu diesem Moment ist gesichert und liegt auf den Spuren.\n\n{}",
+    ),
+    ("Recording stopped: {}. The take is kept up to there. {}", "Aufnahme gestoppt: {}. Die Aufnahme bleibt bis dahin erhalten. {}"),
+    ("Playback stopped: {}. {}", "Wiedergabe gestoppt: {}. {}"),
+    ("Audio output: {}. {}", "Audioausgabe: {}. {}"),
+    ("Audio input: {}. {}", "Audioeingang: {}. {}"),
+    (
+        "The disk is too slow: this take has lost {} ms of input so far.",
+        "Die Festplatte ist zu langsam: Diese Aufnahme hat bisher {} ms Eingang verloren.",
+    ),
+    (
+        "Use Reconnect audio device in Setup ▸ Playback Engine, or restart TalkCraft.",
+        "Unter Einstellungen ▸ Playback Engine „Audiogerät neu verbinden“ wählen oder TalkCraft neu starten.",
+    ),
+    (
+        "Plug it back in, then use Reconnect audio device in Setup ▸ Playback Engine.",
+        "Wieder anstecken, dann unter Einstellungen ▸ Playback Engine „Audiogerät neu verbinden“ wählen.",
+    ),
+    ("Use Reconnect audio device in Setup ▸ Playback Engine.", "Unter Einstellungen ▸ Playback Engine „Audiogerät neu verbinden“ wählen."),
+    (
+        "Reconnect it, then use Reconnect audio device in Setup ▸ Playback Engine.",
+        "Wieder anschließen, dann unter Einstellungen ▸ Playback Engine „Audiogerät neu verbinden“ wählen.",
+    ),
+    ("Check the disk, then record again.", "Festplatte prüfen, dann erneut aufnehmen."),
     ("Cut a jingle in the timeline and put it on a pad", "Einen Jingle in der Zeitleiste schneiden und auf ein Pad legen"),
     (
         "Drop an audio file into TalkCraft, cut it with the usual tools, select the range (or just its track), then export it here.",

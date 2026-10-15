@@ -241,11 +241,11 @@ fn export_jingle(e: &mut Engine, p: &Value) -> Result<Value> {
     let name = str_param(p, "name").map(str::trim).filter(|n| !n.is_empty()).map(str::to_string).or(first_clip).unwrap_or_else(|| "Jingle".into());
     let name: String = name.chars().take(80).collect();
     let dir = jingle_dir(e);
-    std::fs::create_dir_all(&dir).map_err(|err| bad(ID, format!("{}: {err}", dir.display())))?;
+    crate::io::make_dir(&dir)?;
     let safe: String = name.chars().map(|c| if c.is_alphanumeric() || " -_".contains(c) { c } else { '_' }).collect();
     let mut path = dir.join(format!("{safe}.wav"));
     let mut n = 2;
-    while path.exists() {
+    while crate::io::file_found(&path) {
         path = dir.join(format!("{safe} {n}.wav"));
         n += 1;
     }
@@ -364,7 +364,7 @@ fn place_jingle(e: &mut Engine, p: &Value) -> Result<Value> {
     }
     let track = jingle_track(e.session()).ok_or_else(|| bad(ID, "no jingle track: lock a track against recording to use it for jingles"))?;
     let at = position_param(e, ID, p, "at")?.unwrap_or(e.session().edit.selection.start).max(0);
-    let bytes = std::fs::read(&path).map_err(|err| bad(ID, format!("{path}: {err}")))?;
+    let bytes = crate::io::read_file(&path)?;
     let name = std::path::Path::new(&path).file_name().and_then(|n| n.to_str()).unwrap_or("Jingle").to_string();
     let r = crate::io::import_audio_bytes(e, &name, &bytes, Some(path.as_str()), Some(track), at)?;
     Ok(json!({"pad": pad, "placed": r}))
@@ -508,7 +508,7 @@ fn sync_clip(e: &mut Engine, p: &Value) -> Result<Value> {
     let delta = new_start - clip.start;
     if delta != 0 {
         let s = e.session_mut();
-        crate::edit::move_clips(s, &[id], delta, None);
+        crate::edit::move_clips(s, &[id], delta, &[]);
     }
     Ok(json!({"moved": delta, "moved_s": sr.seconds(delta), "correlation": score}))
 }
@@ -605,7 +605,7 @@ fn extend_clip(e: &mut Engine, p: &Value) -> Result<Value> {
     if end {
         if ripple {
             let later = clips_from(s, &tracks, c.end(), id);
-            crate::edit::move_clips(s, &later, delta, None);
+            crate::edit::move_clips(s, &later, delta, &[]);
         }
         if let Some(x) = s.find_clip_mut(id) {
             x.trim_end_to(c.end() + delta);
@@ -619,7 +619,7 @@ fn extend_clip(e: &mut Engine, p: &Value) -> Result<Value> {
         // The clip keeps its place; what is revealed pushes it and everything after it later.
         let mut later = clips_from(s, &tracks, c.start, id);
         later.push(id);
-        crate::edit::move_clips(s, &later, delta, None);
+        crate::edit::move_clips(s, &later, delta, &[]);
         if let Some(x) = s.find_clip_mut(id) {
             x.trim_start_to(c.start);
         }
@@ -723,7 +723,7 @@ fn track_named(e: &mut Engine, name: &str) -> soundcraft_model::TrackId {
 }
 
 fn import_file(e: &mut Engine, id: &str, path: &str, track: soundcraft_model::TrackId, at: Samples) -> Result<u64> {
-    let bytes = std::fs::read(path).map_err(|err| EngineError::Io(format!("{path}: {err}")))?;
+    let bytes = crate::io::read_file(path)?;
     let name = std::path::Path::new(path).file_name().and_then(|n| n.to_str()).unwrap_or("Audio").to_string();
     let v = crate::io::import_audio_bytes(e, &name, &bytes, Some(path), Some(track), at.max(0))?;
     v["clip"].as_u64().ok_or_else(|| bad(id, "import made no clip"))
@@ -902,11 +902,11 @@ fn cover(id: &str, path: &str) -> Result<Option<(String, Vec<u8>)>> {
         "png" => "image/png",
         _ => return Err(bad(id, format!("cover `{path}` must be a JPEG or PNG"))),
     };
-    let len = std::fs::metadata(path).map_err(|err| bad(id, format!("cover `{path}`: {err}")))?.len();
+    let len = crate::io::file_size(path).map_err(|err| bad(id, format!("cover: {err}")))?;
     if len > MAX_COVER_BYTES {
         return Err(bad(id, format!("cover `{path}` is larger than 10 MB")));
     }
-    let data = std::fs::read(path).map_err(|err| bad(id, format!("cover `{path}`: {err}")))?;
+    let data = crate::io::read_file(path).map_err(|err| bad(id, format!("cover: {err}")))?;
     Ok(Some((mime.to_string(), data)))
 }
 
@@ -1315,7 +1315,7 @@ mod tests {
         let s = e.session_mut();
         let gast = s.track_by_name("Gast 1").unwrap().id;
         let right_id = s.track(gast).unwrap().clips()[1].id;
-        crate::edit::move_clips(s, &[right_id], sec, None);
+        crate::edit::move_clips(s, &[right_id], sec, &[]);
         e.execute("edit.extend_clip", &json!({"clip": left, "edge": "end", "to": {"seconds": 2.5}, "all_tracks": true})).unwrap();
         assert_eq!(clips(&e, "Gast 1")[0], (0, 2 * sec + sec / 2));
         assert_eq!(clips(&e, "Moderation"), vec![(0, 2 * sec), (2 * sec, 4 * sec)], "no overlap on the other track");
