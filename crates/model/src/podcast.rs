@@ -90,6 +90,8 @@ pub struct PodcastSettings {
     pub jingle_images: Vec<String>,
     /// A name per pad ("" = the file's name).
     pub jingle_names: Vec<String>,
+    /// A colour per pad (`None` = the theme's).
+    pub jingle_colors: Vec<Option<[u8; 3]>>,
     /// How many pads the Jingles window shows (0 = the standard eight).
     pub jingle_pads: u32,
     /// The run sheet: the episode's topics in order, each with its planned length.

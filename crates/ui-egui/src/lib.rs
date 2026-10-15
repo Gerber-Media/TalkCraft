@@ -6,6 +6,7 @@
 
 pub mod audio_setup;
 pub mod audiogram;
+pub mod colors;
 pub mod control;
 pub mod credits;
 pub mod dialogs;

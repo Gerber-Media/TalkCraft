@@ -88,6 +88,7 @@ enum Action {
     AddPad,
     Move(usize, usize),
     Rename(usize, String),
+    Color(usize, Option<[u8; 3]>),
 }
 
 pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
@@ -135,15 +136,24 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                     };
                     let size = if own_window { (pad.y / 4.0).clamp(14.0, 28.0) } else { 13.0 };
                     // With a picture the label is drawn over it; the button itself stays empty.
+                    let color = pod.jingle_colors.get(i).copied().flatten();
+                    let fill = color.map(crate::theme::rgb);
                     let label = if pic.is_some() {
                         RichText::new("")
+                    } else if let Some(f) = fill {
+                        // The text follows the pad's colour: dark on light, light on dark.
+                        RichText::new(&text).size(size).strong().color(crate::colors::ink_on(f))
                     } else if path.is_empty() {
                         RichText::new(&text).size(size).color(t.text_dim)
                     } else {
                         RichText::new(&text).size(size).strong()
                     };
+                    let mut button = egui::Button::new(label).min_size(pad);
+                    if let Some(f) = fill {
+                        button = button.fill(if path.is_empty() { f.gamma_multiply(0.5) } else { f });
+                    }
                     let r = ui
-                        .add_enabled(!path.is_empty() || pic.is_some(), egui::Button::new(label).min_size(pad))
+                        .add_enabled(!path.is_empty() || pic.is_some(), button)
                         .on_hover_text(tr("Click: play it now (while recording or playing at the playhead, else at the insertion point) · drop an audio file or a picture here · right-click for more"))
                         .on_disabled_hover_text(tr("Drop an audio file here, or set a path"));
                     if let Some(tex) = &pic {
@@ -189,6 +199,17 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                             w.renaming = Some((i, name.clone()));
                             ui.close();
                         }
+                        ui.menu_button(tr("Colour"), |ui| match crate::colors::menu(ui, color) {
+                            Some(crate::colors::Choice::Color(c)) => {
+                                actions.push(Action::Color(i, Some(c)));
+                                ui.close();
+                            }
+                            Some(crate::colors::Choice::Reset) => {
+                                actions.push(Action::Color(i, None));
+                                ui.close();
+                            }
+                            None => {}
+                        });
                         if let Some(pick) = &app.services.pick_open
                             && ui.button(tr("Choose audio file…")).clicked()
                         {
@@ -293,6 +314,21 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             // usize::MAX: the name field closed.
             Action::Rename(usize::MAX, _) => app.extra.jingles.renaming = None,
             Action::Rename(i, name) => set_slot(app, "jingle_names", i, &name),
+            Action::Color(i, c) => {
+                let pod = &app.engine.session().podcast;
+                let mut colors = pod.jingle_colors.clone();
+                colors.resize(colors.len().max(i + 1), None);
+                if let Some(slot) = colors.get_mut(i) {
+                    *slot = c;
+                }
+                while colors.last().is_some_and(Option::is_none) {
+                    colors.pop();
+                }
+                let pads = pad_count(pod) as u32;
+                if let Err(e) = app.run("podcast.set", json!({"jingle_colors": colors, "jingle_pads": pads})) {
+                    app.ui.status = e;
+                }
+            }
             Action::Move(from, to) => {
                 if let Err(e) = app.run("podcast.jingle_move", json!({"from": from + 1, "to": to + 1})) {
                     app.ui.status = e;

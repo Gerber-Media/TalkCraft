@@ -327,6 +327,16 @@ fn edit_marker(e: &mut Engine, p: &Value) -> Result<Value> {
     if let Some(c) = str_param(p, "comments") {
         m.comments = c.to_string();
     }
+    // `color: [r, g, b]` colours the marker; `color: null` takes the colour off.
+    match p.get("color") {
+        Some(Value::Array(a)) if a.len() == 3 => {
+            let v: Vec<u8> = a.iter().map(|x| x.as_u64().unwrap_or(0).min(255) as u8).collect();
+            m.color = Some([v.first().copied().unwrap_or(0), v.get(1).copied().unwrap_or(0), v.get(2).copied().unwrap_or(0)]);
+        }
+        Some(Value::Null) => m.color = None,
+        Some(_) => return Err(bad("markers.edit", "`color` is [r, g, b] or null")),
+        None => {}
+    }
     if let Some(a) = at {
         let len = m.end - m.start;
         m.start = a.max(0);

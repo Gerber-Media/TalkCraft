@@ -398,14 +398,13 @@ fn strip(app: &mut SoundApp, ui: &mut Ui, id: TrackId, snap: Option<&MeterSnapsh
     };
     ui.painter().text(pos2(vr.center().x, vr.max.y + 9.0), Align2::CENTER_CENTER, kind, regular(9.5), t.text_dim);
     let nr = Rect::from_min_size(pos2(x0, r.max.y - 26.0), vec2(inner_w, 18.0));
-    ui.painter().rect(
-        nr,
-        CornerRadius::same(2),
-        if selected { t.name_field_sel } else { t.name_field },
-        Stroke::new(1.0, Color32::BLACK),
-        StrokeKind::Inside,
-    );
-    ui.painter().with_clip_rect(nr).text(nr.center(), Align2::CENTER_CENTER, &track.name, bold(12.0), t.text_dark);
+    let (plate, ink) = match track.label_color {
+        Some(c) => (crate::theme::rgb(c), crate::colors::ink_on(crate::theme::rgb(c))),
+        None => (if selected { t.name_field_sel } else { t.name_field }, t.text_dark),
+    };
+    let outline = if selected && track.label_color.is_some() { Stroke::new(2.0, t.accent) } else { Stroke::new(1.0, Color32::BLACK) };
+    ui.painter().rect(nr, CornerRadius::same(2), plate, outline, StrokeKind::Inside);
+    ui.painter().with_clip_rect(nr).text(nr.center(), Align2::CENTER_CENTER, &track.name, bold(12.0), ink);
     let nresp = ui.interact(nr, ui.id().with(("strip_name", id.0)), Sense::click());
     if nresp.clicked() {
         crate::edit_window::click_track(app, id, ui.input(|i| i.modifiers), |_, t| !t.hidden && t.kind != TrackKind::Video);

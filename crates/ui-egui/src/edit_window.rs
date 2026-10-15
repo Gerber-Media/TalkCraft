@@ -637,6 +637,37 @@ fn draw_rulers(app: &mut SoundApp, ui: &mut Ui, area: Rect, tl: Rect, rulers: &[
                         let _ = app.run("markers.recall", json!({"number": m.number}));
                     }
                 }
+                // Right-click on a marker: its colour. The marker is remembered while the menu is open.
+                let menu_id = ui.id().with(("marker_menu", lane));
+                if resp.secondary_clicked()
+                    && let Some(p) = resp.interact_pointer_pos()
+                {
+                    let hit = s
+                        .markers
+                        .iter()
+                        .filter(|m| m.ruler == lane || (lane == 1 && m.ruler == 0))
+                        .min_by(|a, b| (x_of(&s, tl, a.start) - p.x).abs().total_cmp(&(x_of(&s, tl, b.start) - p.x).abs()))
+                        .filter(|m| (x_of(&s, tl, m.start) - p.x).abs() < 12.0)
+                        .map(|m| (m.number, m.color));
+                    ui.data_mut(|d| d.insert_temp(menu_id, hit));
+                }
+                let target: Option<(u32, Option<[u8; 3]>)> = ui.data(|d| d.get_temp(menu_id)).flatten();
+                if let Some((number, color)) = target {
+                    resp.context_menu(|ui| {
+                        ui.label(egui::RichText::new(crate::i18n::tr("Marker colour")).strong());
+                        match crate::colors::menu(ui, color) {
+                            Some(crate::colors::Choice::Color(c)) => {
+                                let _ = app.run("markers.edit", json!({"number": number, "color": c}));
+                                ui.close();
+                            }
+                            Some(crate::colors::Choice::Reset) => {
+                                let _ = app.run("markers.edit", json!({"number": number, "color": null}));
+                                ui.close();
+                            }
+                            None => {}
+                        }
+                    });
+                }
             }
             _ => {
                 if let Some(f) = fmt {
@@ -920,24 +951,25 @@ fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, sele
     bg.context_menu(|ui| track_context_menu(app, ui, id));
     // Name field.
     let name_r = Rect::from_min_size(pos2(x0, head.min.y + 4.0), vec2(150.0, 17.0));
-    ui.painter().rect(
-        name_r,
-        CornerRadius::same(2),
-        if selected { t.name_field_sel } else { t.name_field },
-        Stroke::new(1.0, Color32::from_rgb(20, 20, 20)),
-        StrokeKind::Inside,
-    );
+    // A plate of its own colour (the text follows: dark on light, light on dark); selected = outlined.
+    let (plate, ink) = match track.label_color {
+        Some(c) => (rgb(c), crate::colors::ink_on(rgb(c))),
+        None => (if selected { t.name_field_sel } else { t.name_field }, t.text_dark),
+    };
+    let outline = if selected && track.label_color.is_some() { Stroke::new(2.0, t.accent) } else { Stroke::new(1.0, Color32::from_rgb(20, 20, 20)) };
+    ui.painter().rect(name_r, CornerRadius::same(2), plate, outline, StrokeKind::Inside);
     let shown_name = if app.engine.session().edit.flag("edit_view.track_number") {
         let n = app.engine.session().track_index(id).map_or(0, |i| i + 1);
         format!("{n}  {}", track.name)
     } else {
         track.name.clone()
     };
-    ui.painter().with_clip_rect(name_r).text(name_r.center(), Align2::CENTER_CENTER, &shown_name, bold(12.0), t.text_dark);
+    ui.painter().with_clip_rect(name_r).text(name_r.center(), Align2::CENTER_CENTER, &shown_name, bold(12.0), ink);
     let nresp = ui.interact(name_r, ui.id().with(("name", id.0)), Sense::click_and_drag());
     // The grip on the name plate: drag the plate to sort the track (the Tracks list has one too).
     let grip = Rect::from_min_size(pos2(name_r.min.x + 2.0, name_r.min.y), vec2(10.0, name_r.height()));
-    icons::draw(ui.painter(), grip, "grip", if nresp.hovered() || nresp.dragged() { t.text_dark } else { Color32::from_gray(140) });
+    icons::draw(ui.painter(), grip, "grip", if nresp.hovered() || nresp.dragged() { ink } else { ink.gamma_multiply(0.55) });
+    nresp.context_menu(|ui| track_context_menu(app, ui, id));
     if nresp.hovered() && !nresp.dragged() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
     }
@@ -1173,6 +1205,37 @@ fn view_hint(view: &str) -> &'static str {
     if view == "volume" { "Show the volume line (draw it with the pencil; auto-ducking writes it)" } else { "Show the waveform" }
 }
 
+/// Track menu › Name Plate Colour: swatches, a free picker, and the option to colour the track too.
+pub fn plate_color_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
+    let (current, track_color) = app.engine.session().track(id).map(|t| (t.label_color, t.color)).unwrap_or((None, [128, 128, 128]));
+    ui.menu_button(crate::i18n::tr("Name Plate Colour"), |ui| {
+        let chosen = crate::colors::menu(ui, current);
+        ui.separator();
+        if ui
+            .button(crate::i18n::tr("Use for the track and its clips too"))
+            .on_hover_text(crate::i18n::tr("The coloured bar and the clips take the plate's colour"))
+            .clicked()
+            && let Some(c) = current
+        {
+            let _ = app.run("track.color", json!({"tracks": [id.0], "color": c}));
+            ui.close();
+        }
+        if ui.button(crate::i18n::tr("Take the track's colour")).clicked() {
+            let _ = app.run("track.label_color", json!({"tracks": [id.0], "color": track_color}));
+            ui.close();
+        }
+        match chosen {
+            Some(crate::colors::Choice::Color(c)) => {
+                let _ = app.run("track.label_color", json!({"tracks": [id.0], "color": c}));
+            }
+            Some(crate::colors::Choice::Reset) => {
+                let _ = app.run("track.label_color", json!({"tracks": [id.0], "color": null}));
+            }
+            None => {}
+        }
+    });
+}
+
 fn track_context_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
     let tid = id.0;
     let items: [(&str, &str); 9] = [
@@ -1197,6 +1260,7 @@ fn track_context_menu(app: &mut SoundApp, ui: &mut Ui, id: TrackId) {
         }
     }
     ui.separator();
+    plate_color_menu(app, ui, id);
     ui.menu_button(crate::i18n::tr("Track Height"), |ui| {
         for h in TrackHeight::ALL {
             if ui.button(h.label()).clicked() {

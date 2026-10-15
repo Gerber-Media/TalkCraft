@@ -195,6 +195,9 @@ pub struct Track {
     pub kind: TrackKind,
     pub format: ChannelFormat,
     pub color: [u8; 3],
+    /// The name plate's own background (`None` = the theme's plate); the track colour stays.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label_color: Option<[u8; 3]>,
     pub height: TrackHeight,
     pub playlists: Vec<Playlist>,
     pub active_playlist: usize,
@@ -251,6 +254,7 @@ impl Track {
             kind,
             format,
             color,
+            label_color: None,
             height: TrackHeight::Medium,
             active_playlist: 0,
             mixer: Mixer::new(format),

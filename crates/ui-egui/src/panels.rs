@@ -58,6 +58,7 @@ pub fn tracks_and_groups(app: &mut SoundApp, ui: &mut Ui) {
             if resp.clicked() {
                 crate::edit_window::click_track(app, soundcraft_model::TrackId(id), ui.input(|i| i.modifiers), |_, _| true);
             }
+            resp.context_menu(|ui| crate::edit_window::plate_color_menu(app, ui, soundcraft_model::TrackId(id)));
         }
     });
     if let Some((from, to)) = moved

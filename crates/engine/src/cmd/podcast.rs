@@ -191,6 +191,13 @@ fn jingle_move(e: &mut Engine, p: &Value) -> Result<Value> {
             list.pop();
         }
     }
+    let colors = &mut s.jingle_colors;
+    colors.resize(n, None);
+    let c = colors.remove(from - 1);
+    colors.insert(to - 1, c);
+    while colors.last().is_some_and(Option::is_none) {
+        colors.pop();
+    }
     e.session_mut().podcast = s;
     Ok(json!({"from": from, "to": to}))
 }
@@ -219,6 +226,9 @@ fn jingle_pad(e: &mut Engine, p: &Value) -> Result<Value> {
         }
         if r <= s.jingle_names.len() {
             s.jingle_names.remove(r - 1);
+        }
+        if r <= s.jingle_colors.len() {
+            s.jingle_colors.remove(r - 1);
         }
         s.jingle_pads = (n - 1) as u32;
     } else {
@@ -728,6 +738,7 @@ fn checked(id: &str, v: Value) -> Result<PodcastSettings> {
     if s.jingles.len() > MAX_JINGLE_PADS
         || s.jingle_images.len() > MAX_JINGLE_PADS
         || s.jingle_names.len() > MAX_JINGLE_PADS
+        || s.jingle_colors.len() > MAX_JINGLE_PADS
         || s.jingle_pads as usize > MAX_JINGLE_PADS
         || s.jingle_names.iter().any(|n| n.chars().count() > 80)
     {
@@ -1276,6 +1287,10 @@ mod tests {
         assert_eq!(jingle_name(&plain, 8), "intro", "else the file's name");
         e.execute("podcast.jingle_move", &json!({"from": 9, "to": 1})).unwrap();
         assert_eq!(jingle_name(&e.session().podcast, 0), "Outro", "the name moves with the pad");
+        e.execute("podcast.set", &json!({"jingle_colors": [null, [200, 30, 30]]})).unwrap();
+        e.execute("podcast.jingle_move", &json!({"from": 2, "to": 1})).unwrap();
+        assert_eq!(e.session().podcast.jingle_colors.first(), Some(&Some([200, 30, 30])), "the colour moves too");
+        e.execute("podcast.jingle_move", &json!({"from": 1, "to": 2})).unwrap();
         let pod = &e.session().podcast;
         assert_eq!(pod.jingles[0], wav.to_string_lossy());
         assert_eq!(pod.jingle_images.get(2).map(String::as_str), Some("cover.png"), "picture 2 moved to 3");

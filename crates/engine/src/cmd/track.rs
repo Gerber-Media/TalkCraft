@@ -58,6 +58,15 @@ pub fn specs() -> Vec<CommandSpec> {
         cmd!("track.rename", "Rename Track", [], None, "{track, name}", has_tracks, rename),
         cmd!("track.comments", "Track Comments", [], None, "{track, comments}", has_tracks, comments),
         cmd!("track.color", "Track Color", [], None, "{tracks?, color: [r,g,b] | palette index}", has_selection, color),
+        cmd!(
+            "track.label_color",
+            "Name Plate Color",
+            [],
+            None,
+            "{tracks?, color: [r,g,b] | null} — the name plate's background (null: the standard one)",
+            has_selection,
+            label_color
+        ),
         cmd!("track.height", "Track Height", [], None, "{tracks?, height: micro|mini|small|medium|large|jumbo|extreme}", has_selection, height),
         cmd!("track.view", "Track View", [], None, "{tracks?, view: waveform|blocks|notes|volume|pan|mute|<automation id>}", has_selection, view),
         cmd!("track.hide", "Hide Track", [], None, "{tracks?, hidden?: bool}", has_selection, |e, p| flag(
@@ -483,6 +492,25 @@ fn color(e: &mut Engine, p: &Value) -> Result<Value> {
     Ok(json!({"color": c}))
 }
 
+fn label_color(e: &mut Engine, p: &Value) -> Result<Value> {
+    let tracks = tracks_required(e, "track.label_color", p)?;
+    let c = match p.get("color") {
+        Some(Value::Array(a)) if a.len() == 3 => {
+            let v: Vec<u8> = a.iter().map(|x| x.as_u64().unwrap_or(0).min(255) as u8).collect();
+            Some([v.first().copied().unwrap_or(0), v.get(1).copied().unwrap_or(0), v.get(2).copied().unwrap_or(0)])
+        }
+        Some(Value::Null) => None,
+        _ => return Err(bad("track.label_color", "`color` must be [r,g,b] or null")),
+    };
+    let s = e.session_mut();
+    for t in &tracks {
+        if let Some(tr) = s.track_mut(*t) {
+            tr.label_color = c;
+        }
+    }
+    Ok(json!({"color": c}))
+}
+
 fn height(e: &mut Engine, p: &Value) -> Result<Value> {
     let tracks = tracks_required(e, "track.height", p)?;
     let h = str_param(p, "height").and_then(TrackHeight::from_id).ok_or_else(|| bad("track.height", "unknown height"))?;
@@ -673,6 +701,13 @@ mod tests {
     #[test]
     fn folder_routes_members_through_its_bus() {
         let mut e = crate::demo::demo_engine();
+        // The name plate gets its own colour; the track keeps its own.
+        let kick = e.session().track_by_name("Kick").unwrap().color;
+        e.execute("track.label_color", &json!({"tracks": ["Kick"], "color": [240, 196, 64]})).unwrap();
+        let t = e.session().track_by_name("Kick").unwrap();
+        assert_eq!((t.label_color, t.color), (Some([240, 196, 64]), kick));
+        e.execute("track.label_color", &json!({"tracks": ["Kick"], "color": null})).unwrap();
+        assert_eq!(e.session().track_by_name("Kick").unwrap().label_color, None);
         let r = e.execute("track.move_to_new_folder", &json!({"tracks": ["Kick", "Snare"], "name": "Drums"})).unwrap();
         assert!(r["bus"].is_u64());
         let s = e.session();

@@ -97,6 +97,13 @@ function renderPads(pads) {
   pads.forEach((p, i) => {
     const b = document.createElement("button");
     b.className = "pad" + (p.name ? "" : " empty");
+    if (p.color) {
+      // The pad's colour, with dark or light text, whichever reads better.
+      const n = parseInt(p.color.slice(1), 16), lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+      const l = 0.2126 * lin(n >> 16) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+      b.style.background = p.color;
+      b.style.color = (l + 0.05) / 0.062 > 1.25 * (1.05 / (l + 0.05)) ? "#121214" : "#fff";
+    }
     b.disabled = !p.name;
     if (p.image) { const img = document.createElement("img"); img.src = `pad/${i + 1}?v=${encodeURIComponent(p.image)}`; img.alt = ""; b.append(img); }
     const s = document.createElement("span");

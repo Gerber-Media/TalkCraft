@@ -236,7 +236,8 @@ pub fn update(app: &mut SoundApp, now: bool) {
             let has_file = pod.jingles.get(i).is_some_and(|f| !f.trim().is_empty());
             let name = if has_file { soundcraft_engine::cmd::podcast::jingle_name(&pod, i) } else { String::new() };
             let image = pod.jingle_images.get(i).cloned().unwrap_or_default();
-            json!({"name": name, "image": image})
+            let color = pod.jingle_colors.get(i).copied().flatten().map(|c| format!("#{:02x}{:02x}{:02x}", c[0], c[1], c[2]));
+            json!({"name": name, "image": image, "color": color})
         })
         .collect();
     state["pads"] = Value::Array(pads);
