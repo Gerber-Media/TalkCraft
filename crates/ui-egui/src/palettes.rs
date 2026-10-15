@@ -96,6 +96,12 @@ pub fn show(
     let slot = PALETTES.iter().position(|(p, _)| *p == id).unwrap_or(0) as f32;
     win = win.default_pos([260.0 + slot * 48.0, 140.0 + slot * 40.0]);
     if let Some([x, y, w, h]) = st.rect {
+        // Never larger than the screen, and never off it: a palette that once grew too big
+        // comes back at a size that can be handled again.
+        let screen = ctx.content_rect();
+        let (w, h) = (w.min(screen.width() * 0.9).max(160.0), h.min(screen.height() * 0.9).max(80.0));
+        let x = x.clamp(screen.min.x, (screen.max.x - 120.0).max(screen.min.x));
+        let y = y.clamp(screen.min.y, (screen.max.y - 60.0).max(screen.min.y));
         win = win.default_pos([x, y]).default_size([w, h]);
     }
     let mut content = None;

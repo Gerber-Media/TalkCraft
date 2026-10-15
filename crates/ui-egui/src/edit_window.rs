@@ -919,19 +919,33 @@ fn playlist_lanes(app: &mut SoundApp, ui: &mut Ui, track: &Track, row: Rect, mai
 fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, selected: bool) {
     let t = Tokens::current();
     let id = track.id;
-    // Drag the bottom edge to resize (snaps to the height presets).
+    // Drag the bottom edge to resize, live and freely (Cmd: snap to the height presets; Alt:
+    // every track, Alt+Shift: the selected ones too). One undo step per drag.
     let edge = Rect::from_min_max(pos2(head.min.x, head.max.y - 4.0), pos2(head.max.x, head.max.y + 2.0));
-    let eresp = ui.interact(edge, ui.id().with(("hedge", id.0)), Sense::drag());
+    let eresp = ui.interact(edge, ui.id().with(("hedge", id.0)), Sense::drag()).on_hover_text(crate::i18n::tr("Drag to change the track's height"));
     if eresp.hovered() || eresp.dragged() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
     }
-    if eresp.drag_stopped()
+    if eresp.drag_started() {
+        ui.data_mut(|d| d.insert_temp(eresp.id, track.height));
+    }
+    if eresp.dragged()
         && let Some(p) = ui.ctx().pointer_latest_pos()
+        && let Some(origin) = ui.input(|i| i.pointer.press_origin()).filter(|o| o.y != p.y)
     {
-        let want = (p.y - head.min.y).max(10.0);
-        let best = TrackHeight::ALL.into_iter().min_by_key(|h| ((h.points() - want).abs() * 10.0) as i64).unwrap_or(TrackHeight::Medium);
-        if best != track.height {
-            let _ = app.run("track.height", json!({"tracks": [id.0], "height": best.label()}));
+        let start = ui.data(|d| d.get_temp::<TrackHeight>(eresp.id)).unwrap_or(track.height);
+        let want = start.points() + p.y - origin.y;
+        let m = ui.input(|i| i.modifiers);
+        let best = if m.command {
+            TrackHeight::ALL.into_iter().min_by_key(|h| ((h.points() - want).abs() * 10.0) as i64).unwrap_or(start)
+        } else {
+            TrackHeight::from_points(want)
+        };
+        let s = app.engine.session();
+        let tracks = height_targets(s, m, &[id]);
+        if tracks.iter().any(|t| s.track(TrackId(*t)).is_some_and(|tr| tr.height != best)) {
+            let _ = app.engine.execute_merged("track.height", &json!({"tracks": tracks, "height": best.points()}), &format!("track_height:{}", id.0));
+            ui.ctx().request_repaint();
         }
     }
     let x0 = head.min.x + 12.0;
@@ -1207,6 +1221,13 @@ pub(crate) fn height_targets(s: &Session, m: egui::Modifiers, own: &[TrackId]) -
 
 /// Zoom Toggle sized to the track area on screen.
 pub fn zoom_toggle(app: &mut SoundApp) {
+    // Without a range there is nothing to zoom to (it would zoom into a few samples); turning the
+    // toggle off always works.
+    let ed = &app.engine.session().edit;
+    if ed.zoom_toggle.is_none() && ed.selection.is_empty() {
+        app.ui.status = crate::i18n::tr("Zoom Toggle: select a range first (it zooms to the selection; press again to go back)").into();
+        return;
+    }
     let [x0, y0, x1, y1] = app.edit_layout.timeline;
     let _ = app.run("view.zoom_toggle", json!({"width_px": x1 - x0, "height_px": y1 - y0}));
 }

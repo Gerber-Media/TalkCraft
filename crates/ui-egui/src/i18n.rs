@@ -569,6 +569,16 @@ const DE: &[(&str, &str)] = &[
     ("Quit TalkCraft", "TalkCraft beenden"),
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
+    ("Open on this computer", "Auf diesem Computer öffnen"),
+    (
+        "Opens the remote in this computer's browser (to try it, or as a second screen)",
+        "Öffnet die Fernbedienung im Browser dieses Computers (zum Ausprobieren oder als zweiten Bildschirm)",
+    ),
+    ("Drag to change the track's height", "Ziehen, um die Spurhöhe zu ändern"),
+    (
+        "Zoom Toggle: select a range first (it zooms to the selection; press again to go back)",
+        "Zoom umschalten: erst einen Bereich auswählen (es zoomt auf die Auswahl; nochmal drücken springt zurück)",
+    ),
     ("{}: click to open · {}click to bypass · right-click to change", "{}: Klick öffnet · {}Klick umgeht · Rechtsklick ändert"),
     ("Bouncing {} ({}%)", "Bounce {} ({} %)"),
     ("Click to add a MIDI clip to {} at the insertion point.", "Klicken, um auf {} an der Einfügemarke einen MIDI-Clip anzulegen."),

@@ -273,6 +273,15 @@ fn run(app: &mut SoundApp, c: &Value) {
     }
 }
 
+/// The same page through this computer's own address (127.0.0.1), which no firewall blocks here.
+pub fn local_url(url: &str) -> String {
+    let rest = url.trim_start_matches("http://");
+    match rest.split_once(':') {
+        Some((_, port_and_path)) => format!("http://127.0.0.1:{port_and_path}"),
+        None => url.to_string(),
+    }
+}
+
 /// A QR code drawn with the painter (black modules on white, with the quiet zone).
 fn qr(ui: &mut egui::Ui, text: &str, size: f32) {
     let Ok(code) = qrcodegen::QrCode::encode_text(text, qrcodegen::QrCodeEcc::Medium) else {
@@ -305,7 +314,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let url = app.extra.remote_control.server.as_ref().map(|s| s.url.clone());
     let count = devices(app);
     let note = app.extra.remote_control.note.clone();
-    crate::palettes::show(app, ctx, "remote_control", tr("Remote Control"), vec2(360.0, 420.0), |_app, ui, _| {
+    crate::palettes::show(app, ctx, "remote_control", tr("Remote Control"), vec2(360.0, 420.0), |_app, ui, own_window| {
         let t = Tokens::current();
         match &url {
             None => {
@@ -317,14 +326,25 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             }
             Some(url) => {
                 ui.label(RichText::new(tr("Scan with the phone's camera:")).strong());
-                let side = ui.available_width().clamp(160.0, 320.0);
+                // Fixed sizes inside the main window: sizes taken from the window's own width made
+                // it grow a little every frame (the row came out wider than the room it measured).
+                let (side, field) = if own_window { (ui.available_width().clamp(160.0, 480.0), 300.0) } else { (220.0, 220.0) };
                 ui.vertical_centered(|ui| qr(ui, url, side));
                 ui.horizontal(|ui| {
-                    ui.add(egui::TextEdit::singleline(&mut url.as_str()).desired_width(ui.available_width() - 70.0));
+                    ui.add(egui::TextEdit::singleline(&mut url.as_str()).desired_width(field));
                     if ui.button(tr("Copy")).clicked() {
                         ui.ctx().copy_text(url.clone());
                     }
                 });
+                // The network address may be blocked on this very computer (company security
+                // software); the local one always works here.
+                if ui
+                    .button(tr("Open on this computer"))
+                    .on_hover_text(tr("Opens the remote in this computer's browser (to try it, or as a second screen)"))
+                    .clicked()
+                {
+                    crate::remote::open_in_browser(&local_url(url));
+                }
                 let devices = if count == 0 { tr("No device connected yet.").to_string() } else { trf("{} device(s) connected", &[&count]) };
                 ui.label(RichText::new(devices).color(if count > 0 { Color32::from_rgb(60, 175, 90) } else { t.text_dim }));
                 ui.label(
@@ -365,6 +385,34 @@ mod tests {
         (status, out.split("\r\n\r\n").nth(1).unwrap_or("").to_string())
     }
 
+    /// A guard only: the growth seen in the app (link field sized from the available width) did
+    /// not show in the test harness, which lays the window out once with a fixed screen.
+    #[test]
+    fn switching_on_does_not_make_the_window_grow() {
+        use egui_kittest::kittest::Queryable;
+        let mut app = SoundApp::new(soundcraft_engine::Engine::default(), None, Services::default());
+        app.run("window.remote_control", json!({"value": true})).unwrap();
+        let mut h = egui_kittest::Harness::builder().with_size(vec2(1600.0, 1000.0)).build_ui_state(
+            |ui, app: &mut SoundApp| {
+                app.logic(&ui.ctx().clone());
+                app.ui(ui);
+            },
+            app,
+        );
+        h.run_steps(3);
+        let id = egui::Id::new(("palette", "remote_control", 0u32));
+        let width = |h: &egui_kittest::Harness<'_, SoundApp>| h.ctx.memory(|m| m.area_rect(id)).map_or(0.0, |r| r.width());
+        let before = width(&h);
+        h.get_by_label("Switch on").click();
+        h.run_steps(20);
+        if h.state().extra.remote_control.server.is_none() {
+            return; // no network here
+        }
+        let after = width(&h);
+        let _ = h.state_mut().run("remote_control.stop", json!({}));
+        assert!(after < before + 120.0, "the window grew when switched on: {before} → {after}");
+    }
+
     #[test]
     fn a_phone_sees_the_studio_and_sets_markers() {
         let mut app = SoundApp::new(soundcraft_engine::Engine::default(), None, Services::default());
@@ -380,6 +428,7 @@ mod tests {
         let url = v["url"].as_str().unwrap().to_string();
         // The local address works the same as the network one.
         let local = format!("http://127.0.0.1:{}", url.trim_start_matches("http://").split_once(':').unwrap().1);
+        assert_eq!(local_url(&url), local, "the button's local address");
         let (status, page) = http(&local, "GET", "");
         assert_eq!(status, 200);
         assert!(page.contains("Remote") || page.contains("TalkCraft"));
