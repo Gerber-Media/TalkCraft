@@ -570,6 +570,26 @@ const DE: &[(&str, &str)] = &[
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
     (
+        "A window of its own, e.g. for a second screen or a touchscreen",
+        "Ein eigenes Fenster, z. B. für einen zweiten Bildschirm oder einen Touchscreen",
+    ),
+    ("Back to the main window", "Zurück ins Hauptfenster"),
+    (
+        "Click: play it now (while recording or playing at the playhead, else at the insertion point) · drop an audio file here to load the pad",
+        "Klick: jetzt abspielen (bei Aufnahme oder Wiedergabe an der Abspielposition, sonst an der Einfügemarke) · Audiodatei hierher ziehen, um das Pad zu belegen",
+    ),
+    ("Drop an audio file here, or set a path", "Audiodatei hierher ziehen oder einen Pfad eintragen"),
+    ("In their own window: {}", "Im eigenen Fenster: {}"),
+    (
+        "Jingles, Run Sheet and Remote Guests go back into the main window, at their default place and size",
+        "Jingles, Ablaufplan und Ferngäste kommen zurück ins Hauptfenster, an ihren Standardplatz in Standardgröße",
+    ),
+    ("Own window", "Eigenes Fenster"),
+    ("Palettes", "Paletten"),
+    ("Path", "Pfad"),
+    ("Puts the palette back into TalkCraft's window", "Holt die Palette zurück ins TalkCraft-Fenster"),
+    ("Reset palettes to default", "Paletten auf Standard zurücksetzen"),
+    (
         "A short portrait video of the selected sentences (first to last word) for Instagram, TikTok and co. 15–60 seconds work best.",
         "Ein kurzes Hochkant-Video der markierten Sätze (erstes bis letztes Wort) für Instagram, TikTok und Co. 15–60 Sekunden wirken am besten.",
     ),

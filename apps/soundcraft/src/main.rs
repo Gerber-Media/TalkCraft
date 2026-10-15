@@ -77,6 +77,7 @@ impl eframe::App for App {
             self.0.ui.window_size = (r.size() * ctx.zoom_factor()).round().into();
         }
         self.0.ui.ui_scale = self.0.extra.ui_scale;
+        save_prefs_when_changed(ctx, &self.0.ui);
         // With the system menu bar there is no egui bar showing the window and dirty state, so the
         // title carries them; elsewhere the egui menu bar already does.
         let title = if self.0.native_menu_bar {
@@ -150,6 +151,37 @@ fn load_prefs() -> Option<UiState> {
             None
         }
     }
+}
+
+/// Writes the settings soon after they change (a second of quiet first), so nothing is lost when
+/// the app does not get to quit normally. The status line does not count as a change.
+fn save_prefs_when_changed(ctx: &egui::Context, ui: &UiState) {
+    use std::hash::{Hash, Hasher};
+    let now = ctx.input(|i| i.time);
+    let id = egui::Id::new("prefs_saved");
+    // (hash last written, hash last seen, when it was first seen, when last checked)
+    let (written, seen, since, checked) = ctx.data(|d| d.get_temp::<(u64, u64, f64, f64)>(id)).unwrap_or((0, 0, now, f64::MIN));
+    if now - checked < 0.5 {
+        return;
+    }
+    let mut copy = ui.clone();
+    copy.status.clear();
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    serde_json::to_string(&copy).unwrap_or_default().hash(&mut h);
+    let hash = h.finish();
+    let state = if written == 0 {
+        // The first look: what was loaded counts as written.
+        (hash, hash, now, now)
+    } else if hash == written || hash != seen {
+        // Unchanged, or still changing: wait for a quiet second.
+        (written, hash, now, now)
+    } else if now - since >= 1.0 {
+        save_prefs(ui);
+        (hash, hash, now, now)
+    } else {
+        (written, seen, since, now)
+    };
+    ctx.data_mut(|d| d.insert_temp(id, state));
 }
 
 fn save_prefs(ui: &UiState) {

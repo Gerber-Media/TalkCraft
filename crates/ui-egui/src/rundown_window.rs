@@ -11,16 +11,13 @@ use soundcraft_model::RundownItem;
 
 #[derive(Debug, Clone, Default)]
 pub struct RundownWindow {
-    pub show: bool,
     /// The topic being talked about, and the timeline position where it began.
     current: Option<(usize, soundcraft_time::Samples)>,
 }
 
 /// `window.rundown`: opens or closes the window.
 pub fn toggle(app: &mut SoundApp, p: &Value) -> Value {
-    let w = &mut app.extra.rundown;
-    w.show = p.get("value").and_then(Value::as_bool).unwrap_or(!w.show);
-    json!({"value": w.show})
+    crate::palettes::toggle(app, "rundown", p)
 }
 
 fn clock(secs: f64) -> String {
@@ -47,7 +44,7 @@ pub fn start_topic(app: &mut SoundApp, i: usize) {
 }
 
 pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
-    if !app.extra.rundown.show {
+    if !crate::palettes::is_open(app, "rundown") {
         return;
     }
     let t = Tokens::current();
@@ -58,8 +55,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let current = app.extra.rundown.current.filter(|(i, _)| *i < items.len());
     let mut changed = false;
     let mut go: Option<usize> = None;
-    let mut open = true;
-    egui::Window::new(tr("Run Sheet")).open(&mut open).default_size(vec2(420.0, 380.0)).resizable(true).show(ctx, |ui| {
+    crate::palettes::show(app, ctx, "rundown", tr("Run Sheet"), vec2(420.0, 380.0), |_app, ui, _| {
         // Now: the current topic large, its time against the plan, and the button on.
         if let Some((i, since)) = current {
             let item = items.get(i).cloned().unwrap_or_default();
@@ -132,7 +128,6 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             ui.label(RichText::new(tr("The plan is saved with the session.")).small().color(t.text_dim));
         }
     });
-    app.extra.rundown.show = open;
     if changed {
         save(app, &items);
     }

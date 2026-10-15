@@ -172,7 +172,6 @@ struct Server {
 
 #[derive(Debug, Clone, Default)]
 pub struct RemoteStudio {
-    pub show: bool,
     server: Option<Arc<Server>>,
     /// Per take: where the recording started on the timeline, and when (ms since the epoch).
     takes: HashMap<u32, (Samples, i64)>,
@@ -185,9 +184,7 @@ pub struct RemoteStudio {
 
 /// `window.remote`: opens or closes the window.
 pub fn toggle(app: &mut SoundApp, p: &Value) -> Value {
-    let w = &mut app.extra.remote;
-    w.show = p.get("value").and_then(Value::as_bool).unwrap_or(!w.show);
-    json!({"value": w.show})
+    crate::palettes::toggle(app, "remote", p)
 }
 
 fn now_ms() -> i64 {
@@ -568,7 +565,7 @@ fn open_in_browser(url: &str) {
 }
 
 pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
-    if !app.extra.remote.show {
+    if !crate::palettes::is_open(app, "remote") {
         if app.extra.remote.server.is_some() {
             update(app);
             ctx.request_repaint_after(Duration::from_millis(250));
@@ -577,14 +574,13 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     }
     update(app);
     let t = Tokens::current();
-    let mut open = true;
     let mut start = false;
     let mut mute: Option<(String, bool)> = None;
     let mut kick: Option<String> = None;
-    let muted = |name: &str| app.engine.session().track_by_name(&track_name(name)).is_some_and(|t| t.mixer.mute);
     let guests = app.extra.remote.server.as_ref().and_then(|s| s.shared.lock().ok().map(|sh| sh.guests.clone())).unwrap_or_default();
     let mut turn = app.ui.turn.clone();
-    egui::Window::new(tr("Remote Guests")).open(&mut open).default_size(vec2(460.0, 300.0)).resizable(true).show(ctx, |ui| {
+    crate::palettes::show(app, ctx, "remote", tr("Remote Guests"), vec2(460.0, 300.0), |app, ui, _| {
+        let muted = |name: &str| app.engine.session().track_by_name(&track_name(name)).is_some_and(|t| t.mixer.mute);
         let w = &app.extra.remote;
         match &w.server {
             None => {
@@ -664,7 +660,6 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 .color(t.text_dim),
         );
     });
-    app.extra.remote.show = open;
     if let Some((name, value)) = mute
         && let Err(e) = app.run("mix.mute", json!({"tracks": [track_name(&name)], "value": value}))
     {

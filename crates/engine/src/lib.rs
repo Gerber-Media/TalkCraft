@@ -122,6 +122,9 @@ pub struct Engine {
     pub path: Option<String>,
     /// Revision counter; bumps on every document change but zoom/scroll (UI caches key on it).
     pub revision: u64,
+    /// Bumps each time a whole document is opened or created (`replace_session`), so the UI can
+    /// bring the user's own preferences to it.
+    pub generation: u64,
     dirty: bool,
     /// The document as last opened or saved, for `is_dirty`.
     saved: Arc<Session>,
@@ -155,6 +158,7 @@ impl Engine {
             journal: Vec::new(),
             path: None,
             revision: 1,
+            generation: 0,
             dirty: false,
             dirty_at: Cell::new((0, false)),
             merge_key: None,
@@ -193,6 +197,7 @@ impl Engine {
         self.undo.clear();
         self.redo.clear();
         self.revision = self.revision.wrapping_add(1);
+        self.generation = self.generation.wrapping_add(1);
         self.dirty = false;
     }
 

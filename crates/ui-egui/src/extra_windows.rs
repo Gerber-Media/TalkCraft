@@ -22,6 +22,8 @@ pub struct ExtraState {
     pub rundown: crate::rundown_window::RundownWindow,
     pub finish: crate::finish_window::FinishWindow,
     pub publish: crate::publish_window::PublishWindow,
+    /// Where each detached palette's window was when it opened this run (it is placed only then).
+    pub palette_start: std::collections::HashMap<&'static str, Option<[f32; 4]>>,
     /// The listening rate before L sped playback up (K returns to it).
     pub shuttle_rate: Option<f32>,
     /// The start question is open; after a recording, switching to editing is offered.
@@ -29,9 +31,7 @@ pub struct ExtraState {
     pub offer_edit: bool,
     workspace_started: bool,
     pub show_ui_customization: bool,
-    pub auto_update_config: bool,
     pub ui_scale: f32,
-    pub reduce_motion: bool,
     pub tooltips: bool,
     last_auto_update: f64,
     applied: Option<(f32, bool)>,
@@ -50,14 +50,13 @@ impl Default for ExtraState {
             rundown: Default::default(),
             finish: Default::default(),
             publish: Default::default(),
+            palette_start: Default::default(),
             shuttle_rate: None,
             ask_workspace: false,
             offer_edit: false,
             workspace_started: false,
             show_ui_customization: false,
-            auto_update_config: false,
             ui_scale: 1.0,
-            reduce_motion: false,
             tooltips: true,
             last_auto_update: 0.0,
             applied: None,
@@ -74,7 +73,7 @@ pub fn run(app: &mut SoundApp, id: &str, p: &Value) -> Option<Value> {
     Some(match id {
         "window.renderer" => flag(&mut app.extra.show_renderer),
         "window.ui_customization" => flag(&mut app.extra.show_ui_customization),
-        "window.config_auto_update" => flag(&mut app.extra.auto_update_config),
+        "window.config_auto_update" => flag(&mut app.ui.auto_update_config),
         "window.subtitles" => crate::subtitle_editor::toggle(app, p),
         "window.words" => crate::words_window::toggle(app, p),
         "window.jingles" => crate::jingles_window::toggle(app, p),
@@ -121,7 +120,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
 }
 
 fn apply_customization(app: &mut SoundApp, ctx: &egui::Context) {
-    let want = (app.extra.ui_scale.clamp(0.75, 1.5), app.extra.reduce_motion);
+    let want = (app.extra.ui_scale.clamp(0.75, 1.5), app.ui.reduce_motion);
     // Rescaling mid-drag would move the Interface scale slider out from under the pointer.
     if app.extra.applied == Some(want) || ctx.input(|i| i.pointer.any_down()) {
         return;
@@ -135,7 +134,7 @@ fn apply_customization(app: &mut SoundApp, ctx: &egui::Context) {
 }
 
 fn auto_update(app: &mut SoundApp, ctx: &egui::Context) {
-    if !app.extra.auto_update_config || app.ui.configurations.is_empty() {
+    if !app.ui.auto_update_config || app.ui.configurations.is_empty() {
         return;
     }
     let now = ctx.input(|i| i.time);
@@ -232,7 +231,7 @@ pub(crate) fn appearance_ui(app: &mut SoundApp, ui: &mut egui::Ui) {
                 ui.add(egui::Slider::new(&mut app.extra.ui_scale, 0.75..=1.5).step_by(0.05).custom_formatter(|v, _| format!("{:.0} %", v * 100.0)));
                 ui.end_row();
                 ui.label(tr("Reduce motion"));
-                ui.checkbox(&mut app.extra.reduce_motion, "");
+                ui.checkbox(&mut app.ui.reduce_motion, "");
                 ui.end_row();
                 ui.label(tr("Theme"));
                 let mut chosen = None;
@@ -250,7 +249,7 @@ pub(crate) fn appearance_ui(app: &mut SoundApp, ui: &mut egui::Ui) {
             });
             if ui.button(tr("Reset")).clicked() {
                 app.extra.ui_scale = 1.0;
-                app.extra.reduce_motion = false;
+                app.ui.reduce_motion = false;
                 let _ = app.run("ui.theme", json!({"mode": crate::theme::ThemeMode::default().id()}));
             }
         }

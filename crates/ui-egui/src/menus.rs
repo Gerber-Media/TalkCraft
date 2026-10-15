@@ -26,6 +26,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("publish.start", "Export and Publish", "", None),
     ("publish.status", "Publishing Status", "", None),
     ("words.quote_clip", "Quote Clip...", "", None),
+    ("ui.palette", "Palette Window", "", None),
     ("transport.rate", "Playback Speed", "", None),
     ("ui.workspace", "Work Mode", "", None),
     ("window.audiogram", "Audiogram (MP4)...", "File > Export > Audiogram (MP4)...", None),
@@ -338,7 +339,7 @@ fn checked_state(app: &SoundApp, path: &str, id: Option<&str>) -> bool {
         Some("window.narrow_mix") => app.ui.narrow_mix,
         Some("window.renderer") => app.extra.show_renderer,
         Some("window.ui_customization") => app.extra.show_ui_customization,
-        Some("window.config_auto_update") => app.extra.auto_update_config,
+        Some("window.config_auto_update") => app.ui.auto_update_config,
         Some("view.mix_section") => path.rsplit(" > ").next().map(mix_section_id).is_some_and(|s| app.ui.mix_views.iter().any(|v| v == s)),
         _ => false,
     }
@@ -545,6 +546,9 @@ fn wants_dialog(id: &str) -> bool {
 pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<Value, String>> {
     if matches!(id, "ui.dock" | "ui.dock.reset") {
         return Some(crate::docking::command(app, id == "ui.dock.reset", p));
+    }
+    if id == "ui.palette" {
+        return Some(crate::palettes::command(app, p));
     }
     if id == "words.quote_clip" {
         return Some(crate::words_window::quote_clip(app));

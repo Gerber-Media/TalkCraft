@@ -23,8 +23,10 @@ pub mod midi_editor;
 pub mod mix_window;
 pub mod ops_windows;
 pub mod palette;
+pub mod palettes;
 pub mod panels;
 pub mod podcast;
+pub mod prefs;
 pub mod publish_window;
 pub mod readiness;
 pub mod remote;
@@ -93,6 +95,17 @@ pub struct UiState {
     pub countdown: bool,
     /// The user's own relay server for remote guests behind strict networks.
     pub turn: remote::TurnServer,
+    /// Palettes (Jingles, Run Sheet, Remote Guests …): open, in their own window, where.
+    pub palettes: std::collections::BTreeMap<String, palettes::PaletteState>,
+    /// Bumped by "Reset palettes": the in-app windows forget where egui put them.
+    pub palette_layout: u32,
+    /// Working preferences kept across sessions (see `prefs`); `None` until first seen.
+    pub edit_prefs: Option<Value>,
+    /// Appearance: no animations; refresh the active window configuration automatically.
+    pub reduce_motion: bool,
+    pub auto_update_config: bool,
+    /// Finish Episode's steps as last ticked: denoise, match speakers, fillers, pauses, duck.
+    pub finish_steps: Option<[bool; 5]>,
     /// Listening rate that keeps the pitch (1 = normal; the toolbar's 1× button).
     #[serde(default = "default_rate")]
     pub playback_rate: f32,
@@ -170,6 +183,12 @@ impl Default for UiState {
             // Tests record at once.
             countdown: false,
             turn: Default::default(),
+            palettes: Default::default(),
+            palette_layout: 0,
+            edit_prefs: None,
+            reduce_motion: false,
+            auto_update_config: false,
+            finish_steps: None,
             workspace: workspace::Workspace::All,
             // Tests start without the question; the app asks on a fresh install.
             ask_workspace: false,
@@ -333,6 +352,9 @@ pub struct SoundApp {
     /// Transport simulation when there is no player (tests, offscreen renders).
     sim: Option<(Samples, Option<Samples>, Option<Range>)>,
     pub quit_requested: bool,
+    /// What `prefs::sync` has seen: the document generation and revision.
+    pub prefs_generation: Option<u64>,
+    pub prefs_revision: u64,
     /// Reset floating-window positions next frame (Window › Arrange).
     pub arrange_request: bool,
     /// Tracks whose automation was touched during this pass (Touch/Latch writing).
@@ -397,6 +419,8 @@ impl SoundApp {
             docking_context: None,
             sim: None,
             quit_requested: false,
+            prefs_generation: None,
+            prefs_revision: 0,
             arrange_request: false,
             touched: std::collections::HashSet::new(),
             last_write_at: i64::MIN,
@@ -1010,6 +1034,7 @@ impl SoundApp {
         self.watch_devices();
         self.input_peaks = self.recorder.as_ref().map(|r| r.levels.take()).unwrap_or_default();
         crate::readiness::tick(self);
+        crate::prefs::sync(self);
         if let Some(p) = &self.player
             && (p.rate() - self.ui.playback_rate).abs() > 0.001
         {

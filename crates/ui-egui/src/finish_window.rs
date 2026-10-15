@@ -20,11 +20,23 @@ pub struct FinishWindow {
     pub report: Vec<(bool, String)>,
     /// History steps before and after the run.
     pub before_after: Option<(usize, usize)>,
+    /// The ticks were taken from the settings.
+    loaded: bool,
 }
 
 impl Default for FinishWindow {
     fn default() -> Self {
-        Self { show: false, denoise: false, match_speakers: true, pauses: true, fillers: true, duck: true, report: Vec::new(), before_after: None }
+        Self {
+            show: false,
+            denoise: false,
+            match_speakers: true,
+            pauses: true,
+            fillers: true,
+            duck: true,
+            report: Vec::new(),
+            before_after: None,
+            loaded: false,
+        }
     }
 }
 
@@ -97,6 +109,14 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
         return;
     }
     let t = Tokens::current();
+    // The ticks are remembered across restarts.
+    if !app.extra.finish.loaded {
+        app.extra.finish.loaded = true;
+        if let Some([d, m, f, p, k]) = app.ui.finish_steps {
+            let w = &mut app.extra.finish;
+            (w.denoise, w.match_speakers, w.fillers, w.pauses, w.duck) = (d, m, f, p, k);
+        }
+    }
     let mut open = true;
     let mut start = false;
     let mut go: Option<usize> = None;
@@ -142,6 +162,8 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
         }
     });
     app.extra.finish.show = open;
+    let w = &app.extra.finish;
+    app.ui.finish_steps = Some([w.denoise, w.match_speakers, w.fillers, w.pauses, w.duck]);
     if start {
         run(app);
     }

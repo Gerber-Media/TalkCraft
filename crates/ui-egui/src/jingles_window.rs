@@ -10,16 +10,13 @@ use soundcraft_engine::cmd::podcast::JINGLE_PADS;
 
 #[derive(Debug, Clone, Default)]
 pub struct JinglesWindow {
-    pub show: bool,
     /// Pad whose path is being edited, and the text so far.
     editing: Option<(usize, String)>,
 }
 
 /// `window.jingles`: opens or closes the window.
 pub fn toggle(app: &mut SoundApp, p: &Value) -> Value {
-    let w = &mut app.extra.jingles;
-    w.show = p.get("value").and_then(Value::as_bool).unwrap_or(!w.show);
-    json!({"value": w.show})
+    crate::palettes::toggle(app, "jingles", p)
 }
 
 /// Stores `path` on pad `i` (0-based) in the session's podcast settings.
@@ -44,19 +41,31 @@ fn file_name(path: &str) -> String {
 }
 
 pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
-    if !app.extra.jingles.show {
+    if !crate::palettes::is_open(app, "jingles") {
         return;
     }
     let t = Tokens::current();
     let pads = app.engine.session().podcast.jingles.clone();
-    let recording = app.engine.transport.recording;
-    let mut open = true;
     let mut place: Option<usize> = None;
     let mut store: Option<(usize, String)> = None;
-    let dropped: Vec<(Option<egui::Pos2>, String)> = ctx.input(|i| {
-        i.raw.dropped_files.iter().map(|f| (i.pointer.hover_pos(), f.path().to_string_lossy().to_string())).filter(|(_, p)| !p.is_empty()).collect()
-    });
-    egui::Window::new(crate::i18n::tr("Jingles")).open(&mut open).default_size(vec2(520.0, 230.0)).resizable(true).show(ctx, |ui| {
+    crate::palettes::show(app, ctx, "jingles", crate::i18n::tr("Jingles"), vec2(520.0, 230.0), |app, ui, own_window| {
+        // Files dropped on this window (in its own window, the drop arrives there).
+        let dropped: Vec<(Option<egui::Pos2>, String)> = ui.ctx().input(|i| {
+            i.raw
+                .dropped_files
+                .iter()
+                .map(|f| (i.pointer.hover_pos(), f.path().to_string_lossy().to_string()))
+                .filter(|(_, p)| !p.is_empty())
+                .collect()
+        });
+        // In a window of its own the pads fill it: big enough for a finger on a touchscreen.
+        let pad = if own_window {
+            let w = ((ui.available_width() - 3.0 * 8.0) / 4.0).max(112.0);
+            let h = ((ui.available_height() - 2.0 * 30.0 - 40.0) / 2.0).clamp(54.0, 220.0);
+            vec2(w, h)
+        } else {
+            vec2(112.0, 54.0)
+        };
         let w = &mut app.extra.jingles;
         egui::Grid::new("jingle_pads").num_columns(4).spacing(vec2(8.0, 8.0)).show(ui, |ui| {
             for i in 0..JINGLE_PADS {
@@ -67,12 +76,13 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                     } else {
                         RichText::new(format!("{}\n{}", i + 1, file_name(&path))).strong()
                     };
+                    let label = if own_window { label.size((pad.y / 4.0).clamp(14.0, 28.0)) } else { label };
                     let r = ui
-                        .add_enabled(!path.is_empty() && !recording, egui::Button::new(label).min_size(vec2(112.0, 54.0)))
+                        .add_enabled(!path.is_empty(), egui::Button::new(label).min_size(pad))
                         .on_hover_text(crate::i18n::tr(
-                            "Click: place on the jingle track at the insertion point · drop an audio file here to load the pad",
+                            "Click: play it now (while recording or playing at the playhead, else at the insertion point) · drop an audio file here to load the pad",
                         ))
-                        .on_disabled_hover_text(if recording { "Not while recording" } else { "Drop an audio file here, or set a path" });
+                        .on_disabled_hover_text(crate::i18n::tr("Drop an audio file here, or set a path"));
                     if r.clicked() {
                         place = Some(i);
                     }
@@ -96,7 +106,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                                 {
                                     store = Some((i, p));
                                 }
-                                if ui.small_button("✎").on_hover_text(crate::i18n::tr("Type or paste a path")).clicked() {
+                                if ui.small_button(crate::i18n::tr("Path")).on_hover_text(crate::i18n::tr("Type or paste a path")).clicked() {
                                     w.editing = Some((i, path.clone()));
                                 }
                             });
@@ -114,7 +124,6 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 .color(t.text_dim),
         );
     });
-    app.extra.jingles.show = open;
     if let Some((i, path)) = store {
         app.extra.jingles.editing = None;
         set_pad(app, i, &path);

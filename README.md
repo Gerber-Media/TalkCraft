@@ -103,11 +103,18 @@ podcast does not need.
   settings folder, readable only by the user. A social package (post text, chapters, cover,
   shownotes), the audiogram, and quote clips: mark the best sentences in Edit by Text and Quote
   Clip makes a short portrait video of them for Instagram, TikTok and co.
+- **Palettes on a second screen.** Jingles, Run Sheet and Remote Guests can go into a window of
+  their own ("Own window" at the top of the palette): drag it to a second monitor or a touchscreen,
+  where the jingle pads grow to fill it. TalkCraft remembers which palettes were open, detached and
+  where; Setup > Preferences > General resets them. Jingle pads also fire while recording.
 - **Languages.** English and German interface (Automatic follows the system).
 - **Settings.** Setup > Preferences has tabs: Episode (saved with the session), General (language,
   start question, scrolling and editing behaviour), Appearance (size, motion, theme, waveform and
   clip display), Audio (devices, pre/post-roll, loop recording, delay compensation) and
-  Transcription. Settings you choose once live there, not in the menus.
+  Transcription. Settings you choose once live there, not in the menus. Everything is kept:
+  working preferences (scrolling, waveform and clip display, pre/post-roll, loop recording) carry
+  over to every new or opened session, and the settings are saved a second after each change, not
+  only on quit.
 
 ## How to
 
@@ -301,12 +308,19 @@ braucht.
   Social-Paket (Beitragstext, Kapitel, Cover, Shownotes), das Audiogramm und Zitat-Clips: die besten
   Sätze in „Schnitt am Text“ markieren, „Zitat-Clip …“ macht daraus ein kurzes Hochkant-Video für
   Instagram, TikTok und Co.
+- **Paletten auf dem zweiten Bildschirm.** Jingles, Ablaufplan und Ferngäste lassen sich in ein
+  eigenes Fenster holen („Eigenes Fenster“ oben in der Palette) und auf einen zweiten Monitor oder
+  einen Touchscreen ziehen; dort werden die Jingle-Pads groß. TalkCraft merkt sich, welche Paletten
+  offen und abgedockt waren und wo; Einstellungen > Einstellungen … > Allgemein setzt sie zurück. Die
+  Jingle-Pads lassen sich auch während der Aufnahme auslösen.
 - **Sprachen.** Deutsche und englische Oberfläche („Automatisch“ folgt dem System).
 - **Einstellungen.** Einstellungen > Einstellungen … hat Reiter: Folge (in der Session gespeichert),
   Allgemein (Sprache, Startfrage, Scrollen und Bearbeitungsverhalten), Erscheinungsbild (Größe,
   Bewegung, Farbschema, Wellenform- und Clip-Anzeige), Audio (Geräte, Pre-/Post-Roll,
   Loop-Aufnahme, Latenzausgleich) und Transkription. Was man einmal einstellt, steht dort und nicht
-  im Menü.
+  im Menü. Alles bleibt erhalten: Arbeitsvorlieben (Scrollen, Wellenform- und Clip-Anzeige,
+  Pre-/Post-Roll, Loop-Aufnahme) gelten für jede neue oder geöffnete Session, und die Einstellungen
+  werden eine Sekunde nach jeder Änderung gesichert, nicht erst beim Beenden.
 
 ## Anleitung
 

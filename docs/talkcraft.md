@@ -204,3 +204,20 @@ background job is a separate step.
   the studio page offers it from the start (direct paths still win). Tested with Playwright in a
   network where the direct path hangs: switch after 12 s, then the "not even through the fallback"
   hint. A working relay could not be tested (no account).
+
+## Palettes and kept settings
+
+- `palettes.rs` shows Jingles, Run Sheet and Remote Guests either as an `egui::Window` or, detached,
+  through `show_viewport_immediate` (a real OS window). The builder's position and size are passed
+  only from the state saved when the window first opens in this run (`ExtraState.palette_start`):
+  feeding back the live position every frame fights the user's dragging. Backends without
+  multi-viewport support (`ctx.embed_viewports()`) fall back to the in-app window.
+- Input in a detached window (dropped files, hover) belongs to that viewport: read it from the
+  body's `ui.ctx()`, not from the main context. The main window's keyboard shortcuts (1–8 for
+  jingles) do not fire while the detached window has the focus; clicks and touches do.
+- `palette.rs` (no s) is the command palette. Do not mix the two up.
+- Working preferences live in the session's `EditState` (as in the incumbent) but users expect
+  them to stay: `prefs.rs` copies them to `UiState.edit_prefs` when they change and applies them to
+  every document `replace_session` brings (`Engine.generation`), keeping a fresh session clean.
+- `ui.json` is written a second after any change (status line excluded), not only on quit.
+- ✎ (U+270E) is also missing from the interface font. Prefer words over symbols.

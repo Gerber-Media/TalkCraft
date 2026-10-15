@@ -1324,6 +1324,8 @@ fn general_prefs(app: &mut SoundApp, ui: &mut egui::Ui) {
         });
         ui.label(egui::RichText::new(crate::i18n::tr("The macOS menu bar follows after a restart.")).small().color(dim));
         ui.checkbox(&mut app.ui.ask_workspace, crate::i18n::tr("Ask at start what I want to do (otherwise start with everything)"));
+        ui.separator();
+        crate::palettes::preferences(app, ui);
         if ui.button(crate::i18n::tr("Keyboard Shortcuts…")).clicked() {
             let _ = app.run("window.shortcuts", json!({"value": true}));
         }
