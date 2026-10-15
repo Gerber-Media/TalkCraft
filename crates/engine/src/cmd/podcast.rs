@@ -39,6 +39,15 @@ pub fn specs() -> Vec<CommandSpec> {
             jingle_pad
         ),
         cmd!(
+            "podcast.export_jingle",
+            "Selection as Jingle...",
+            [],
+            None,
+            "{tracks?, start?, end?, name?, pad?, loudness_lufs?: -16|null, fade_in_ms?: 10, fade_out_ms?: 30} — renders the selected tracks over the selection (else their clips) as a WAV jingle into the Jingles folder and puts it on a pad (the first empty one, else a new one)",
+            has_tracks,
+            export_jingle
+        ),
+        cmd!(
             "podcast.jingle_move",
             "Move Jingle Pad",
             [],
@@ -170,6 +179,105 @@ pub fn jingle_name(s: &soundcraft_model::PodcastSettings, i: usize) -> String {
 pub fn pad_count(s: &soundcraft_model::PodcastSettings) -> usize {
     let n = if s.jingle_pads == 0 { JINGLE_PADS } else { s.jingle_pads as usize };
     n.max(s.jingles.len()).clamp(1, MAX_JINGLE_PADS)
+}
+
+/// Where exported jingles go: a `Jingles` folder beside the session file, else in the settings.
+fn jingle_dir(e: &Engine) -> std::path::PathBuf {
+    match e.path.as_deref().and_then(|p| std::path::Path::new(p).parent()) {
+        Some(d) if !d.as_os_str().is_empty() => d.join("Jingles"),
+        _ => crate::transcribe::settings_dir().unwrap_or_else(std::env::temp_dir).join("Jingles"),
+    }
+}
+
+/// `podcast.export_jingle`: the selected tracks (else every track) over the selection (else over
+/// their clips) as a jingle: rendered on their own, loudness matched, with short fades against
+/// clicks, written as WAV into the Jingles folder and put on a pad.
+fn export_jingle(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "podcast.export_jingle";
+    let mut tracks = tracks_param(e, ID, p)?;
+    if tracks.is_empty() {
+        tracks = e.session().tracks.iter().filter(|t| !t.clips().is_empty()).map(|t| t.id).collect();
+    }
+    let s = e.session();
+    let mut r = range_param(e, ID, p)?;
+    if r.is_empty() {
+        // No range: what is on those tracks, start to end.
+        let clips: Vec<(i64, i64)> = tracks.iter().filter_map(|t| s.track(*t)).flat_map(|t| t.clips().iter().map(|c| (c.start, c.end()))).collect();
+        let (a, b) = (clips.iter().map(|c| c.0).min(), clips.iter().map(|c| c.1).max());
+        let (Some(a), Some(b)) = (a, b) else { return Err(bad(ID, "nothing to export: select a range or a track with audio")) };
+        r = soundcraft_time::Range::new(a, b);
+    }
+    if r.len() > s.sample_rate.samples(600.0) {
+        return Err(bad(ID, "a jingle is at most 10 minutes long"));
+    }
+    let sr = s.sample_rate.hz();
+    let mut ch = crate::io::render_tracks(e, r, &tracks, ID)?;
+    let target = match p.get("loudness_lufs") {
+        Some(Value::Null) => None,
+        Some(v) => v.as_f64().map(|v| v as f32).filter(|v| (-40.0..=0.0).contains(v)),
+        None => Some(-16.0),
+    };
+    if let Some(t) = target {
+        soundcraft_dsp::offline::normalize_loudness(&mut ch, sr as f32, t, crate::podcast::PODCAST_TRUE_PEAK - 0.5);
+    }
+    // Short fades: the cut edges never click.
+    let fade_in = (f64::from(sr) * f64_or(p, "fade_in_ms", 10.0).clamp(0.0, 5000.0) / 1000.0) as usize;
+    let fade_out = (f64::from(sr) * f64_or(p, "fade_out_ms", 30.0).clamp(0.0, 5000.0) / 1000.0) as usize;
+    for c in &mut ch {
+        let n = c.len();
+        for i in 0..fade_in.min(n) {
+            if let Some(x) = c.get_mut(i) {
+                *x *= i as f32 / fade_in as f32;
+            }
+        }
+        for i in 0..fade_out.min(n) {
+            if let Some(x) = c.get_mut(n - 1 - i) {
+                *x *= i as f32 / fade_out as f32;
+            }
+        }
+    }
+    let first_clip =
+        tracks.iter().filter_map(|t| s.track(*t)).flat_map(|t| t.clips()).find(|c| c.start < r.end && c.end() > r.start).map(|c| c.name.clone());
+    let name = str_param(p, "name").map(str::trim).filter(|n| !n.is_empty()).map(str::to_string).or(first_clip).unwrap_or_else(|| "Jingle".into());
+    let name: String = name.chars().take(80).collect();
+    let dir = jingle_dir(e);
+    std::fs::create_dir_all(&dir).map_err(|err| bad(ID, format!("{}: {err}", dir.display())))?;
+    let safe: String = name.chars().map(|c| if c.is_alphanumeric() || " -_".contains(c) { c } else { '_' }).collect();
+    let mut path = dir.join(format!("{safe}.wav"));
+    let mut n = 2;
+    while path.exists() {
+        path = dir.join(format!("{safe} {n}.wav"));
+        n += 1;
+    }
+    let buf = AudioBuffer { sample_rate: sr, channels: ch };
+    let format = soundcraft_audio_io::encode_format_for("wav").ok_or_else(|| bad(ID, "cannot write WAV"))?;
+    let bytes = soundcraft_audio_io::encode(&buf, &EncodeOptions { format, bit_depth: BitDepth::Int24, dither: true, bwf: None })
+        .map_err(|err| bad(ID, err.to_string()))?;
+    let file = path.to_string_lossy().to_string();
+    crate::io::write_file(&file, &bytes)?;
+    // The pad: the one asked for, else the first empty one, else a new one at the end.
+    let mut pod = e.session().podcast.clone();
+    let count = pad_count(&pod);
+    let pad = match p.get("pad").and_then(Value::as_u64).map(|v| v as usize) {
+        Some(v) if (1..=MAX_JINGLE_PADS).contains(&v) => v,
+        _ => (0..count).find(|i| pod.jingles.get(*i).is_none_or(|f| f.trim().is_empty())).map_or(count + 1, |i| i + 1),
+    };
+    if pad > MAX_JINGLE_PADS {
+        return Err(bad(ID, format!("all {MAX_JINGLE_PADS} pads are in use: give `pad` to replace one ({file} was written)")));
+    }
+    pod.jingles.resize(pod.jingles.len().max(pad), String::new());
+    pod.jingle_names.resize(pod.jingle_names.len().max(pad), String::new());
+    if let (Some(f), Some(n)) = (pod.jingles.get_mut(pad - 1), pod.jingle_names.get_mut(pad - 1)) {
+        *f = file.clone();
+        *n = name.clone();
+    }
+    pod.jingle_pads = pad_count(&pod).max(pad) as u32;
+    e.session_mut().podcast = pod;
+    Ok(json!({"path": file, "pad": pad, "name": name, "seconds": s_seconds(r.len(), sr), "loudness_lufs": target}))
+}
+
+fn s_seconds(n: i64, sr: u32) -> f64 {
+    n as f64 / f64::from(sr.max(1))
 }
 
 /// `podcast.jingle_move {from, to}`: moves pad `from` (file and picture) to position `to` (both
@@ -1037,6 +1145,38 @@ mod tests {
                 .unwrap();
         }
         e
+    }
+
+    #[test]
+    fn a_selection_becomes_a_jingle_on_a_pad() {
+        let dir = std::env::temp_dir().join(format!("sc-podcast-jexport-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut e = toned(&dir, &[("Moderation", 0.5, 0.0, 6.0), ("Gast 1", 0.3, 0.0, 6.0)]);
+        // A saved session: the jingle goes into a Jingles folder beside it.
+        e.path = Some(dir.join("T.scraft").to_string_lossy().to_string());
+        let v = e
+            .execute("podcast.export_jingle", &json!({"tracks": ["Gast 1"], "start": {"seconds": 1.0}, "end": {"seconds": 3.0}, "name": "Stinger"}))
+            .unwrap();
+        let path = v["path"].as_str().unwrap().to_string();
+        assert!(path.starts_with(&dir.join("Jingles").to_string_lossy().to_string()) && path.ends_with("Stinger.wav"), "{v}");
+        assert_eq!(v["pad"], 1, "the first empty pad");
+        assert_eq!(jingle_name(&e.session().podcast, 0), "Stinger");
+        let (_, buf) = soundcraft_audio_io::decode(&std::fs::read(&path).unwrap(), Some("wav")).unwrap();
+        let n = buf.channels[0].len();
+        assert!((n as f64 / 48_000.0 - 2.0).abs() < 0.01, "two seconds: {n}");
+        assert!(buf.channels[0][0].abs() < 1e-3 && buf.channels[0][n - 1].abs() < 1e-3, "faded in and out");
+        let mut m = soundcraft_dsp::meter::LoudnessMeter::new(48_000.0, buf.channels.len());
+        m.process(&buf.channels, n);
+        assert!((m.integrated_lufs() + 16.0).abs() < 1.0, "loudness matched: {}", m.integrated_lufs());
+        // Only that track: the louder speaker is not in it.
+        let v = e.execute("podcast.export_jingle", &json!({"tracks": ["Gast 1"], "name": "Stinger", "loudness_lufs": null})).unwrap();
+        assert!(v["path"].as_str().unwrap().ends_with("Stinger 2.wav"), "never overwrites: {v}");
+        assert_eq!(v["pad"], 2);
+        let (_, buf) = soundcraft_audio_io::decode(&std::fs::read(v["path"].as_str().unwrap()).unwrap(), Some("wav")).unwrap();
+        let peak = buf.channels[0].iter().fold(0.0f32, |a, x| a.max(x.abs()));
+        assert!(peak < 0.35 && peak > 0.2, "the guest's tone alone, as recorded: {peak}");
+        assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 
     #[test]

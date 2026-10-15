@@ -86,6 +86,7 @@ pub fn run(app: &mut SoundApp, id: &str, p: &Value) -> Option<Value> {
         "window.rundown" => crate::rundown_window::toggle(app, p),
         "window.finish" => crate::finish_window::toggle(app, p),
         "window.onair" => crate::onair::toggle(app, p),
+        "window.jingle_export" => crate::jingles_window::toggle_export(app, p),
         "window.remote_control" => crate::remote_control::toggle(app, p),
         "studio.status" => crate::onair::status_json(app),
         "ui.workspace" => crate::workspace::run(app, p).unwrap_or_else(|e| json!({"error": e})),

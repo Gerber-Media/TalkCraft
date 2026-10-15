@@ -38,6 +38,8 @@ pub struct JinglesWindow {
     renaming: Option<(usize, String)>,
     /// Decoded pad sounds for pressing a pad while stopped, by file.
     sounds: Sounds,
+    /// The "Selection as Jingle" form, while open.
+    pub export: Option<ExportForm>,
 }
 
 /// `window.jingles`: opens or closes the window.
@@ -91,6 +93,90 @@ fn picture(ctx: &egui::Context, cache: &mut Pictures, path: &str) -> Option<egui
         .clone()
 }
 
+/// Selection as Jingle: what to call it, which pad (0 = the first empty one), loudness on/off.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExportForm {
+    pub name: String,
+    pub pad: usize,
+    pub match_loudness: bool,
+    pub note: String,
+}
+
+/// `window.jingle_export`: opens the form (`value: false` closes it).
+pub fn toggle_export(app: &mut SoundApp, p: &Value) -> Value {
+    let open = p.get("value").and_then(Value::as_bool).unwrap_or(app.extra.jingles.export.is_none());
+    app.extra.jingles.export = open.then(|| ExportForm { name: String::new(), pad: 0, match_loudness: true, note: String::new() });
+    json!({"value": open})
+}
+
+/// The form: what will be exported, name, pad, loudness, Export.
+fn export_window(app: &mut SoundApp, ctx: &egui::Context) {
+    let Some(mut form) = app.extra.jingles.export.clone() else { return };
+    let t = Tokens::current();
+    let s = app.engine.session();
+    let selected: Vec<String> = s.edit.selected_tracks.iter().filter_map(|id| s.track(*id)).map(|t| t.name.clone()).collect();
+    let sel = s.edit.selection;
+    let what = if selected.is_empty() { tr("every track").to_string() } else { selected.join(", ") };
+    let span = if sel.is_empty() { tr("from the first to the last clip").to_string() } else { format!("{:.1} s", s.sample_rate.seconds(sel.len())) };
+    let pod = s.podcast.clone();
+    let count = pad_count(&pod);
+    let mut open = true;
+    let mut go = false;
+    egui::Window::new(tr("Selection as Jingle")).open(&mut open).collapsible(false).resizable(false).default_pos([460.0, 200.0]).show(ctx, |ui| {
+        ui.label(RichText::new(trf("{} · {}", &[&what, &span])).color(t.text_dim));
+        ui.label(
+            RichText::new(tr(
+                "Drop an audio file into TalkCraft, cut it with the usual tools, select the range (or just its track), then export it here.",
+            ))
+            .small()
+            .color(t.text_dim),
+        );
+        ui.add_space(4.0);
+        egui::Grid::new("jingle_export").num_columns(2).show(ui, |ui| {
+            ui.label(tr("Name"));
+            ui.add(egui::TextEdit::singleline(&mut form.name).hint_text(tr("the clip's name")).desired_width(220.0));
+            ui.end_row();
+            ui.label(tr("Pad"));
+            let label = |p: usize| {
+                if p == 0 {
+                    tr("first empty pad").to_string()
+                } else {
+                    let n = soundcraft_engine::cmd::podcast::jingle_name(&pod, p - 1);
+                    if n.is_empty() { trf("Pad {}", &[&p]) } else { trf("Pad {} (replaces {})", &[&p, &n]) }
+                }
+            };
+            egui::ComboBox::from_id_salt("jingle_export_pad").selected_text(label(form.pad)).width(220.0).show_ui(ui, |ui| {
+                for p in 0..=count {
+                    ui.selectable_value(&mut form.pad, p, label(p));
+                }
+            });
+            ui.end_row();
+        });
+        ui.checkbox(&mut form.match_loudness, tr("Match the loudness (−16 LUFS, like the episode)"));
+        ui.add_space(4.0);
+        if ui.add(egui::Button::new(RichText::new(tr("Export as Jingle")).strong()).fill(t.accent)).clicked() {
+            go = true;
+        }
+        if !form.note.is_empty() {
+            ui.label(RichText::new(&form.note).small());
+        }
+    });
+    if go {
+        let mut p = json!({"name": form.name, "loudness_lufs": if form.match_loudness { json!(-16.0) } else { Value::Null }});
+        if form.pad > 0 {
+            p["pad"] = json!(form.pad);
+        }
+        form.note = match app.run("podcast.export_jingle", p) {
+            Ok(v) => {
+                crate::palettes::toggle(app, "jingles", &json!({"value": true}));
+                trf("On pad {}: {}", &[&v["pad"], &v["path"].as_str().unwrap_or_default()])
+            }
+            Err(e) => e,
+        };
+    }
+    app.extra.jingles.export = open.then_some(form);
+}
+
 /// What a click or menu on the pads asks for.
 enum Action {
     Fire(usize),
@@ -99,12 +185,14 @@ enum Action {
     RemovePad(usize),
     AddPad,
     Place(usize),
+    ExportForm,
     Move(usize, usize),
     Rename(usize, String),
     Color(usize, Option<[u8; 3]>),
 }
 
 pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
+    export_window(app, ctx);
     if !crate::palettes::is_open(app, "jingles") {
         return;
     }
@@ -307,6 +395,9 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             if ui.add_enabled(count > 1, egui::Button::new(" − ")).on_hover_text(tr("Remove the last pad")).clicked() {
                 actions.push(Action::RemovePad(count - 1));
             }
+            if ui.button(tr("From Selection…")).on_hover_text(tr("Cut a jingle in the timeline and put it on a pad")).clicked() {
+                actions.push(Action::ExportForm);
+            }
             ui.label(
                 RichText::new(tr(
                     "Pads are saved with the session. Keys 1–8 fire the first eight. The jingle track is the one locked against recording.",
@@ -323,6 +414,9 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             }
             Action::Audio(i, p) => set_slot(app, "jingles", i, &p),
             Action::Picture(i, p) => set_slot(app, "jingle_images", i, &p),
+            Action::ExportForm => {
+                toggle_export(app, &json!({"value": true}));
+            }
             Action::Place(i) => place(app, i + 1, app.engine.session().edit.selection.start),
             Action::AddPad => {
                 if let Err(e) = app.run("podcast.jingle_pad", json!({"add": true})) {
@@ -463,6 +557,9 @@ mod tests {
         assert!(app.run("jingles.fire", json!({"pad": 1})).is_ok());
         assert_eq!((clips(&app), app.engine.undo_history().len()), (before, undo), "nothing placed while stopped");
         assert!(app.run("jingles.fire", json!({"pad": 7})).is_err(), "an empty pad");
+        // File › Export › Selection as Jingle opens the form.
+        app.run("window.jingle_export", json!({})).unwrap();
+        assert!(app.extra.jingles.export.as_ref().is_some_and(|f| f.match_loudness && f.pad == 0));
     }
 
     fn frame(ctx: &egui::Context, app: &mut SoundApp, events: Vec<egui::Event>) {

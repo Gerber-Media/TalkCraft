@@ -22,6 +22,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("window.rundown", "Run Sheet", "Window > Run Sheet", None),
     ("window.finish", "Finish Episode...", "Edit > Finish Episode...", None),
     ("window.onair", "On Air", "Window > On Air", None),
+    ("window.jingle_export", "Selection as Jingle...", "File > Export > Selection as Jingle...", None),
     ("window.remote_control", "Remote Control (Phone, Tablet)", "Window > Remote Control (Phone, Tablet)", None),
     ("studio.status", "Studio Status", "", None),
     ("remote_control.start", "Start Remote Control", "", None),
@@ -428,6 +429,7 @@ const MENU_WINDOWS: &[(&str, &str)] = &[
     ("Window > Run Sheet", "window.rundown"),
     ("Edit > Finish Episode...", "window.finish"),
     ("Window > On Air", "window.onair"),
+    ("File > Export > Selection as Jingle...", "window.jingle_export"),
     ("Window > Remote Control (Phone, Tablet)", "window.remote_control"),
     ("File > Publish Episode...", "window.publish"),
     // The one option still switched often; the rest moved to the Settings.

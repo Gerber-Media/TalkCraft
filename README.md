@@ -86,7 +86,9 @@ podcast does not need.
   lowers the music while anyone speaks; a separately recorded track can be lined up with the others
   by cross-correlation.
 - **Jingles.** Pads for intro, outro and stingers (eight to start; + and − add and remove pads, up
-  to 32), each with an optional picture on it; one click plays it.
+  to 32), each with an optional picture on it; one click plays it at once (while recording it also
+  goes into the episode). Make your own: drop an audio file in, cut it, select it and File > Export >
+  Selection as Jingle puts it on a pad, loudness matched and with clean edges.
 - **Subtitles and transcript.** A cue list with speakers, a subtitle ruler, SRT and WebVTT
   import/export, automatic transcription with [whisper.cpp](https://github.com/ggml-org/whisper.cpp)
   (speakers named after the loudest track) and a plain-text transcript export.
@@ -321,7 +323,10 @@ braucht.
   automatisch absenken“ senkt die Musik, sobald jemand spricht; eine getrennt aufgenommene Spur
   lässt sich per Kreuzkorrelation an den anderen ausrichten.
 - **Jingles.** Pads für Intro, Outro und Trenner (acht zu Beginn; + und − fügen Pads hinzu oder
-  entfernen sie, bis 32), jedes auf Wunsch mit einem Bild; ein Klick spielt es ab.
+  entfernen sie, bis 32), jedes auf Wunsch mit einem Bild; ein Klick spielt es sofort ab (bei der
+  Aufnahme kommt es dabei auch in die Folge). Eigene Jingles: Audiodatei hineinziehen, schneiden,
+  auswählen, und Ablage > Exportieren > Auswahl als Jingle legt sie auf ein Pad, mit angeglichener
+  Lautheit und sauberen Kanten.
 - **Untertitel und Transkript.** Untertitel-Liste mit Sprechern, Untertitel-Lineal, Import und
   Export als SRT und WebVTT, automatische Transkription mit
   [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (Sprecher nach der lautesten Spur benannt)
