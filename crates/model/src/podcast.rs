@@ -84,8 +84,12 @@ impl Default for EpisodeInfo {
 pub struct PodcastSettings {
     pub export: PodcastExport,
     pub episode: EpisodeInfo,
-    /// Audio files on the jingle pads (intro, outro, stingers), up to eight; "" = empty pad.
+    /// Audio files on the jingle pads (intro, outro, stingers); "" = empty pad.
     pub jingles: Vec<String>,
+    /// A picture per pad (JPEG/PNG path, "" = none), shown on the pad.
+    pub jingle_images: Vec<String>,
+    /// How many pads the Jingles window shows (0 = the standard eight).
+    pub jingle_pads: u32,
     /// The run sheet: the episode's topics in order, each with its planned length.
     pub rundown: Vec<RundownItem>,
 }

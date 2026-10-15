@@ -30,6 +30,15 @@ pub fn specs() -> Vec<CommandSpec> {
             set
         ),
         cmd!(
+            "podcast.jingle_pad",
+            "Jingle Pad",
+            [],
+            None,
+            "{add: true} adds an empty jingle pad; {remove: n} removes pad n (later pads move up)",
+            always,
+            jingle_pad
+        ),
+        cmd!(
             noundo "file.export_podcast",
             "Export Episode...",
             [],
@@ -131,8 +140,46 @@ pub fn specs() -> Vec<CommandSpec> {
     ]
 }
 
-/// Most jingle pads.
+/// Pads a session starts with (keys 1–8 fire them).
 pub const JINGLE_PADS: usize = 8;
+/// Most jingle pads.
+pub const MAX_JINGLE_PADS: usize = 32;
+
+/// How many pads there are: the chosen number, at least as many as hold a file.
+pub fn pad_count(s: &soundcraft_model::PodcastSettings) -> usize {
+    let n = if s.jingle_pads == 0 { JINGLE_PADS } else { s.jingle_pads as usize };
+    n.max(s.jingles.len()).clamp(1, MAX_JINGLE_PADS)
+}
+
+/// `podcast.jingle_pad {add: true}` adds an empty pad at the end; `{remove: n}` removes pad n (its
+/// file and picture; later pads move up).
+fn jingle_pad(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "podcast.jingle_pad";
+    let mut s = e.session().podcast.clone();
+    let n = pad_count(&s);
+    if p.get("add").and_then(Value::as_bool) == Some(true) {
+        if n >= MAX_JINGLE_PADS {
+            return Err(bad(ID, format!("at most {MAX_JINGLE_PADS} jingle pads")));
+        }
+        s.jingle_pads = (n + 1) as u32;
+    } else if let Some(r) = p.get("remove").and_then(Value::as_u64) {
+        let r = r as usize;
+        if !(1..=n).contains(&r) || n <= 1 {
+            return Err(bad(ID, format!("`remove` is a pad from 1 to {n}, and one pad stays")));
+        }
+        if r <= s.jingles.len() {
+            s.jingles.remove(r - 1);
+        }
+        if r <= s.jingle_images.len() {
+            s.jingle_images.remove(r - 1);
+        }
+        s.jingle_pads = (n - 1) as u32;
+    } else {
+        return Err(bad(ID, "`add: true` or `remove: <pad>`"));
+    }
+    e.session_mut().podcast = s;
+    Ok(json!({"pads": pad_count(&e.session().podcast)}))
+}
 
 /// The music/jingle track: the first audio track locked against recording.
 pub fn jingle_track(s: &soundcraft_model::Session) -> Option<soundcraft_model::TrackId> {
@@ -141,7 +188,11 @@ pub fn jingle_track(s: &soundcraft_model::Session) -> Option<soundcraft_model::T
 
 fn place_jingle(e: &mut Engine, p: &Value) -> Result<Value> {
     const ID: &str = "podcast.place_jingle";
-    let pad = p.get("pad").and_then(Value::as_u64).filter(|n| (1..=JINGLE_PADS as u64).contains(n)).ok_or_else(|| bad(ID, "`pad` is 1 to 8"))?;
+    let pad = p
+        .get("pad")
+        .and_then(Value::as_u64)
+        .filter(|n| (1..=MAX_JINGLE_PADS as u64).contains(n))
+        .ok_or_else(|| bad(ID, format!("`pad` is 1 to {MAX_JINGLE_PADS}")))?;
     let path = e.session().podcast.jingles.get(pad as usize - 1).cloned().unwrap_or_default();
     if path.trim().is_empty() {
         return Err(bad(ID, format!("pad {pad} is empty: give it an audio file first")));
@@ -627,8 +678,8 @@ fn checked(id: &str, v: Value) -> Result<PodcastSettings> {
     {
         return Err(bad(id, "`loudness_lufs` is between -40 and 0 LUFS, or null for none"));
     }
-    if s.jingles.len() > JINGLE_PADS {
-        return Err(bad(id, format!("at most {JINGLE_PADS} jingle pads")));
+    if s.jingles.len() > MAX_JINGLE_PADS || s.jingle_images.len() > MAX_JINGLE_PADS || s.jingle_pads as usize > MAX_JINGLE_PADS {
+        return Err(bad(id, format!("at most {MAX_JINGLE_PADS} jingle pads")));
     }
     if s.rundown.len() > 200 || s.rundown.iter().any(|i| !(i.minutes.is_finite() && (0.0..=600.0).contains(&i.minutes)) || i.title.len() > 500) {
         return Err(bad(id, "the run sheet holds up to 200 topics of 0 to 600 minutes"));
@@ -1151,7 +1202,20 @@ mod tests {
         let music = e.session().track_by_name("Jingles & Musik").unwrap();
         assert_eq!(music.clips().len(), 1);
         assert_eq!(music.clips()[0].start, 96_000);
-        assert!(e.execute("podcast.set", &json!({"jingles": vec![""; 9]})).is_err(), "eight pads at most");
+        assert!(e.execute("podcast.set", &json!({"jingles": vec![""; 33]})).is_err(), "32 pads at most");
+        // Pads are added and removed one at a time, like tracks.
+        assert_eq!(pad_count(&e.session().podcast), 8);
+        e.execute("podcast.jingle_pad", &json!({"add": true})).unwrap();
+        e.execute("podcast.set", &json!({"jingles": ["", "", "", "", "", "", "", "", wav.to_string_lossy()], "jingle_images": ["", "cover.png"]}))
+            .unwrap();
+        e.execute("podcast.place_jingle", &json!({"pad": 9})).unwrap();
+        e.execute("podcast.jingle_pad", &json!({"remove": 1})).unwrap();
+        let pod = &e.session().podcast;
+        assert_eq!(pad_count(pod), 8);
+        assert_eq!(pod.jingles[7], wav.to_string_lossy(), "later pads move up");
+        assert_eq!(pod.jingle_images[0], "cover.png");
+        e.execute("edit.undo", &json!({})).unwrap();
+        assert_eq!(pad_count(&e.session().podcast), 9, "undoable");
         assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 

@@ -45,8 +45,12 @@ fn main() {
     let engine = if blank { soundcraft_engine::Engine::default() } else { soundcraft_engine::demo::demo_engine() };
     let (tx, rx) = mpsc::channel::<ControlRequest>();
     let app = SoundApp::new(engine, None, Services::default()).with_control(rx);
-    let mut harness =
-        egui_kittest::Harness::builder().with_size(egui::vec2(w, h)).with_pixels_per_point(2.0).with_max_steps(1_000_000).wgpu().build_ui_state(
+    let mut harness = egui_kittest::Harness::builder()
+        .with_size(egui::vec2(w, h))
+        .with_pixels_per_point(std::env::var("UI_SHOT_PPP").ok().and_then(|v| v.parse().ok()).unwrap_or(2.0))
+        .with_max_steps(1_000_000)
+        .wgpu()
+        .build_ui_state(
             |ui, app: &mut SoundApp| {
                 if !READY.load(Ordering::Relaxed) {
                     return;

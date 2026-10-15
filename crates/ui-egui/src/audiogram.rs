@@ -66,7 +66,7 @@ pub fn available() -> bool {
     ffmpeg().is_some()
 }
 
-/// A bold sans-serif from the system, else egui's built-in font.
+/// The interface's bold font (Inter SemiBold).
 fn font() -> Option<fontdue::Font> {
     let (bytes, index) = crate::fonts::bold_font_bytes()?;
     fontdue::Font::from_bytes(bytes, fontdue::FontSettings { collection_index: index, ..Default::default() }).ok()

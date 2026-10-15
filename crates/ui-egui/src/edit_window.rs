@@ -1049,7 +1049,9 @@ fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, sele
     }
     // Volume readout and inserts summary.
     let info = format!("vol {}  pan {}", crate::widgets::db_text(m.volume_db), m.pan.first().map_or("-".into(), |p| crate::widgets::pan_text(*p)));
-    ui.painter().text(pos2(view_r.max.x + 8.0, view_r.center().y), Align2::LEFT_CENTER, info, regular(10.0), t.text_dim);
+    // After the view buttons as drawn: wider labels (other languages, fonts) push it along.
+    let info_x = view_r.max.x.max(c2.min_rect().max.x) + 8.0;
+    ui.painter().text(pos2(info_x, view_r.center().y), Align2::LEFT_CENTER, info, regular(10.0), t.text_dim);
     let ins: Vec<&str> = m.inserts.iter().flatten().filter_map(|i| soundcraft_dsp::plugin_info(&i.plugin).map(|p| p.short_name)).collect();
     if !ins.is_empty() {
         ui.painter().with_clip_rect(Rect::from_min_max(pos2(am_r.max.x + 6.0, am_r.min.y), pos2(head.max.x - 20.0, am_r.max.y))).text(

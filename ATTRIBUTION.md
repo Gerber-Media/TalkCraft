@@ -21,14 +21,19 @@ are bundled.
 
 ## Fonts
 
-SoundCraft bundles no font files. It uses the default fonts shipped inside the `egui` crate
-(Ubuntu-Light: Ubuntu Font Licence 1.0; Hack: MIT; Noto Emoji: OFL-1.1; emoji-icon-font: OFL-1.1/MIT)
-and, at runtime, the operating system's own UI fonts when available (never redistributed).
+The interface font is **Inter** by Rasmus Andersson and the Inter Project Authors
+(<https://github.com/rsms/inter>, release 4.1), SIL Open Font License 1.1: `assets/fonts/Inter-Regular.ttf`
+and `assets/fonts/Inter-SemiBold.ttf`, embedded in the app, with the licence in
+`assets/fonts/Inter-LICENSE.txt`. Behind it, for symbols and emoji, the default fonts shipped inside
+the `egui` crate (Ubuntu-Light: Ubuntu Font Licence 1.0; Hack: MIT; Noto Emoji: OFL-1.1;
+emoji-icon-font: OFL-1.1/MIT).
 
 ## Files
 
 | Path | Author | Source | License |
 |---|---|---|---|
+| `assets/fonts/Inter-Regular.ttf` | Rasmus Andersson, The Inter Project Authors | github.com/rsms/inter v4.1 | SIL OFL 1.1 (`assets/fonts/Inter-LICENSE.txt`) |
+| `assets/fonts/Inter-SemiBold.ttf` | Rasmus Andersson, The Inter Project Authors | github.com/rsms/inter v4.1 | SIL OFL 1.1 (`assets/fonts/Inter-LICENSE.txt`) |
 | `docs/brand/artcraft-logo.svg` | ArtCraft Team | craftrules `assets/brand/` | ArtCraft brand terms (`docs/brand/LICENSE-brand.txt`) |
 | `docs/brand/artcraft-logo.png` | ArtCraft Team | craftrules `assets/brand/` | ArtCraft brand terms |
 | `docs/brand/artcraft-logo-white.svg` | ArtCraft Team | craftrules `assets/brand/` | ArtCraft brand terms |

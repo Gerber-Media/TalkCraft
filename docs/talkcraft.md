@@ -221,3 +221,13 @@ background job is a separate step.
   every document `replace_session` brings (`Engine.generation`), keeping a fresh session clean.
 - `ui.json` is written a second after any change (status line excluded), not only on quit.
 - ✎ (U+270E) is also missing from the interface font. Prefer words over symbols.
+
+## Interface font and icons
+
+- The interface font is Inter (bundled, OFL). Helvetica Neue from the system rendered wavy in egui
+  at 1× scale (non-Retina screens): glyphs of small text jumped up and down. Compare renders with
+  `UI_SHOT_PPP=1` for the `ui_shot` example, since at 2× it looks fine.
+- `icons::draw` draws into the largest centred square of the rect it gets: the transport buttons
+  are wider than tall and stretched the stop square into a bar.
+- Jingle pads: any number from 1 to 32 (`PodcastSettings.jingle_pads`, 0 = eight), a picture per
+  pad (`jingle_images`), `podcast.jingle_pad {add|remove}`. Keys 1–8 still fire the first eight.

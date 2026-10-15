@@ -9,6 +9,10 @@ fn p(r: Rect, x: f32, y: f32) -> Pos2 {
 
 /// Draw icon `name` inside `r` with colour `c`.
 pub fn draw(painter: &Painter, r: Rect, name: &str, c: Color32) {
+    // Icons are drawn for a square: on a wide button they would be stretched (a stop square turning
+    // into a bar), so they use the largest square in the middle.
+    let side = r.width().min(r.height());
+    let r = Rect::from_center_size(r.center(), vec2(side, side));
     let s = Stroke::new((r.width() / 14.0).clamp(1.2, 2.4), c);
     match name {
         "play" => {

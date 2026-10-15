@@ -569,15 +569,28 @@ const DE: &[(&str, &str)] = &[
     ("Quit TalkCraft", "TalkCraft beenden"),
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
+    ("Add a pad", "Pad hinzufügen"),
+    ("Choose audio file…", "Audiodatei wählen …"),
+    ("Choose picture…", "Bild wählen …"),
+    (
+        "Click: play it now (while recording or playing at the playhead, else at the insertion point) · drop an audio file or a picture here · right-click for more",
+        "Klick: jetzt abspielen (bei Aufnahme oder Wiedergabe an der Abspielposition, sonst an der Einfügemarke) · Audiodatei oder Bild hierher ziehen · Rechtsklick für mehr",
+    ),
+    ("Empty pad", "Pad leeren"),
+    (
+        "Pads are saved with the session. Keys 1–8 fire the first eight. The jingle track is the one locked against recording.",
+        "Die Pads werden mit der Session gespeichert. Die Tasten 1–8 spielen die ersten acht. Die Jingle-Spur ist die gegen Aufnahme gesperrte.",
+    ),
+    ("Picture", "Bild"),
+    ("Remove pad", "Pad entfernen"),
+    ("Remove picture", "Bild entfernen"),
+    ("Remove the last pad", "Letztes Pad entfernen"),
+    ("Show a picture on the pad (PNG or JPEG)", "Ein Bild auf dem Pad zeigen (PNG oder JPEG)"),
     (
         "A window of its own, e.g. for a second screen or a touchscreen",
         "Ein eigenes Fenster, z. B. für einen zweiten Bildschirm oder einen Touchscreen",
     ),
     ("Back to the main window", "Zurück ins Hauptfenster"),
-    (
-        "Click: play it now (while recording or playing at the playhead, else at the insertion point) · drop an audio file here to load the pad",
-        "Klick: jetzt abspielen (bei Aufnahme oder Wiedergabe an der Abspielposition, sonst an der Einfügemarke) · Audiodatei hierher ziehen, um das Pad zu belegen",
-    ),
     ("Drop an audio file here, or set a path", "Audiodatei hierher ziehen oder einen Pfad eintragen"),
     ("In their own window: {}", "Im eigenen Fenster: {}"),
     (

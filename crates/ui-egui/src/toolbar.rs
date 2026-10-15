@@ -302,7 +302,7 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
                     Stroke::new(1.0, t.button_border),
                     StrokeKind::Inside,
                 );
-                icons::draw(ui.painter(), r.shrink(5.0), "stop", if playing { t.text } else { t.accent });
+                icons::draw(ui.painter(), r.shrink(2.0), "stop", if playing { t.text } else { t.accent });
                 if resp.on_hover_text(crate::i18n::tr("Stop (Space)")).clicked() {
                     let _ = app.run("transport.stop", json!({}));
                 }
@@ -320,7 +320,7 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
                     Stroke::new(1.0, t.button_border),
                     StrokeKind::Inside,
                 );
-                icons::draw(ui.painter(), r.shrink(5.0), "play", if playing { Color32::from_rgb(120, 255, 140) } else { t.counter_text });
+                icons::draw(ui.painter(), r.shrink(2.0), "play", if playing { Color32::from_rgb(120, 255, 140) } else { t.counter_text });
                 if resp.on_hover_text(crate::i18n::tr("Play (Space)")).clicked() {
                     let _ = app.run("transport.play", json!({}));
                 }
@@ -341,7 +341,7 @@ fn transport(app: &mut SoundApp, ui: &mut Ui) {
                     Stroke::new(1.0, t.button_border),
                     StrokeKind::Inside,
                 );
-                icons::draw(ui.painter(), r.shrink(5.0), "record", t.rec);
+                icons::draw(ui.painter(), r.shrink(2.0), "record", t.rec);
                 if resp.on_hover_text(crate::i18n::tr("Record (Cmd+Space)")).clicked() {
                     let _ = app.run("transport.record", json!({}));
                 }

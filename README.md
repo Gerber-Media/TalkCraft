@@ -14,6 +14,11 @@
   <a href="https://github.com/storytold/soundcraft">SoundCraft</a> by GERBER.MEDIA.
 </p>
 
+<p align="center">
+  Idea, concept and design: <b>Dirk Gerber</b> · <a href="https://gerber.media">gerber.media</a><br>
+  Idee, Konzept und Gestaltung: <b>Dirk Gerber</b>
+</p>
+
 <a id="english"></a>
 
 # English
@@ -66,7 +71,8 @@ podcast does not need.
 - **Speakers and music.** Match Speaker Levels makes every speaker equally loud; Auto-Duck Music
   lowers the music while anyone speaks; a separately recorded track can be lined up with the others
   by cross-correlation.
-- **Jingles.** Eight pads for intro, outro and stingers, placed with one click.
+- **Jingles.** Pads for intro, outro and stingers (eight to start; + and − add and remove pads, up
+  to 32), each with an optional picture on it; one click plays it.
 - **Subtitles and transcript.** A cue list with speakers, a subtitle ruler, SRT and WebVTT
   import/export, automatic transcription with [whisper.cpp](https://github.com/ggml-org/whisper.cpp)
   (speakers named after the loudest track) and a plain-text transcript export.
@@ -198,6 +204,14 @@ packaging/macos/package.sh --arch aarch64   # dist/release/talkcraft-<version>-m
 
 Unsigned builds are for testing: Gatekeeper and SmartScreen warn about them.
 
+## Who made it
+
+TalkCraft is **Dirk Gerber**'s podcast studio ([GERBER.MEDIA](https://gerber.media)). Dirk had the
+idea and decided what it does and how it looks and works: the work modes, remote guests from the
+browser, the run sheet, the jingle palette for a second screen, publishing to the own feed, and
+much more. The code was written together with Claude (Anthropic), which is why commits carry a
+"Co-Authored-By: Claude" line next to Dirk as their author.
+
 ## Licence and credits
 
 MIT OR Apache-2.0, like SoundCraft. TalkCraft is based on SoundCraft by the SoundCraft authors
@@ -266,7 +280,8 @@ braucht.
 - **Sprecher und Musik.** „Sprecher angleichen“ macht alle Sprecher gleich laut; „Musik
   automatisch absenken“ senkt die Musik, sobald jemand spricht; eine getrennt aufgenommene Spur
   lässt sich per Kreuzkorrelation an den anderen ausrichten.
-- **Jingles.** Acht Pads für Intro, Outro und Trenner, mit einem Klick platziert.
+- **Jingles.** Pads für Intro, Outro und Trenner (acht zu Beginn; + und − fügen Pads hinzu oder
+  entfernen sie, bis 32), jedes auf Wunsch mit einem Bild; ein Klick spielt es ab.
 - **Untertitel und Transkript.** Untertitel-Liste mit Sprechern, Untertitel-Lineal, Import und
   Export als SRT und WebVTT, automatische Transkription mit
   [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (Sprecher nach der lautesten Spur benannt)
@@ -410,6 +425,15 @@ packaging/macos/package.sh --arch aarch64   # dist/release/talkcraft-<version>-m
 ```
 
 Unsignierte Builds sind zum Testen gedacht: Gatekeeper und SmartScreen warnen davor.
+
+## Wer steckt dahinter
+
+TalkCraft ist das Podcast-Studio von **Dirk Gerber** ([GERBER.MEDIA](https://gerber.media)). Von
+Dirk stammen die Idee und die Entscheidungen, was TalkCraft kann, wie es aussieht und sich bedienen
+lässt: die Arbeitsmodi, Ferngäste aus dem Browser, der Ablaufplan, die Jingle-Palette für den
+zweiten Bildschirm, das Veröffentlichen im eigenen Feed und vieles mehr. Den Code hat er zusammen mit
+Claude (Anthropic) geschrieben; deshalb tragen die Commits neben Dirk als Autor eine Zeile
+„Co-Authored-By: Claude“.
 
 ## Lizenz und Danksagung
 
