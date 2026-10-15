@@ -33,6 +33,8 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("publish.status", "Publishing Status", "", None),
     ("words.quote_clip", "Quote Clip...", "", None),
     ("ui.palette", "Palette Window", "", None),
+    ("rundown.start", "Start Topic", "", None),
+    ("rundown.next", "Next Topic", "", None),
     ("transport.rate", "Playback Speed", "", None),
     ("ui.workspace", "Work Mode", "", None),
     ("window.audiogram", "Audiogram (MP4)...", "File > Export > Audiogram (MP4)...", None),
@@ -557,6 +559,19 @@ pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<
     }
     if id.starts_with("remote_control.") {
         return Some(crate::remote_control::command(app, id));
+    }
+    // A mistake marker is named in the interface's language ("✂ Schneiden" in German).
+    if id == "markers.add_cut" && p.get("name").is_none() {
+        let mut p = p.clone();
+        if let Some(o) = p.as_object_mut() {
+            o.insert("name".into(), json!(crate::i18n::tr("✂ Cut")));
+        } else {
+            p = json!({"name": crate::i18n::tr("✂ Cut")});
+        }
+        return Some(app.engine.execute(id, &p).map_err(|e| e.to_string()));
+    }
+    if id == "rundown.start" || id == "rundown.next" {
+        return Some(crate::rundown_window::command(app, id, p));
     }
     if id == "ui.palette" {
         return Some(crate::palettes::command(app, p));

@@ -61,7 +61,7 @@ pub fn is_speaker(t: &soundcraft_model::Track) -> bool {
 }
 
 /// Name of the "cut here" markers set while recording (they never become chapters).
-pub const CUT_MARKER: &str = "✂ Schneiden";
+pub const CUT_MARKER: &str = "✂ Cut";
 /// Their colour on the marker ruler.
 pub const CUT_MARKER_COLOR: [u8; 3] = [220, 60, 60];
 

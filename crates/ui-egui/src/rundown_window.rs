@@ -163,6 +163,26 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
 }
 
 /// Tab while recording: the next topic.
+/// `rundown.start {topic}` (1-based) starts a topic; `rundown.next` the next one. Each sets a
+/// chapter marker named after the topic.
+pub fn command(app: &mut SoundApp, id: &str, p: &Value) -> Result<Value, String> {
+    let n = app.engine.session().podcast.rundown.len();
+    if id == "rundown.next" {
+        if !next_topic(app) {
+            return Err("no next topic in the run sheet".into());
+        }
+    } else {
+        let t = p
+            .get("topic")
+            .and_then(Value::as_u64)
+            .map(|t| t as usize)
+            .filter(|t| (1..=n).contains(t))
+            .ok_or_else(|| format!("`topic` is 1 to {n}"))?;
+        start_topic(app, t - 1);
+    }
+    Ok(json!({"topic": app.extra.rundown.current.map(|(i, _)| i + 1)}))
+}
+
 /// The topic being talked about: title, seconds spent on it, seconds planned (0 = open).
 pub fn current_topic(app: &SoundApp) -> Option<(String, f64, f64)> {
     let (i, since) = app.extra.rundown.current?;

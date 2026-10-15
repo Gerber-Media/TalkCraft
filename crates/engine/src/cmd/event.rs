@@ -367,8 +367,10 @@ fn add_cut_marker(e: &mut Engine, p: &Value) -> Result<Value> {
         None if e.transport.playing => e.transport.position,
         None => e.session().edit.selection.start,
     };
+    // The name comes in the interface's language (the UI passes it); it must start with ✂.
+    let name = str_param(p, "name").map(str::trim).filter(|n| n.starts_with('✂')).unwrap_or(crate::podcast::CUT_MARKER).to_string();
     let s = e.session_mut();
-    let id = s.add_marker(crate::podcast::CUT_MARKER, MarkerKind::Marker, at.max(0), at.max(0));
+    let id = s.add_marker(&name, MarkerKind::Marker, at.max(0), at.max(0));
     if let Some(m) = s.markers.iter_mut().find(|m| m.id == id) {
         m.color = Some(crate::podcast::CUT_MARKER_COLOR);
     }

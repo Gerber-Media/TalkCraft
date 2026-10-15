@@ -15,6 +15,10 @@
 </p>
 
 <p align="center">
+  <img alt="TalkCraft: the editor with coloured name plates, chapters and two speakers, fading between the dark and the light theme" src="docs/media/talkcraft-hero.gif" width="900">
+</p>
+
+<p align="center">
   Idea, concept and design: <b>Dirk Gerber</b> · <a href="https://gerber.media">gerber.media</a><br>
   Idee, Konzept und Gestaltung: <b>Dirk Gerber</b>
 </p>
@@ -30,6 +34,16 @@ guests join from their browser, and the episode is cut, subtitled, levelled and 
 place. It runs natively on macOS, Windows and Linux and is written in Rust. Underneath sits the
 full SoundCraft engine (mixer, plugins, automation, CLI, MCP server); the menus leave out what a
 podcast does not need.
+
+## Workflow
+
+<table>
+<tr>
+<td width="33%" valign="top"><img alt="Recording: run sheet, jingle pads (a pad is played and lands on the jingle track) and the phone remote" src="docs/media/talkcraft-record.gif"><br><b>Record.</b> The run sheet keeps the topics on time, jingle pads play live (here “Applause” lands on the jingle track), and a phone becomes the remote.</td>
+<td width="33%" valign="top"><img alt="Editing: a mistake marked while recording is selected, cut out of every track at once, then Finish Episode" src="docs/media/talkcraft-edit.gif"><br><b>Edit.</b> The mistake marked while recording is selected, cut from every track at once, and Finish Episode does the rest.</td>
+<td width="33%" valign="top"><img alt="Publishing: the checklist shows one open mistake marker, then everything is green" src="docs/media/talkcraft-publish.gif"><br><b>Publish.</b> The checklist says what is missing; then one button exports the episode to your own feed or your host.</td>
+</tr>
+</table>
 
 ## Features
 
@@ -120,6 +134,8 @@ podcast does not need.
   the same Wi-Fi and it becomes the remote, with On Air, Record/Stop, chapter and mistake markers,
   the next topic and the jingle pads with their pictures. Nothing to install; English or German
   after the phone's language.
+- **Colours that tell things apart.** Name plates, jingle pads and markers take a colour of your
+  choice (swatches or a free colour picker); the text on them turns dark or light to stay readable.
 - **Sort by hand.** Jingle pads, run sheet topics and tracks have a grip: drag it and the others make
   room live; letting go snaps the item into place. The History stays in its order.
 - **Languages.** English and German interface (Automatic follows the system).
@@ -213,6 +229,10 @@ packaging/macos/package.sh --arch aarch64   # dist/release/talkcraft-<version>-m
 
 Unsigned builds are for testing: Gatekeeper and SmartScreen warn about them.
 
+**Downloads:** the installers for macOS, Windows and Linux are built on GitHub
+([Gerber-Media/TalkCraft › Releases](https://github.com/Gerber-Media/TalkCraft/releases)) by
+`.github/workflows/release.yml` whenever a version tag `v…` is pushed.
+
 ## Who made it
 
 TalkCraft is **Dirk Gerber**'s podcast studio ([GERBER.MEDIA](https://gerber.media)). Dirk had the
@@ -229,7 +249,8 @@ MIT OR Apache-2.0, like SoundCraft. TalkCraft is based on SoundCraft by the Soun
 lists what that means for distributing binaries. TalkCraft is not affiliated with or endorsed by
 the SoundCraft or ArtCraft projects.
 
-Source: [codefloe.com/GerberMedia/TalkCraft](https://codefloe.com/GerberMedia/TalkCraft)
+Source: [codefloe.com/GerberMedia/TalkCraft](https://codefloe.com/GerberMedia/TalkCraft) · mirror and
+downloads: [github.com/Gerber-Media/TalkCraft](https://github.com/Gerber-Media/TalkCraft)
 
 ---
 
@@ -245,6 +266,16 @@ untertitelt, im Pegel angeglichen und exportiert. TalkCraft läuft nativ auf mac
 Linux und ist in Rust geschrieben. Darunter steckt die vollständige SoundCraft-Engine (Mischpult,
 Plug-ins, Automation, Kommandozeile, MCP-Server); die Menüs lassen weg, was ein Podcast nicht
 braucht.
+
+## Arbeitsablauf
+
+<table>
+<tr>
+<td width="33%" valign="top"><img alt="Aufnehmen: Ablaufplan, Jingle-Pads (ein Pad wird gespielt und landet auf der Jingle-Spur) und die Handy-Fernbedienung" src="docs/media/talkcraft-record.gif"><br><b>Aufnehmen.</b> Der Ablaufplan hält die Themen im Zeitplan, Jingle-Pads spielen live (hier landet „Applause“ auf der Jingle-Spur), und ein Handy wird zur Fernbedienung.</td>
+<td width="33%" valign="top"><img alt="Schneiden: ein bei der Aufnahme markierter Fehler wird ausgewählt, aus allen Spuren zugleich geschnitten, dann Folge fertig machen" src="docs/media/talkcraft-edit.gif"><br><b>Schneiden.</b> Der bei der Aufnahme markierte Fehler wird ausgewählt und aus allen Spuren zugleich geschnitten; „Folge fertig machen“ erledigt den Rest.</td>
+<td width="33%" valign="top"><img alt="Veröffentlichen: die Checkliste zeigt einen offenen Fehler-Marker, danach ist alles grün" src="docs/media/talkcraft-publish.gif"><br><b>Veröffentlichen.</b> Die Checkliste sagt, was fehlt; dann exportiert ein Knopf die Folge in den eigenen Feed oder zum Hoster.</td>
+</tr>
+</table>
 
 ## Funktionen
 
@@ -344,6 +375,9 @@ braucht.
   selben WLAN scannen, und es wird zur Fernbedienung mit On Air, Aufnahme/Stopp, Kapitel- und
   Fehler-Markern, nächstem Thema und den Jingle-Pads samt Bildern. Nichts zu installieren; Deutsch
   oder Englisch nach der Sprache des Handys.
+- **Farben zum Unterscheiden.** Namensschilder, Jingle-Pads und Marker bekommen eine Farbe nach
+  Wahl (Farbfelder oder freier Farbwähler); die Schrift darauf wird dunkel oder hell, damit sie
+  lesbar bleibt.
 - **Von Hand sortieren.** Jingle-Pads, Themen im Ablaufplan und Spuren haben einen Anfasser: ziehen,
   die anderen rücken live zur Seite, beim Loslassen rastet der Eintrag ein. Der Verlauf bleibt in
   seiner Reihenfolge.
@@ -444,6 +478,10 @@ packaging/macos/package.sh --arch aarch64   # dist/release/talkcraft-<version>-m
 ```
 
 Unsignierte Builds sind zum Testen gedacht: Gatekeeper und SmartScreen warnen davor.
+
+**Downloads:** Die Installer für macOS, Windows und Linux baut GitHub
+([Gerber-Media/TalkCraft › Releases](https://github.com/Gerber-Media/TalkCraft/releases)) mit
+`.github/workflows/release.yml`, sobald ein Versions-Tag `v…` hochgeladen wird.
 
 ## Wer steckt dahinter
 

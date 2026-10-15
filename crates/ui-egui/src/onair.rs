@@ -169,7 +169,8 @@ mod tests {
         let v = app.run("studio.status", json!({})).unwrap();
         assert_eq!(v["recording"], json!(false));
         assert_eq!(v["next"], json!("Intro"));
-        crate::rundown_window::start_topic(&mut app, 0);
+        app.run("rundown.start", json!({"topic": 1})).unwrap();
+        assert!(app.run("rundown.start", json!({"topic": 9})).is_err());
         let v = app.run("studio.status", json!({})).unwrap();
         assert_eq!(v["topic"]["title"], json!("Intro"));
         assert_eq!(v["topic"]["planned"], json!("00:02:00"));

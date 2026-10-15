@@ -121,46 +121,49 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let mut start = false;
     let mut go: Option<usize> = None;
     let now = app.engine.undo_history().len();
-    egui::Window::new(tr("Finish Episode")).open(&mut open).default_size(vec2(440.0, 360.0)).resizable(true).show(ctx, |ui| {
-        let w = &mut app.extra.finish;
-        ui.label(
-            RichText::new(tr("The usual finishing steps in one go. Each one is undoable; Before and After let you compare."))
-                .small()
-                .color(t.text_dim),
-        );
-        ui.add_space(4.0);
-        ui.checkbox(&mut w.denoise, tr("Reduce background noise (takes a while on long episodes)"));
-        ui.checkbox(&mut w.match_speakers, tr("Match speaker levels"));
-        ui.checkbox(&mut w.fillers, tr("Cut the filler words selected in Edit by Text"));
-        ui.checkbox(&mut w.pauses, tr("Shorten long pauses"));
-        ui.checkbox(&mut w.duck, tr("Duck music under speech"));
-        ui.add_space(6.0);
-        if ui.add(egui::Button::new(RichText::new(tr("Finish Episode")).strong()).fill(t.accent)).clicked() {
-            start = true;
-        }
-        if !w.report.is_empty() {
-            ui.separator();
-            for (ok, line) in &w.report {
-                ui.label(RichText::new(format!("{} {line}", if *ok { "✔" } else { "–" })).color(if *ok { t.text } else { t.text_dim }));
+    egui::Window::new(tr("Finish Episode")).open(&mut open).default_pos([420.0, 180.0]).default_size(vec2(440.0, 360.0)).resizable(true).show(
+        ctx,
+        |ui| {
+            let w = &mut app.extra.finish;
+            ui.label(
+                RichText::new(tr("The usual finishing steps in one go. Each one is undoable; Before and After let you compare."))
+                    .small()
+                    .color(t.text_dim),
+            );
+            ui.add_space(4.0);
+            ui.checkbox(&mut w.denoise, tr("Reduce background noise (takes a while on long episodes)"));
+            ui.checkbox(&mut w.match_speakers, tr("Match speaker levels"));
+            ui.checkbox(&mut w.fillers, tr("Cut the filler words selected in Edit by Text"));
+            ui.checkbox(&mut w.pauses, tr("Shorten long pauses"));
+            ui.checkbox(&mut w.duck, tr("Duck music under speech"));
+            ui.add_space(6.0);
+            if ui.add(egui::Button::new(RichText::new(tr("Finish Episode")).strong()).fill(t.accent)).clicked() {
+                start = true;
             }
-        }
-        if let Some((before, after)) = w.before_after {
-            ui.separator();
-            ui.horizontal(|ui| {
-                if ui.selectable_label(now == before, tr("Before")).on_hover_text(tr("The episode as it was (play to compare)")).clicked() {
-                    go = Some(before);
+            if !w.report.is_empty() {
+                ui.separator();
+                for (ok, line) in &w.report {
+                    ui.label(RichText::new(format!("{} {line}", if *ok { "✔" } else { "–" })).color(if *ok { t.text } else { t.text_dim }));
                 }
-                if ui.selectable_label(now == after, tr("After")).clicked() {
-                    go = Some(after);
-                }
-                if ui.button(tr("Undo All")).clicked() {
-                    go = Some(before);
-                    w.before_after = None;
-                    w.report.clear();
-                }
-            });
-        }
-    });
+            }
+            if let Some((before, after)) = w.before_after {
+                ui.separator();
+                ui.horizontal(|ui| {
+                    if ui.selectable_label(now == before, tr("Before")).on_hover_text(tr("The episode as it was (play to compare)")).clicked() {
+                        go = Some(before);
+                    }
+                    if ui.selectable_label(now == after, tr("After")).clicked() {
+                        go = Some(after);
+                    }
+                    if ui.button(tr("Undo All")).clicked() {
+                        go = Some(before);
+                        w.before_after = None;
+                        w.report.clear();
+                    }
+                });
+            }
+        },
+    );
     app.extra.finish.show = open;
     let w = &app.extra.finish;
     app.ui.finish_steps = Some([w.denoise, w.match_speakers, w.fillers, w.pauses, w.duck]);

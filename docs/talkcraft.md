@@ -246,3 +246,17 @@ background job is a separate step.
   The jingle test drives a real drag through `egui::Context::run_ui`.
 - `fonts::tests::every_symbol_in_the_interface_has_a_glyph` fails when a string literal uses a
   character no bundled font has (✓, ✎, ✕ and ♯ showed as boxes before).
+
+## GitHub mirror, installers and README media
+
+- The repository lives on Codefloe (`origin`); `github` (github.com/Gerber-Media/TalkCraft) is a
+  fork of storytold/soundcraft, so changes can be offered upstream as pull requests and upstream
+  changes can be merged in. Push to both.
+- storytold's release workflows use a paid macOS runner (macos-15-xlarge) and their own secrets:
+  replaced by `.github/workflows/release.yml` on standard runners (macos-14, windows-latest,
+  ubuntu-22.04). A tag `v*` makes a GitHub Release; signing secrets are optional.
+- `docs/media/*.gif` are made from the app itself: `ui_shot` scenes (an English session with two
+  voices from the macOS `say` command), rendered with `HOME` pointing at an empty folder so no
+  local settings or user names show, then cross-faded with ffmpeg (palettegen/paletteuse). The
+  phone frame is the real remote-control page in Playwright (iPhone 13) against a mock state.
+  Never show the remote control's QR code or address: it contains the local network address.

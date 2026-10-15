@@ -1219,6 +1219,11 @@ mod tests {
         e.execute("markers.previous_cut", &json!({})).unwrap();
         assert_eq!(e.session().edit.selection.start, 2 * 48_000);
         assert!(e.execute("markers.done_cut", &json!({"at": {"seconds": 8.0}})).is_err(), "nothing there");
+        // Named in the interface's language; a name without ✂ would not be found again, so it is refused.
+        e.execute("markers.add_cut", &json!({"at": {"seconds": 7.0}, "name": "✂ Schneiden"})).unwrap();
+        e.execute("markers.add_cut", &json!({"at": {"seconds": 8.0}, "name": "oops"})).unwrap();
+        let names: Vec<&str> = e.session().markers.iter().filter(|m| crate::podcast::is_cut_marker(m)).map(|m| m.name.as_str()).collect();
+        assert!(names.contains(&"✂ Schneiden") && names.contains(&"✂ Cut"), "{names:?}");
     }
 
     #[test]

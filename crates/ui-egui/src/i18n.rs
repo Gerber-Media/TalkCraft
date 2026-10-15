@@ -569,6 +569,7 @@ const DE: &[(&str, &str)] = &[
     ("Quit TalkCraft", "TalkCraft beenden"),
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
+    ("✂ Cut", "✂ Schneiden"),
     ("Colour", "Farbe"),
     ("Marker colour", "Markerfarbe"),
     ("Name Plate Colour", "Farbe des Namensschilds"),

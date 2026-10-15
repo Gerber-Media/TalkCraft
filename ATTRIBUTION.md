@@ -32,6 +32,7 @@ emoji-icon-font: OFL-1.1/MIT).
 
 | Path | Author | Source | License |
 |---|---|---|---|
+| `docs/media/` | TalkCraft contributors | screen recordings of TalkCraft itself (demo voices synthesised with the macOS speech synthesiser; parrot = the TalkCraft icon) | MIT OR Apache-2.0 |
 | `assets/fonts/Inter-Regular.ttf` | Rasmus Andersson, The Inter Project Authors | github.com/rsms/inter v4.1 | SIL OFL 1.1 (`assets/fonts/Inter-LICENSE.txt`) |
 | `assets/fonts/Inter-SemiBold.ttf` | Rasmus Andersson, The Inter Project Authors | github.com/rsms/inter v4.1 | SIL OFL 1.1 (`assets/fonts/Inter-LICENSE.txt`) |
 | `docs/brand/artcraft-logo.svg` | ArtCraft Team | craftrules `assets/brand/` | ArtCraft brand terms (`docs/brand/LICENSE-brand.txt`) |
