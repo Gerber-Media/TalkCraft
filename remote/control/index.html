@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111214">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>TalkCraft</title>
+<style>
+  :root { --bg: #111214; --panel: #1d1f23; --ink: #f2f2f2; --dim: #8b8f96; --red: #d33a2c; --green: #2f9e63; --yellow: #e0a92a; --accent: #3b82c4; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.35 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding: max(12px, env(safe-area-inset-top)) 12px max(16px, env(safe-area-inset-bottom)); user-select: none; -webkit-user-select: none; }
+  .lamp { border-radius: 12px; padding: 14px 12px; text-align: center; font-weight: 700; font-size: 26px; letter-spacing: .04em; background: var(--panel); }
+  .lamp.on { background: var(--red); color: #fff; }
+  .lamp.count { background: #7a1a14; color: #fff; }
+  .lamp .dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; margin-right: 10px; vertical-align: 2px; }
+  .time { font: 600 44px/1.1 ui-monospace, Menlo, Consolas, monospace; text-align: center; margin: 10px 0 2px; color: var(--dim); }
+  .time.on { color: var(--ink); }
+  .topic { text-align: center; min-height: 52px; }
+  .topic .t { font-size: 20px; font-weight: 600; }
+  .topic .s { color: var(--dim); font-family: ui-monospace, Menlo, monospace; }
+  .topic .s.over { color: var(--red); }
+  .next { color: var(--dim); text-align: center; font-size: 14px; margin-bottom: 10px; }
+  .row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0; }
+  button { font: inherit; font-weight: 600; color: var(--ink); background: var(--panel); border: 0; border-radius: 12px; min-height: 60px; padding: 6px; }
+  button:active { transform: scale(.97); filter: brightness(1.3); }
+  button:disabled { opacity: .35; }
+  button.rec { background: var(--red); color: #fff; }
+  button.stop { background: #444; color: #fff; }
+  .pads { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 6px; }
+  .pad { position: relative; min-height: 96px; overflow: hidden; display: flex; align-items: flex-end; text-align: left; padding: 0; }
+  .pad img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .pad span { position: relative; width: 100%; padding: 6px 8px; background: rgba(0,0,0,.55); font-size: 14px; }
+  .pad.empty span { background: none; color: var(--dim); }
+  .pad.fired { outline: 3px solid var(--green); }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin: 16px 2px 4px; }
+  .msg { color: var(--dim); text-align: center; font-size: 14px; margin-top: 18px; }
+  @media (max-width: 420px) { .row { grid-template-columns: repeat(2, 1fr); } .time { font-size: 38px; } }
+</style>
+</head>
+<body>
+<div id="lamp" class="lamp">…</div>
+<div id="time" class="time">00:00:00</div>
+<div id="topic" class="topic"></div>
+<div id="next" class="next"></div>
+<div class="row">
+  <button id="rec" class="rec"></button>
+  <button id="chapter" data-t="chapter"></button>
+  <button id="mistake" data-t="mistake"></button>
+  <button id="nexttopic" data-t="next_topic"></button>
+</div>
+<h2 data-t="jingles"></h2>
+<div id="pads" class="pads"></div>
+<div id="msg" class="msg"></div>
+<script>
+const TEXT = {
+  en: {
+    ready: "Ready", check: "Check", not_ready: "Not ready", on_air: "ON AIR", in: "Recording in",
+    record: "● Record", stop: "■ Stop", chapter: "+ Chapter", mistake: "✂ Mistake", next_topic: "Next topic",
+    jingles: "Jingles", empty: "empty", next: "Next: ", now: "Now",
+    offline: "No connection to TalkCraft. Same Wi-Fi? Is the remote control still on in TalkCraft?",
+  },
+  de: {
+    ready: "Bereit", check: "Prüfen", not_ready: "Nicht bereit", on_air: "ON AIR", in: "Aufnahme in",
+    record: "● Aufnahme", stop: "■ Stopp", chapter: "+ Kapitel", mistake: "✂ Fehler", next_topic: "Nächstes Thema",
+    jingles: "Jingles", empty: "leer", next: "Danach: ", now: "Jetzt",
+    offline: "Keine Verbindung zu TalkCraft. Gleiches WLAN? Ist die Fernbedienung in TalkCraft noch an?",
+  },
+};
+const LANG = [new URLSearchParams(location.search).get("lang"), ...(navigator.languages || []), navigator.language]
+  .filter(Boolean).map((l) => l.slice(0, 2).toLowerCase()).find((l) => l in TEXT) || "en";
+const T = TEXT[LANG];
+document.documentElement.lang = LANG;
+for (const el of document.querySelectorAll("[data-t]")) el.textContent = T[el.dataset.t];
+const $ = (id) => document.getElementById(id);
+// One id per device, so TalkCraft can show how many are connected.
+let device = localStorage.getItem("tc-device");
+if (!device) { device = Math.random().toString(36).slice(2, 10); localStorage.setItem("tc-device", device); }
+let state = null, padsKey = "", wakeLock = null;
+
+async function act(a, n) {
+  try { await fetch("do", { method: "POST", body: JSON.stringify({ a, n }) }); } catch {}
+  poll(true);
+}
+$("rec").onclick = () => act(state && (state.recording || state.countdown != null) ? "stop" : "record");
+$("chapter").onclick = () => act("chapter");
+$("mistake").onclick = () => act("mistake");
+$("nexttopic").onclick = () => act("next");
+
+function renderPads(pads) {
+  const key = JSON.stringify(pads);
+  if (key === padsKey) return;
+  padsKey = key;
+  const box = $("pads");
+  box.textContent = "";
+  pads.forEach((p, i) => {
+    const b = document.createElement("button");
+    b.className = "pad" + (p.name ? "" : " empty");
+    b.disabled = !p.name;
+    if (p.image) { const img = document.createElement("img"); img.src = `pad/${i + 1}?v=${encodeURIComponent(p.image)}`; img.alt = ""; b.append(img); }
+    const s = document.createElement("span");
+    s.textContent = `${i + 1} · ${p.name || T.empty}`;
+    b.append(s);
+    b.onclick = () => { b.classList.add("fired"); setTimeout(() => b.classList.remove("fired"), 400); act("pad", i + 1); };
+    box.append(b);
+  });
+}
+
+function render(s) {
+  state = s;
+  const lamp = $("lamp");
+  lamp.className = "lamp";
+  if (s.countdown != null) { lamp.classList.add("count"); lamp.textContent = `${T.in} ${s.countdown}`; }
+  else if (s.recording) { lamp.classList.add("on"); lamp.textContent = `● ${T.on_air}`; }
+  else {
+    const color = { green: "var(--green)", yellow: "var(--yellow)", red: "var(--red)" }[s.light];
+    const word = { green: T.ready, yellow: T.check, red: T.not_ready }[s.light];
+    lamp.innerHTML = `<span class="dot" style="background:${color}"></span>`;
+    lamp.append(word);
+  }
+  $("time").textContent = s.take;
+  $("time").className = "time" + (s.recording ? " on" : "");
+  const topic = $("topic");
+  topic.textContent = "";
+  if (s.topic) {
+    const t = document.createElement("div"); t.className = "t"; t.textContent = s.topic.title;
+    const st = document.createElement("div"); st.className = "s" + (s.topic.over ? " over" : "");
+    st.textContent = s.topic.planned ? `${s.topic.spent} / ${s.topic.planned}` : s.topic.spent;
+    topic.append(t, st);
+  } else if (!s.recording && s.checks.length) {
+    const c = document.createElement("div"); c.className = "s"; c.textContent = s.checks.slice(0, 2).join(" · ");
+    topic.append(c);
+  }
+  $("next").textContent = s.next ? T.next + s.next : "";
+  $("nexttopic").disabled = !s.next;
+  const busy = s.recording || s.countdown != null;
+  $("rec").textContent = busy ? T.stop : T.record;
+  $("rec").className = busy ? "stop" : "rec";
+  renderPads(s.pads || []);
+  $("msg").textContent = "";
+}
+
+let timer = null;
+async function poll(once) {
+  clearTimeout(timer);
+  try {
+    const r = await fetch(`state?d=${device}`, { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    render(await r.json());
+  } catch { $("msg").textContent = T.offline; }
+  if (!once) timer = setTimeout(poll, 500);
+  else timer = setTimeout(poll, 500);
+}
+async function keepAwake() {
+  try { if ("wakeLock" in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request("screen"); wakeLock.onrelease = () => { wakeLock = null; }; } } catch {}
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { keepAwake(); poll(); } });
+document.addEventListener("click", keepAwake, { once: true });
+keepAwake();
+poll();
+</script>
+</body>
+</html>

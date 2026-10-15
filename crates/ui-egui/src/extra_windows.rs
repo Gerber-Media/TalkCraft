@@ -24,6 +24,9 @@ pub struct ExtraState {
     pub publish: crate::publish_window::PublishWindow,
     /// Where each detached palette's window was when it opened this run (it is placed only then).
     pub palette_start: std::collections::HashMap<&'static str, Option<[f32; 4]>>,
+    /// Sorting the Tracks list by its grips.
+    pub track_sort: crate::reorder::Reorder,
+    pub remote_control: crate::remote_control::RemoteControl,
     /// The listening rate before L sped playback up (K returns to it).
     pub shuttle_rate: Option<f32>,
     /// The start question is open; after a recording, switching to editing is offered.
@@ -51,6 +54,8 @@ impl Default for ExtraState {
             finish: Default::default(),
             publish: Default::default(),
             palette_start: Default::default(),
+            track_sort: Default::default(),
+            remote_control: Default::default(),
             shuttle_rate: None,
             ask_workspace: false,
             offer_edit: false,
@@ -80,6 +85,9 @@ pub fn run(app: &mut SoundApp, id: &str, p: &Value) -> Option<Value> {
         "window.remote" => crate::remote::toggle(app, p),
         "window.rundown" => crate::rundown_window::toggle(app, p),
         "window.finish" => crate::finish_window::toggle(app, p),
+        "window.onair" => crate::onair::toggle(app, p),
+        "window.remote_control" => crate::remote_control::toggle(app, p),
+        "studio.status" => crate::onair::status_json(app),
         "ui.workspace" => crate::workspace::run(app, p).unwrap_or_else(|e| json!({"error": e})),
         "transport.rate" => {
             let r = p.get("rate").and_then(Value::as_f64).unwrap_or(1.0) as f32;
@@ -103,6 +111,8 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
     crate::remote::window(app, ctx);
     crate::rundown_window::window(app, ctx);
     crate::finish_window::window(app, ctx);
+    crate::onair::window(app, ctx);
+    crate::remote_control::window(app, ctx);
     crate::publish_window::window(app, ctx);
     if !app.extra.workspace_started {
         app.extra.workspace_started = true;

@@ -113,6 +113,15 @@ podcast does not need.
   their own ("Own window" at the top of the palette): drag it to a second monitor or a touchscreen,
   where the jingle pads grow to fill it. TalkCraft remembers which palettes were open, detached and
   where; Setup > Preferences > General resets them. Jingle pads also fire while recording.
+- **On Air display.** Window > On Air: a big lamp (On Air, the 3-2-1, or ready and what to check),
+  the running time, the current topic against its plan and the next one. In its own window it adds
+  big buttons for a touchscreen.
+- **Remote control on a phone or tablet.** Window > Remote Control: scan the QR code with a phone in
+  the same Wi-Fi and it becomes the remote, with On Air, Record/Stop, chapter and mistake markers,
+  the next topic and the jingle pads with their pictures. Nothing to install; English or German
+  after the phone's language.
+- **Sort by hand.** Jingle pads, run sheet topics and tracks have a grip: drag it and the others make
+  room live; letting go snaps the item into place. The History stays in its order.
 - **Languages.** English and German interface (Automatic follows the system).
 - **Settings.** Setup > Preferences has tabs: Episode (saved with the session), General (language,
   start question, scrolling and editing behaviour), Appearance (size, motion, theme, waveform and
@@ -328,6 +337,16 @@ braucht.
   einen Touchscreen ziehen; dort werden die Jingle-Pads groß. TalkCraft merkt sich, welche Paletten
   offen und abgedockt waren und wo; Einstellungen > Einstellungen … > Allgemein setzt sie zurück. Die
   Jingle-Pads lassen sich auch während der Aufnahme auslösen.
+- **On-Air-Anzeige.** Fenster > On Air: eine große Lampe (On Air, der 3-2-1-Countdown oder bereit
+  und was zu prüfen ist), die laufende Zeit, das aktuelle Thema gegen die Planung und das nächste.
+  Im eigenen Fenster kommen große Knöpfe für einen Touchscreen dazu.
+- **Fernbedienung per Handy oder Tablet.** Fenster > Fernbedienung: Den QR-Code mit einem Handy im
+  selben WLAN scannen, und es wird zur Fernbedienung mit On Air, Aufnahme/Stopp, Kapitel- und
+  Fehler-Markern, nächstem Thema und den Jingle-Pads samt Bildern. Nichts zu installieren; Deutsch
+  oder Englisch nach der Sprache des Handys.
+- **Von Hand sortieren.** Jingle-Pads, Themen im Ablaufplan und Spuren haben einen Anfasser: ziehen,
+  die anderen rücken live zur Seite, beim Loslassen rastet der Eintrag ein. Der Verlauf bleibt in
+  seiner Reihenfolge.
 - **Sprachen.** Deutsche und englische Oberfläche („Automatisch“ folgt dem System).
 - **Einstellungen.** Einstellungen > Einstellungen … hat Reiter: Folge (in der Session gespeichert),
   Allgemein (Sprache, Startfrage, Scrollen und Bearbeitungsverhalten), Erscheinungsbild (Größe,

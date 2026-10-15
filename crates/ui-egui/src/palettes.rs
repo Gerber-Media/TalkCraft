@@ -21,7 +21,8 @@ pub struct PaletteState {
 }
 
 /// The palettes, with their command and title.
-pub const PALETTES: &[(&str, &str)] = &[("jingles", "Jingles"), ("rundown", "Run Sheet"), ("remote", "Remote Guests")];
+pub const PALETTES: &[(&str, &str)] =
+    &[("jingles", "Jingles"), ("rundown", "Run Sheet"), ("remote", "Remote Guests"), ("onair", "On Air"), ("remote_control", "Remote Control")];
 
 pub fn state(app: &SoundApp, id: &str) -> PaletteState {
     app.ui.palettes.get(id).cloned().unwrap_or_default()
@@ -49,9 +50,9 @@ pub fn command(app: &mut SoundApp, p: &Value) -> Result<Value, String> {
         reset(app);
         return Ok(json!({"reset": true}));
     }
-    let id = p.get("palette").and_then(Value::as_str).ok_or("`palette` required (jingles, rundown, remote)")?;
+    let id = p.get("palette").and_then(Value::as_str).ok_or("`palette` required (jingles, rundown, remote, onair, remote_control)")?;
     if !PALETTES.iter().any(|(p, _)| *p == id) {
-        return Err(format!("unknown palette `{id}` (jingles, rundown, remote)"));
+        return Err(format!("unknown palette `{id}` (jingles, rundown, remote, onair, remote_control)"));
     }
     let s = state_mut(app, id);
     if let Some(d) = p.get("detached").and_then(Value::as_bool) {
@@ -91,6 +92,9 @@ pub fn show(
     let mut open = true;
     let mut win =
         egui::Window::new(title).id(egui::Id::new(("palette", id, app.ui.palette_layout))).open(&mut open).resizable(true).default_size(size);
+    // Each palette has its own first place, so they do not open on top of each other.
+    let slot = PALETTES.iter().position(|(p, _)| *p == id).unwrap_or(0) as f32;
+    win = win.default_pos([260.0 + slot * 48.0, 140.0 + slot * 40.0]);
     if let Some([x, y, w, h]) = st.rect {
         win = win.default_pos([x, y]).default_size([w, h]);
     }
@@ -167,7 +171,9 @@ pub fn preferences(app: &mut SoundApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         if ui
             .button(tr("Reset palettes to default"))
-            .on_hover_text(tr("Jingles, Run Sheet and Remote Guests go back into the main window, at their default place and size"))
+            .on_hover_text(tr(
+                "Jingles, Run Sheet, Remote Guests, On Air and Remote Control go back into the main window, at their default place and size",
+            ))
             .clicked()
         {
             reset(app);

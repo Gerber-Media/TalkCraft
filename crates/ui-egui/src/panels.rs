@@ -27,11 +27,25 @@ pub fn tracks_and_groups(app: &mut SoundApp, ui: &mut Ui) {
     let has_groups = !app.engine.session().groups.is_empty();
     // Room at the bottom for the + / − buttons.
     let height = if has_groups { total * 0.62 } else { (total - 64.0).max(60.0) };
+    let mut moved: Option<(usize, usize)> = None;
+    let ids: Vec<u64> = tracks.iter().map(|t| t.0).collect();
     egui::ScrollArea::vertical().id_salt("tracks_scroll").max_height(height).auto_shrink([false, false]).show(ui, |ui| {
-        for (id, name, shown, color, sel) in tracks {
+        let n = tracks.len();
+        app.extra.track_sort.places_for(n);
+        for (k, i) in app.extra.track_sort.order(n).into_iter().enumerate() {
+            let Some((id, name, shown, color, sel)) = tracks.get(i).cloned() else { continue };
             let (r, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 17.0), Sense::click());
             if sel {
                 ui.painter().rect_filled(r, 0.0, t.row_selected);
+            }
+            app.extra.track_sort.place(k, r);
+            app.extra.track_sort.mark(ui, i, r);
+            // The grip at the right end sorts the track (the timeline follows).
+            let grip = Rect::from_min_size(pos2(r.max.x - 16.0, r.min.y), vec2(14.0, 17.0));
+            if n > 1
+                && let Some(m) = app.extra.track_sort.grip(ui, grip, i, "tracks")
+            {
+                moved = Some(m);
             }
             let dot = Rect::from_center_size(pos2(r.min.x + 10.0, r.center().y), vec2(8.0, 8.0));
             let dresp = ui.interact(dot.expand(3.0), ui.id().with(("vis", id)), Sense::click());
@@ -46,6 +60,11 @@ pub fn tracks_and_groups(app: &mut SoundApp, ui: &mut Ui) {
             }
         }
     });
+    if let Some((from, to)) = moved
+        && let Some(id) = ids.get(from)
+    {
+        let _ = app.run("track.move", json!({"track": id, "to": to}));
+    }
     track_buttons(app, ui);
     if !has_groups {
         return;
@@ -331,7 +350,7 @@ pub(crate) fn memory_locations(app: &mut SoundApp, ui: &mut Ui) {
                 ui.label(egui::RichText::new(loc).font(mono(11.0)));
                 ui.label(egui::RichText::new(len).font(mono(11.0)));
                 ui.label(kind);
-                if ui.small_button("✕").on_hover_text(crate::i18n::tr("Delete")).clicked() {
+                if ui.small_button("×").on_hover_text(crate::i18n::tr("Delete")).clicked() {
                     let _ = app.run("markers.delete", json!({"number": n}));
                 }
                 ui.end_row();

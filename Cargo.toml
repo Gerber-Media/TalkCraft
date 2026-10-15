@@ -50,6 +50,7 @@ egui_kittest = "0.36"
 rfd = "0.17"
 # Audiogram videos: subtitle text drawn into the frames (pure Rust, MIT OR Apache-2.0 OR Zlib).
 fontdue = "0.9"
+qrcodegen = "1.8"
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 [workspace.lints.rust]

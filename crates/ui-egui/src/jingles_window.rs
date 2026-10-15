@@ -1,6 +1,6 @@
 //! The Jingles palette: pads for intro, outro and stingers. A pad holds an audio file (drop one on
-//! it, browse, or type its path) and, if wanted, a picture shown on the pad; clicking the pad plays
-//! it. + and − add and remove pads, like tracks; a right-click on a pad offers the rest.
+//! it or choose it) and, if wanted, a picture shown on the pad; clicking the pad plays it. + and −
+//! add and remove pads, like tracks; the grip sorts them; a right-click on a pad offers the rest.
 
 use crate::SoundApp;
 use crate::i18n::{tr, trf};
@@ -22,9 +22,8 @@ impl std::fmt::Debug for Pictures {
 
 #[derive(Debug, Clone, Default)]
 pub struct JinglesWindow {
-    /// Pad whose path is being edited, and the text so far.
-    editing: Option<(usize, String)>,
     pictures: Pictures,
+    sort: crate::reorder::Reorder,
 }
 
 /// `window.jingles`: opens or closes the window.
@@ -85,6 +84,7 @@ enum Action {
     Picture(usize, String),
     RemovePad(usize),
     AddPad,
+    Move(usize, usize),
 }
 
 pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
@@ -117,7 +117,9 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
         let ctx = ui.ctx().clone();
         let w = &mut app.extra.jingles;
         egui::Grid::new("jingle_pads").num_columns(4).spacing(vec2(8.0, 8.0)).show(ui, |ui| {
-            for i in 0..count {
+            w.sort.places_for(count);
+            let order = w.sort.order(count);
+            for (k, &i) in order.iter().enumerate() {
                 let path = pod.jingles.get(i).cloned().unwrap_or_default();
                 let pic_path = pod.jingle_images.get(i).cloned().unwrap_or_default();
                 let pic = picture(&ctx, &mut w.pictures, &pic_path);
@@ -158,6 +160,19 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                             Color32::WHITE,
                         );
                     }
+                    w.sort.place(k, r.rect);
+                    w.sort.mark(ui, i, r.rect);
+                    // The grip in the pad's corner sorts it; the rest of the pad plays it.
+                    let grip = egui::Rect::from_min_size(egui::pos2(r.rect.max.x - 18.0, r.rect.min.y + 3.0), crate::reorder::GRIP);
+                    if count > 1 && pic.is_some() {
+                        // On a picture the grip needs its own dark ground to be seen.
+                        ui.painter().rect_filled(grip.expand(1.0), 3.0, Color32::from_black_alpha(150));
+                    }
+                    if count > 1
+                        && let Some((from, to)) = w.sort.grip(ui, grip, i, "jingle")
+                    {
+                        actions.push(Action::Move(from, to));
+                    }
                     if r.clicked() && !path.is_empty() {
                         actions.push(Action::Fire(i));
                     }
@@ -197,35 +212,22 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                             actions.push(if is_picture(file) { Action::Picture(i, file.clone()) } else { Action::Audio(i, file.clone()) });
                         }
                     }
-                    match &mut w.editing {
-                        Some((e, text)) if *e == i => {
-                            let te = ui.add(egui::TextEdit::singleline(text).desired_width(pad.x).hint_text(tr("/path/to/jingle.wav")));
-                            if te.lost_focus() {
-                                actions.push(Action::Audio(i, text.clone()));
-                            }
+                    ui.horizontal(|ui| {
+                        if let Some(pick) = &app.services.pick_open
+                            && ui.small_button(tr("Browse…")).on_hover_text(tr("Choose an audio file")).clicked()
+                            && let Some(p) = pick("jingle", &[])
+                        {
+                            actions.push(Action::Audio(i, p));
                         }
-                        _ => {
-                            ui.horizontal(|ui| {
-                                if let Some(pick) = &app.services.pick_open
-                                    && ui.small_button(tr("Browse…")).on_hover_text(tr("Choose an audio file")).clicked()
-                                    && let Some(p) = pick("jingle", &[])
-                                {
-                                    actions.push(Action::Audio(i, p));
-                                }
-                                if ui.small_button(tr("Path")).on_hover_text(tr("Type or paste a path")).clicked() {
-                                    w.editing = Some((i, path.clone()));
-                                }
-                                if let Some(pick) = &app.services.pick_open
-                                    && ui.small_button(tr("Picture")).on_hover_text(tr("Show a picture on the pad (PNG or JPEG)")).clicked()
-                                    && let Some(p) = pick("image", &["png", "jpg", "jpeg", "webp"])
-                                {
-                                    actions.push(Action::Picture(i, p));
-                                }
-                            });
+                        if let Some(pick) = &app.services.pick_open
+                            && ui.small_button(tr("Picture")).on_hover_text(tr("Show a picture on the pad (PNG or JPEG)")).clicked()
+                            && let Some(p) = pick("image", &["png", "jpg", "jpeg", "webp"])
+                        {
+                            actions.push(Action::Picture(i, p));
                         }
-                    }
+                    });
                 });
-                if i % 4 == 3 {
+                if k % 4 == 3 {
                     ui.end_row();
                 }
             }
@@ -252,13 +254,15 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             Action::Fire(i) => {
                 fire(app, i + 1);
             }
-            Action::Audio(i, p) => {
-                app.extra.jingles.editing = None;
-                set_slot(app, "jingles", i, &p);
-            }
+            Action::Audio(i, p) => set_slot(app, "jingles", i, &p),
             Action::Picture(i, p) => set_slot(app, "jingle_images", i, &p),
             Action::AddPad => {
                 if let Err(e) = app.run("podcast.jingle_pad", json!({"add": true})) {
+                    app.ui.status = e;
+                }
+            }
+            Action::Move(from, to) => {
+                if let Err(e) = app.run("podcast.jingle_move", json!({"from": from + 1, "to": to + 1})) {
                     app.ui.status = e;
                 }
             }
@@ -306,5 +310,52 @@ mod tests {
         assert_eq!(pad_count(pod), 9, "emptying pad 9 keeps it");
         assert_eq!(pod.jingle_images.get(8).map(String::as_str), Some("/tmp/outro.png"));
         assert!(is_picture("a/B.JPG") && !is_picture("a/b.wav"));
+    }
+
+    fn frame(ctx: &egui::Context, app: &mut SoundApp, events: Vec<egui::Event>) {
+        let raw =
+            egui::RawInput { screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1600.0, 1000.0))), events, ..Default::default() };
+        ctx.run_ui(raw, |ui| {
+            app.logic(ui.ctx());
+            app.ui(ui);
+        })
+        .textures_delta
+        .clear();
+    }
+
+    #[test]
+    fn dragging_a_pads_grip_sorts_it_and_the_others_make_room() {
+        let mut app = SoundApp::new(soundcraft_engine::Engine::default(), None, Services::default());
+        app.engine.execute("session.new", &json!({"name": "J", "template": "podcast", "speakers": 1})).unwrap();
+        app.engine.execute("podcast.set", &json!({"jingles": ["a.wav", "b.wav", "c.wav"]})).unwrap();
+        app.run("window.jingles", json!({"value": true})).unwrap();
+        let ctx = egui::Context::default();
+        for _ in 0..3 {
+            frame(&ctx, &mut app, vec![]);
+        }
+        let place = |app: &SoundApp, k: usize| app.extra.jingles.sort.place_rect(k).unwrap();
+        let pad3 = place(&app, 2);
+        let grip = egui::pos2(pad3.max.x - 11.0, pad3.min.y + 12.0);
+        let target = place(&app, 0).center();
+        frame(&ctx, &mut app, vec![egui::Event::PointerMoved(grip)]);
+        frame(
+            &ctx,
+            &mut app,
+            vec![egui::Event::PointerButton { pos: grip, button: egui::PointerButton::Primary, pressed: true, modifiers: Default::default() }],
+        );
+        for step in 1..=6 {
+            let at = grip + (target - grip) * (step as f32 / 6.0);
+            frame(&ctx, &mut app, vec![egui::Event::PointerMoved(at)]);
+        }
+        // While dragging the pads already show the new order.
+        assert_eq!(app.extra.jingles.sort.order(8)[0], 2, "pad 3 is shown first while dragged");
+        assert_eq!(app.engine.session().podcast.jingles[0], "a.wav", "nothing changed before letting go");
+        frame(
+            &ctx,
+            &mut app,
+            vec![egui::Event::PointerButton { pos: target, button: egui::PointerButton::Primary, pressed: false, modifiers: Default::default() }],
+        );
+        frame(&ctx, &mut app, vec![]);
+        assert_eq!(app.engine.session().podcast.jingles, vec!["c.wav", "a.wav", "b.wav"]);
     }
 }

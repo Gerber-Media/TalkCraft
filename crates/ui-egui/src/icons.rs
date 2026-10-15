@@ -15,6 +15,13 @@ pub fn draw(painter: &Painter, r: Rect, name: &str, c: Color32) {
     let r = Rect::from_center_size(r.center(), vec2(side, side));
     let s = Stroke::new((r.width() / 14.0).clamp(1.2, 2.4), c);
     match name {
+        "grip" => {
+            // Six dots: a handle to drag something into another place.
+            let d = (side * 0.09).max(1.2);
+            for (x, y) in [(0.36, 0.22), (0.64, 0.22), (0.36, 0.5), (0.64, 0.5), (0.36, 0.78), (0.64, 0.78)] {
+                painter.circle_filled(p(r, x, y), d, c);
+            }
+        }
         "play" => {
             painter.add(Shape::convex_polygon(vec![p(r, 0.28, 0.18), p(r, 0.82, 0.5), p(r, 0.28, 0.82)], c, Stroke::NONE));
         }

@@ -21,6 +21,7 @@ pub mod loudness;
 pub mod menus;
 pub mod midi_editor;
 pub mod mix_window;
+pub mod onair;
 pub mod ops_windows;
 pub mod palette;
 pub mod palettes;
@@ -30,6 +31,8 @@ pub mod prefs;
 pub mod publish_window;
 pub mod readiness;
 pub mod remote;
+pub mod remote_control;
+pub mod reorder;
 pub mod rundown_window;
 pub mod score_editor;
 pub mod shortcuts;
@@ -465,6 +468,14 @@ impl SoundApp {
                 Err(e.to_string())
             }
         }
+    }
+
+    /// Seconds recorded in the running take (0 when not recording).
+    pub fn take_seconds(&self) -> f64 {
+        if !self.engine.transport.recording {
+            return 0.0;
+        }
+        self.engine.session().sample_rate.seconds(self.position().saturating_sub(self.record_start).max(0)).max(0.0)
     }
 
     pub fn is_playing(&self) -> bool {

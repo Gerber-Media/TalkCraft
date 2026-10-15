@@ -27,6 +27,7 @@ serde_json.workspace = true
 log.workspace = true
 image.workspace = true
 fontdue.workspace = true
+qrcodegen.workspace = true
 
 [dev-dependencies]
 egui_kittest = { workspace = true, features = ["wgpu", "snapshot"] }

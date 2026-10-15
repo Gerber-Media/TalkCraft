@@ -39,6 +39,15 @@ pub fn specs() -> Vec<CommandSpec> {
             jingle_pad
         ),
         cmd!(
+            "podcast.jingle_move",
+            "Move Jingle Pad",
+            [],
+            None,
+            "{from, to} — moves a jingle pad (file and picture) to another position, 1-based",
+            always,
+            jingle_move
+        ),
+        cmd!(
             noundo "file.export_podcast",
             "Export Episode...",
             [],
@@ -149,6 +158,29 @@ pub const MAX_JINGLE_PADS: usize = 32;
 pub fn pad_count(s: &soundcraft_model::PodcastSettings) -> usize {
     let n = if s.jingle_pads == 0 { JINGLE_PADS } else { s.jingle_pads as usize };
     n.max(s.jingles.len()).clamp(1, MAX_JINGLE_PADS)
+}
+
+/// `podcast.jingle_move {from, to}`: moves pad `from` (file and picture) to position `to` (both
+/// 1-based); the pads between shift by one.
+fn jingle_move(e: &mut Engine, p: &Value) -> Result<Value> {
+    const ID: &str = "podcast.jingle_move";
+    let mut s = e.session().podcast.clone();
+    let n = pad_count(&s);
+    let idx = |k: &str| p.get(k).and_then(Value::as_u64).map(|v| v as usize).filter(|v| (1..=n).contains(v));
+    let (Some(from), Some(to)) = (idx("from"), idx("to")) else {
+        return Err(bad(ID, format!("`from` and `to` are pads from 1 to {n}")));
+    };
+    s.jingle_pads = n as u32;
+    for list in [&mut s.jingles, &mut s.jingle_images] {
+        list.resize(n, String::new());
+        let item = list.remove(from - 1);
+        list.insert(to - 1, item);
+        while list.last().is_some_and(String::is_empty) {
+            list.pop();
+        }
+    }
+    e.session_mut().podcast = s;
+    Ok(json!({"from": from, "to": to}))
 }
 
 /// `podcast.jingle_pad {add: true}` adds an empty pad at the end; `{remove: n}` removes pad n (its
@@ -1216,6 +1248,13 @@ mod tests {
         assert_eq!(pod.jingle_images[0], "cover.png");
         e.execute("edit.undo", &json!({})).unwrap();
         assert_eq!(pad_count(&e.session().podcast), 9, "undoable");
+        // Sorting: pad 9 to the front, the others move one on.
+        e.execute("podcast.jingle_move", &json!({"from": 9, "to": 1})).unwrap();
+        let pod = &e.session().podcast;
+        assert_eq!(pod.jingles[0], wav.to_string_lossy());
+        assert_eq!(pod.jingle_images.get(2).map(String::as_str), Some("cover.png"), "picture 2 moved to 3");
+        assert_eq!(pad_count(pod), 9);
+        assert!(e.execute("podcast.jingle_move", &json!({"from": 10, "to": 1})).is_err());
         assert!(std::fs::remove_dir_all(&dir).is_ok());
     }
 

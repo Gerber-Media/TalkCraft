@@ -192,7 +192,7 @@ fn now_ms() -> i64 {
 }
 
 /// Random lowercase letters and digits, from the system's hasher seeds (no extra crate).
-fn random_id(len: usize) -> String {
+pub(crate) fn random_id(len: usize) -> String {
     use std::hash::{BuildHasher, Hasher};
     const ABC: &[u8] = b"abcdefghijkmnpqrstuvwxyz23456789";
     let mut out = String::new();
@@ -235,7 +235,7 @@ fn url_decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-fn query(q: &str) -> HashMap<String, String> {
+pub(crate) fn query(q: &str) -> HashMap<String, String> {
     q.split('&').filter_map(|kv| kv.split_once('=')).map(|(k, v)| (url_decode(k), url_decode(v))).collect()
 }
 
@@ -552,7 +552,7 @@ fn open_studio(app: &mut SoundApp) {
     }
 }
 
-fn open_in_browser(url: &str) {
+pub(crate) fn open_in_browser(url: &str) {
     #[cfg(target_os = "macos")]
     let r = std::process::Command::new("open").arg(url).spawn();
     #[cfg(target_os = "windows")]

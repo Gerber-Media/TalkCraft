@@ -253,7 +253,7 @@ fn event_list(app: &mut SoundApp, ctx: &egui::Context) {
                         let _ = app.engine.execute("midi.note_edit", &json!({"clip": cid.0, "index": i, "velocity": v}));
                     }
                     ui.label(n.length.to_string());
-                    if ui.small_button("✕").clicked() {
+                    if ui.small_button("×").clicked() {
                         let _ = app.run("midi.note_delete", json!({"clip": cid.0, "indices": [i]}));
                     }
                     ui.end_row();
@@ -399,7 +399,7 @@ fn configurations(app: &mut SoundApp, ctx: &egui::Context) {
                         app.ui = st;
                     }
                 }
-                if ui.small_button("✕").clicked() {
+                if ui.small_button("×").clicked() {
                     app.ui.configurations.remove(i);
                 }
             });

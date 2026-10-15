@@ -45,4 +45,38 @@ mod tests {
             assert_ne!(face.lookup_glyph_index(c), 0, "{c}");
         }
     }
+
+    #[test]
+    fn every_symbol_in_the_interface_has_a_glyph() {
+        // A character no font has shows as a box (it happened with ✓, ✎ and ✕).
+        let defs = super::definitions();
+        let fonts: Vec<fontdue::Font> = defs
+            .font_data
+            .values()
+            .filter_map(|d| fontdue::Font::from_bytes(&d.font[..], fontdue::FontSettings { collection_index: d.index, ..Default::default() }).ok())
+            .collect();
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut missing = std::collections::BTreeSet::new();
+        for entry in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.extension().is_none_or(|x| x != "rs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path).unwrap();
+            // Only what is shown: string literals, not comments.
+            for line in text.lines().filter(|l| !l.trim_start().starts_with("//")) {
+                let mut inside = false;
+                let mut prev = ' ';
+                for c in line.chars() {
+                    if c == '"' && prev != '\\' {
+                        inside = !inside;
+                    } else if inside && !c.is_ascii() && !fonts.iter().any(|f| f.lookup_glyph_index(c) != 0) {
+                        missing.insert((c, path.file_name().unwrap().to_string_lossy().to_string()));
+                    }
+                    prev = c;
+                }
+            }
+        }
+        assert!(missing.is_empty(), "no font has these characters: {missing:?}");
+    }
 }

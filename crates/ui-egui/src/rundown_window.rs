@@ -11,6 +11,7 @@ use soundcraft_model::RundownItem;
 
 #[derive(Debug, Clone, Default)]
 pub struct RundownWindow {
+    sort: crate::reorder::Reorder,
     /// The topic being talked about, and the timeline position where it began.
     current: Option<(usize, soundcraft_time::Samples)>,
 }
@@ -54,8 +55,9 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     let live = app.engine.transport.recording || app.is_playing();
     let current = app.extra.rundown.current.filter(|(i, _)| *i < items.len());
     let mut changed = false;
+    let mut reordered: Option<(usize, usize)> = None;
     let mut go: Option<usize> = None;
-    crate::palettes::show(app, ctx, "rundown", tr("Run Sheet"), vec2(420.0, 380.0), |_app, ui, _| {
+    crate::palettes::show(app, ctx, "rundown", tr("Run Sheet"), vec2(420.0, 380.0), |app, ui, _| {
         // Now: the current topic large, its time against the plan, and the button on.
         if let Some((i, since)) = current {
             let item = items.get(i).cloned().unwrap_or_default();
@@ -88,11 +90,21 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
         let total: f32 = items.iter().map(|i| i.minutes).sum();
         ui.label(RichText::new(trf("Plan: {} topics, {} min", &[&items.len(), &format!("{total:.0}")])).strong());
         let mut remove: Option<usize> = None;
-        let mut swap: Option<(usize, usize)> = None;
+        let mut moved: Option<(usize, usize)> = None;
+        let sort = &mut app.extra.rundown.sort;
         egui::ScrollArea::vertical().max_height(240.0).show(ui, |ui| {
             let n = items.len();
-            for (i, item) in items.iter_mut().enumerate() {
-                ui.horizontal(|ui| {
+            sort.places_for(n);
+            for (k, i) in sort.order(n).into_iter().enumerate() {
+                let Some(item) = items.get_mut(i) else { continue };
+                let row = ui.horizontal(|ui| {
+                    // The grip sorts the topic (drag it up or down).
+                    let (g, _) = ui.allocate_exact_size(crate::reorder::GRIP, egui::Sense::hover());
+                    if n > 1
+                        && let Some(m) = sort.grip(ui, g, i, "rundown")
+                    {
+                        moved = Some(m);
+                    }
                     let here = current.is_some_and(|(c, _)| c == i);
                     ui.label(RichText::new(format!("{}.", i + 1)).color(if here { Color32::from_rgb(210, 60, 55) } else { t.text_dim }));
                     changed |= ui.add(egui::TextEdit::singleline(&mut item.title).desired_width(200.0).hint_text(tr("Topic"))).lost_focus();
@@ -100,16 +112,12 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                     if ui.small_button("▶").on_hover_text(tr("Start this topic now")).clicked() {
                         go = Some(i);
                     }
-                    if i > 0 && ui.small_button("↑").clicked() {
-                        swap = Some((i, i - 1));
-                    }
-                    if i + 1 < n && ui.small_button("↓").clicked() {
-                        swap = Some((i, i + 1));
-                    }
-                    if ui.small_button("✕").on_hover_text(tr("Remove this topic")).clicked() {
+                    if ui.small_button("×").on_hover_text(tr("Remove this topic")).clicked() {
                         remove = Some(i);
                     }
                 });
+                sort.place(k, row.response.rect);
+                sort.mark(ui, i, row.response.rect);
             }
         });
         if ui.button(tr("+ Topic")).clicked() {
@@ -120,14 +128,29 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             items.remove(i);
             changed = true;
         }
-        if let Some((a, b)) = swap {
-            items.swap(a, b);
+        if let Some((from, to)) = moved {
+            let item = items.remove(from);
+            items.insert(to, item);
+            reordered = Some((from, to));
             changed = true;
         }
         if !live {
             ui.label(RichText::new(tr("The plan is saved with the session.")).small().color(t.text_dim));
         }
     });
+    // The topic being talked about stays the current one wherever it moved.
+    if let (Some((from, to)), Some((c, at))) = (reordered, app.extra.rundown.current) {
+        let c = if c == from {
+            to
+        } else if from < c && c <= to {
+            c - 1
+        } else if to <= c && c < from {
+            c + 1
+        } else {
+            c
+        };
+        app.extra.rundown.current = Some((c, at));
+    }
     if changed {
         save(app, &items);
     }
@@ -140,6 +163,22 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
 }
 
 /// Tab while recording: the next topic.
+/// The topic being talked about: title, seconds spent on it, seconds planned (0 = open).
+pub fn current_topic(app: &SoundApp) -> Option<(String, f64, f64)> {
+    let (i, since) = app.extra.rundown.current?;
+    let item = app.engine.session().podcast.rundown.get(i)?;
+    let spent = app.engine.session().sample_rate.seconds((app.position() - since).max(0));
+    let title = if item.title.trim().is_empty() { trf("Topic {}", &[&(i + 1)]) } else { item.title.clone() };
+    Some((title, spent, f64::from(item.minutes) * 60.0))
+}
+
+/// The next topic's title, if the plan has one.
+pub fn next_title(app: &SoundApp) -> Option<String> {
+    let next = app.extra.rundown.current.map_or(0, |(i, _)| i + 1);
+    let item = app.engine.session().podcast.rundown.get(next)?;
+    Some(if item.title.trim().is_empty() { trf("Topic {}", &[&(next + 1)]) } else { item.title.clone() })
+}
+
 pub fn next_topic(app: &mut SoundApp) -> bool {
     let n = app.engine.session().podcast.rundown.len();
     let next = app.extra.rundown.current.map_or(0, |(i, _)| i + 1);

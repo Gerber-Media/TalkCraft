@@ -21,6 +21,12 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("window.remote", "Remote Guests", "Window > Remote Guests", None),
     ("window.rundown", "Run Sheet", "Window > Run Sheet", None),
     ("window.finish", "Finish Episode...", "Edit > Finish Episode...", None),
+    ("window.onair", "On Air", "Window > On Air", None),
+    ("window.remote_control", "Remote Control (Phone, Tablet)", "Window > Remote Control (Phone, Tablet)", None),
+    ("studio.status", "Studio Status", "", None),
+    ("remote_control.start", "Start Remote Control", "", None),
+    ("remote_control.stop", "Stop Remote Control", "", None),
+    ("remote_control.status", "Remote Control Status", "", None),
     ("window.publish", "Publish Episode...", "File > Publish Episode...", None),
     ("publish.checklist", "Publishing Checklist", "", None),
     ("publish.start", "Export and Publish", "", None),
@@ -418,6 +424,8 @@ const MENU_WINDOWS: &[(&str, &str)] = &[
     ("Window > Remote Guests", "window.remote"),
     ("Window > Run Sheet", "window.rundown"),
     ("Edit > Finish Episode...", "window.finish"),
+    ("Window > On Air", "window.onair"),
+    ("Window > Remote Control (Phone, Tablet)", "window.remote_control"),
     ("File > Publish Episode...", "window.publish"),
     // The one option still switched often; the rest moved to the Settings.
     ("View > Loop Playback", "options.loop_playback"),
@@ -546,6 +554,9 @@ fn wants_dialog(id: &str) -> bool {
 pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<Value, String>> {
     if matches!(id, "ui.dock" | "ui.dock.reset") {
         return Some(crate::docking::command(app, id == "ui.dock.reset", p));
+    }
+    if id.starts_with("remote_control.") {
+        return Some(crate::remote_control::command(app, id));
     }
     if id == "ui.palette" {
         return Some(crate::palettes::command(app, p));

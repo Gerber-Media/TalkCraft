@@ -231,3 +231,18 @@ background job is a separate step.
   are wider than tall and stretched the stop square into a bar.
 - Jingle pads: any number from 1 to 32 (`PodcastSettings.jingle_pads`, 0 = eight), a picture per
   pad (`jingle_images`), `podcast.jingle_pad {add|remove}`. Keys 1–8 still fire the first eight.
+
+## On Air, remote control, sorting
+
+- `onair::status` is the one source for the On Air palette, the `studio.status` command and the
+  phone page, so they never disagree.
+- The remote control (`remote_control.rs`, page `remote/control/index.html`, compiled in) listens on
+  all interfaces under a random token and runs only while switched on. The address shown is the
+  interface of the default route (UDP connect trick, no packet sent). Company laptops may drop
+  inbound connections entirely (seen here: even `python3 -m http.server` was unreachable on the LAN
+  address with the macOS firewall off), so tests use 127.0.0.1 with the same token.
+- `reorder::Reorder` sorts any list by a grip: the order is previewed live while dragging and
+  applied once on release (one undo step). Places are remembered per slot from the last frame.
+  The jingle test drives a real drag through `egui::Context::run_ui`.
+- `fonts::tests::every_symbol_in_the_interface_has_a_glyph` fails when a string literal uses a
+  character no bundled font has (✓, ✎, ✕ and ♯ showed as boxes before).

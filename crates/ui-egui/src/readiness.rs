@@ -35,7 +35,7 @@ pub enum Light {
 }
 
 impl Light {
-    fn color(self) -> Color32 {
+    pub fn color(self) -> Color32 {
         match self {
             Light::Green => Color32::from_rgb(60, 175, 90),
             Light::Yellow => Color32::from_rgb(225, 170, 40),

@@ -85,6 +85,8 @@ const EDIT_KEPT_WHILE_RECORDING: &[&str] = &["Edit > Can't Undo", "Edit > Can't 
 /// Menu items only a recording session needs (hidden while editing).
 const RECORD_ONLY: &[&str] = &[
     "Window > Remote Guests",
+    "Window > On Air",
+    "Window > Remote Control (Phone, Tablet)",
     "Setup > Hardware...",
     "Setup > Playback Engine...",
     "Setup > I/O...",

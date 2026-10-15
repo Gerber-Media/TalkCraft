@@ -119,7 +119,7 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                     p.add(Shape::ellipse_filled(head.center(), head.size() * 0.5, ink));
                 }
                 if sharp {
-                    p.text(pos2(x - 12.0, y), Align2::CENTER_CENTER, "♯", regular(12.0), ink);
+                    p.text(pos2(x - 12.0, y), Align2::CENTER_CENTER, "#", regular(12.0), ink);
                 }
                 if q < 3.5 {
                     // Stems up below the middle line of each staff, down above it.

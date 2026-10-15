@@ -903,6 +903,13 @@ fn track_header(app: &mut SoundApp, ui: &mut Ui, track: &Track, head: Rect, sele
     };
     ui.painter().with_clip_rect(name_r).text(name_r.center(), Align2::CENTER_CENTER, &shown_name, bold(12.0), t.text_dark);
     let nresp = ui.interact(name_r, ui.id().with(("name", id.0)), Sense::click_and_drag());
+    // The grip on the name plate: drag the plate to sort the track (the Tracks list has one too).
+    let grip = Rect::from_min_size(pos2(name_r.min.x + 2.0, name_r.min.y), vec2(10.0, name_r.height()));
+    icons::draw(ui.painter(), grip, "grip", if nresp.hovered() || nresp.dragged() { t.text_dark } else { Color32::from_gray(140) });
+    if nresp.hovered() && !nresp.dragged() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+    }
+    let nresp = nresp.on_hover_text(crate::i18n::tr("Drag to sort · double-click to rename"));
     if nresp.double_clicked() {
         app.dialogs.open_rename_track(id, &track.name);
     } else if nresp.clicked() {
