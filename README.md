@@ -19,8 +19,7 @@
 </p>
 
 <p align="center">
-  Idea, concept and design: <b>Dirk Gerber</b> · <a href="https://gerber.media">gerber.media</a><br>
-  Idee, Konzept und Gestaltung: <b>Dirk Gerber</b>
+  Idea, concept and design: <b>Dirk Gerber</b> · <a href="https://gerber.media">gerber.media</a>
 </p>
 
 <a id="english"></a>
@@ -266,6 +265,14 @@ untertitelt, im Pegel angeglichen und exportiert. TalkCraft läuft nativ auf mac
 Linux und ist in Rust geschrieben. Darunter steckt die vollständige SoundCraft-Engine (Mischpult,
 Plug-ins, Automation, Kommandozeile, MCP-Server); die Menüs lassen weg, was ein Podcast nicht
 braucht.
+
+<p align="center">
+  <img alt="TalkCraft: the editor with coloured name plates, chapters and two speakers, fading between the dark and the light theme" src="docs/media/talkcraft-hero.gif" width="900">
+</p>
+
+<p align="center">
+  Idee, Konzept und Gestaltung: <b>Dirk Gerber</b> · <a href="https://gerber.media">gerber.media</a>
+  </p>
 
 ## Arbeitsablauf
 
