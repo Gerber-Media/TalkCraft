@@ -24,6 +24,8 @@ impl std::fmt::Debug for Pictures {
 pub struct JinglesWindow {
     pictures: Pictures,
     sort: crate::reorder::Reorder,
+    /// The pad being renamed, and the name typed so far.
+    renaming: Option<(usize, String)>,
 }
 
 /// `window.jingles`: opens or closes the window.
@@ -34,7 +36,11 @@ pub fn toggle(app: &mut SoundApp, p: &Value) -> Value {
 /// Stores `value` at pad `i` (0-based) in one of the session's lists (`jingles` or `jingle_images`).
 fn set_slot(app: &mut SoundApp, key: &str, i: usize, value: &str) {
     let pod = &app.engine.session().podcast;
-    let mut list = if key == "jingles" { pod.jingles.clone() } else { pod.jingle_images.clone() };
+    let mut list = match key {
+        "jingles" => pod.jingles.clone(),
+        "jingle_names" => pod.jingle_names.clone(),
+        _ => pod.jingle_images.clone(),
+    };
     if list.len() <= i {
         list.resize(i + 1, String::new());
     }
@@ -49,10 +55,6 @@ fn set_slot(app: &mut SoundApp, key: &str, i: usize, value: &str) {
     if let Err(e) = app.run("podcast.set", json!({key: list, "jingle_pads": pads})) {
         app.ui.status = e;
     }
-}
-
-fn file_name(path: &str) -> String {
-    std::path::Path::new(path).file_stem().and_then(|n| n.to_str()).unwrap_or(path).to_string()
 }
 
 fn is_picture(path: &str) -> bool {
@@ -85,6 +87,7 @@ enum Action {
     RemovePad(usize),
     AddPad,
     Move(usize, usize),
+    Rename(usize, String),
 }
 
 pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
@@ -124,7 +127,12 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 let pic_path = pod.jingle_images.get(i).cloned().unwrap_or_default();
                 let pic = picture(&ctx, &mut w.pictures, &pic_path);
                 ui.vertical(|ui| {
-                    let text = if path.is_empty() { trf("Pad {}\nempty", &[&(i + 1)]) } else { format!("{}\n{}", i + 1, file_name(&path)) };
+                    let name = soundcraft_engine::cmd::podcast::jingle_name(&pod, i);
+                    let text = if path.is_empty() && name.is_empty() {
+                        trf("Pad {}\nempty", &[&(i + 1)])
+                    } else {
+                        format!("{}\n{}", i + 1, name)
+                    };
                     let size = if own_window { (pad.y / 4.0).clamp(14.0, 28.0) } else { 13.0 };
                     // With a picture the label is drawn over it; the button itself stays empty.
                     let label = if pic.is_some() {
@@ -177,6 +185,10 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                         actions.push(Action::Fire(i));
                     }
                     r.context_menu(|ui| {
+                        if ui.button(tr("Rename…")).clicked() {
+                            w.renaming = Some((i, name.clone()));
+                            ui.close();
+                        }
                         if let Some(pick) = &app.services.pick_open
                             && ui.button(tr("Choose audio file…")).clicked()
                         {
@@ -212,6 +224,22 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                             actions.push(if is_picture(file) { Action::Picture(i, file.clone()) } else { Action::Audio(i, file.clone()) });
                         }
                     }
+                    if let Some((at, typed)) = &mut w.renaming
+                        && *at == i
+                    {
+                        // The name field where the buttons were; Enter or clicking elsewhere keeps it.
+                        let te = ui.add(egui::TextEdit::singleline(typed).desired_width(pad.x).hint_text(tr("Name on the pad")));
+                        if !te.has_focus() && !te.lost_focus() {
+                            te.request_focus();
+                        }
+                        if te.lost_focus() {
+                            let escape = ui.input(|inp| inp.key_pressed(egui::Key::Escape));
+                            if !escape {
+                                actions.push(Action::Rename(i, typed.clone()));
+                            }
+                            actions.push(Action::Rename(usize::MAX, String::new()));
+                        }
+                    } else {
                     ui.horizontal(|ui| {
                         if let Some(pick) = &app.services.pick_open
                             && ui.small_button(tr("Browse…")).on_hover_text(tr("Choose an audio file")).clicked()
@@ -226,6 +254,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                             actions.push(Action::Picture(i, p));
                         }
                     });
+                    }
                 });
                 if k % 4 == 3 {
                     ui.end_row();
@@ -261,6 +290,9 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                     app.ui.status = e;
                 }
             }
+            // usize::MAX: the name field closed.
+            Action::Rename(usize::MAX, _) => app.extra.jingles.renaming = None,
+            Action::Rename(i, name) => set_slot(app, "jingle_names", i, &name),
             Action::Move(from, to) => {
                 if let Err(e) = app.run("podcast.jingle_move", json!({"from": from + 1, "to": to + 1})) {
                     app.ui.status = e;
@@ -286,7 +318,8 @@ pub fn fire(app: &mut SoundApp, pad: usize) -> bool {
     match app.run("podcast.place_jingle", json!({"pad": pad, "at": at})) {
         Ok(_) => {
             crate::remote::announce_jingle(app, pad);
-            app.ui.status = trf("Placed {}", &[&file_name(&path)]);
+            let name = soundcraft_engine::cmd::podcast::jingle_name(&app.engine.session().podcast, pad - 1);
+            app.ui.status = trf("Placed {}", &[&name]);
         }
         Err(e) => app.ui.status = e,
     }
@@ -310,6 +343,12 @@ mod tests {
         assert_eq!(pad_count(pod), 9, "emptying pad 9 keeps it");
         assert_eq!(pod.jingle_images.get(8).map(String::as_str), Some("/tmp/outro.png"));
         assert!(is_picture("a/B.JPG") && !is_picture("a/b.wav"));
+        // A pad gets its own name; the file stays.
+        set_slot(&mut app, "jingles", 0, "/tmp/intro-v3-final.wav");
+        set_slot(&mut app, "jingle_names", 0, "Intro");
+        let pod = &app.engine.session().podcast;
+        assert_eq!(soundcraft_engine::cmd::podcast::jingle_name(pod, 0), "Intro");
+        assert_eq!(pod.jingles[0], "/tmp/intro-v3-final.wav");
     }
 
     fn frame(ctx: &egui::Context, app: &mut SoundApp, events: Vec<egui::Event>) {

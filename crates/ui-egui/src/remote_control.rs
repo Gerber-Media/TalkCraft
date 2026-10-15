@@ -232,12 +232,9 @@ pub fn update(app: &mut SoundApp, now: bool) {
     let count = soundcraft_engine::cmd::podcast::pad_count(&pod);
     let pads: Vec<Value> = (0..count)
         .map(|i| {
-            let file = pod.jingles.get(i).cloned().unwrap_or_default();
-            let name = if file.trim().is_empty() {
-                String::new()
-            } else {
-                std::path::Path::new(&file).file_stem().and_then(|n| n.to_str()).unwrap_or("Jingle").to_string()
-            };
+            // Only pads with a file can be played: a name alone does not count.
+            let has_file = pod.jingles.get(i).is_some_and(|f| !f.trim().is_empty());
+            let name = if has_file { soundcraft_engine::cmd::podcast::jingle_name(&pod, i) } else { String::new() };
             let image = pod.jingle_images.get(i).cloned().unwrap_or_default();
             json!({"name": name, "image": image})
         })
@@ -390,13 +387,14 @@ mod tests {
         assert_eq!(http(&wrong, "GET", "").0, 404, "no token, no access");
         let (_, state) = http(&format!("{local}state?d=phone1"), "GET", "");
         let state: Value = serde_json::from_str(&state).unwrap();
+        // Right after asking, the phone counts as connected (it stops counting a few seconds later).
+        assert_eq!(app.run("remote_control.status", json!({})).unwrap()["devices"], json!(1));
         assert_eq!(state["recording"], json!(false));
         assert_eq!(state["pads"].as_array().unwrap().len(), 8);
         let markers = app.engine.session().markers.len();
         http(&format!("{local}do"), "POST", r#"{"a":"chapter"}"#);
         update(&mut app, true);
         assert_eq!(app.engine.session().markers.len(), markers + 1, "the chapter marker was set");
-        assert_eq!(app.run("remote_control.status", json!({})).unwrap()["devices"], json!(1));
         app.run("remote_control.stop", json!({})).unwrap();
         assert!(app.extra.remote_control.server.is_none());
     }

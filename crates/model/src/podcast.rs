@@ -88,6 +88,8 @@ pub struct PodcastSettings {
     pub jingles: Vec<String>,
     /// A picture per pad (JPEG/PNG path, "" = none), shown on the pad.
     pub jingle_images: Vec<String>,
+    /// A name per pad ("" = the file's name).
+    pub jingle_names: Vec<String>,
     /// How many pads the Jingles window shows (0 = the standard eight).
     pub jingle_pads: u32,
     /// The run sheet: the episode's topics in order, each with its planned length.

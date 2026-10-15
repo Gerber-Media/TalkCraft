@@ -154,6 +154,18 @@ pub const JINGLE_PADS: usize = 8;
 /// Most jingle pads.
 pub const MAX_JINGLE_PADS: usize = 32;
 
+/// Pad `i`'s name (0-based): the one given to it, else its file's name, else "".
+pub fn jingle_name(s: &soundcraft_model::PodcastSettings, i: usize) -> String {
+    if let Some(n) = s.jingle_names.get(i).map(|n| n.trim()).filter(|n| !n.is_empty()) {
+        return n.to_string();
+    }
+    let file = s.jingles.get(i).map(|f| f.trim()).unwrap_or("");
+    if file.is_empty() {
+        return String::new();
+    }
+    std::path::Path::new(file).file_stem().and_then(|n| n.to_str()).unwrap_or(file).to_string()
+}
+
 /// How many pads there are: the chosen number, at least as many as hold a file.
 pub fn pad_count(s: &soundcraft_model::PodcastSettings) -> usize {
     let n = if s.jingle_pads == 0 { JINGLE_PADS } else { s.jingle_pads as usize };
@@ -171,7 +183,7 @@ fn jingle_move(e: &mut Engine, p: &Value) -> Result<Value> {
         return Err(bad(ID, format!("`from` and `to` are pads from 1 to {n}")));
     };
     s.jingle_pads = n as u32;
-    for list in [&mut s.jingles, &mut s.jingle_images] {
+    for list in [&mut s.jingles, &mut s.jingle_images, &mut s.jingle_names] {
         list.resize(n, String::new());
         let item = list.remove(from - 1);
         list.insert(to - 1, item);
@@ -204,6 +216,9 @@ fn jingle_pad(e: &mut Engine, p: &Value) -> Result<Value> {
         }
         if r <= s.jingle_images.len() {
             s.jingle_images.remove(r - 1);
+        }
+        if r <= s.jingle_names.len() {
+            s.jingle_names.remove(r - 1);
         }
         s.jingle_pads = (n - 1) as u32;
     } else {
@@ -710,7 +725,12 @@ fn checked(id: &str, v: Value) -> Result<PodcastSettings> {
     {
         return Err(bad(id, "`loudness_lufs` is between -40 and 0 LUFS, or null for none"));
     }
-    if s.jingles.len() > MAX_JINGLE_PADS || s.jingle_images.len() > MAX_JINGLE_PADS || s.jingle_pads as usize > MAX_JINGLE_PADS {
+    if s.jingles.len() > MAX_JINGLE_PADS
+        || s.jingle_images.len() > MAX_JINGLE_PADS
+        || s.jingle_names.len() > MAX_JINGLE_PADS
+        || s.jingle_pads as usize > MAX_JINGLE_PADS
+        || s.jingle_names.iter().any(|n| n.chars().count() > 80)
+    {
         return Err(bad(id, format!("at most {MAX_JINGLE_PADS} jingle pads")));
     }
     if s.rundown.len() > 200 || s.rundown.iter().any(|i| !(i.minutes.is_finite() && (0.0..=600.0).contains(&i.minutes)) || i.title.len() > 500) {
@@ -1249,7 +1269,13 @@ mod tests {
         e.execute("edit.undo", &json!({})).unwrap();
         assert_eq!(pad_count(&e.session().podcast), 9, "undoable");
         // Sorting: pad 9 to the front, the others move one on.
+        e.execute("podcast.set", &json!({"jingle_names": ["", "", "", "", "", "", "", "", "Outro"]})).unwrap();
+        assert_eq!(jingle_name(&e.session().podcast, 8), "Outro", "its own name wins over the file's");
+        let mut plain = e.session().podcast.clone();
+        plain.jingle_names.clear();
+        assert_eq!(jingle_name(&plain, 8), "intro", "else the file's name");
         e.execute("podcast.jingle_move", &json!({"from": 9, "to": 1})).unwrap();
+        assert_eq!(jingle_name(&e.session().podcast, 0), "Outro", "the name moves with the pad");
         let pod = &e.session().podcast;
         assert_eq!(pod.jingles[0], wav.to_string_lossy());
         assert_eq!(pod.jingle_images.get(2).map(String::as_str), Some("cover.png"), "picture 2 moved to 3");

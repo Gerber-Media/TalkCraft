@@ -569,6 +569,8 @@ const DE: &[(&str, &str)] = &[
     ("Quit TalkCraft", "TalkCraft beenden"),
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
+    ("Name on the pad", "Name auf dem Pad"),
+    ("Rename…", "Umbenennen …"),
     ("{} device(s) connected", "{} Gerät(e) verbunden"),
     (
         "A phone or tablet in the same Wi-Fi becomes the remote: On Air display, Record, markers, next topic and the jingle pads. Nothing to install.",

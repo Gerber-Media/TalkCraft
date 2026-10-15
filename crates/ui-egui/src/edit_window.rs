@@ -569,8 +569,22 @@ fn draw_rulers(app: &mut SoundApp, ui: &mut Ui, area: Rect, tl: Rect, rulers: &[
                     _ => 1,
                 };
                 painter.rect_filled(row, 0.0, if id == "chords" { Color32::from_rgb(40, 56, 60) } else { t.marker_ruler });
-                for m in s.markers.iter().filter(|m| m.ruler == lane || (lane == 1 && m.ruler == 0)) {
+                // Markers closer than a flag's width share one flag ("Intro +2"), and each name stops
+                // before the next flag: names never write over each other.
+                let mut lane_markers: Vec<&soundcraft_model::MemoryLocation> =
+                    s.markers.iter().filter(|m| m.ruler == lane || (lane == 1 && m.ruler == 0)).collect();
+                lane_markers.sort_by_key(|m| m.start);
+                let mut groups: Vec<(f32, Vec<&soundcraft_model::MemoryLocation>)> = Vec::new();
+                for m in lane_markers {
                     let x = x_of(&s, tl, m.start);
+                    match groups.last_mut() {
+                        Some((gx, list)) if (x - *gx).abs() < 10.0 => list.push(m),
+                        _ => groups.push((x, vec![m])),
+                    }
+                }
+                let next_x: Vec<f32> = groups.iter().skip(1).map(|(x, _)| *x).chain(std::iter::once(row.max.x)).collect();
+                for ((x, list), until) in groups.iter().zip(next_x) {
+                    let (x, Some(m)) = (*x, list.first().copied()) else { continue };
                     let col = m.color.map_or(Color32::from_rgb(232, 200, 64), rgb);
                     if m.kind == soundcraft_model::MarkerKind::Selection {
                         let x1 = x_of(&s, tl, m.end);
@@ -587,7 +601,25 @@ fn draw_rulers(app: &mut SoundApp, ui: &mut Ui, area: Rect, tl: Rect, rulers: &[
                         col,
                         Stroke::NONE,
                     ));
-                    painter.text(pos2(x + 8.0, row.center().y), Align2::LEFT_CENTER, &m.name, bold(11.0), t.marker_text);
+                    let label = if list.len() > 1 { format!("{} +{}", m.name, list.len() - 1) } else { m.name.clone() };
+                    let clip = Rect::from_min_max(pos2(x + 6.0, row.min.y), pos2((until - 4.0).max(x + 6.0), row.max.y));
+                    painter.with_clip_rect(clip.intersect(row)).text(
+                        pos2(x + 8.0, row.center().y),
+                        Align2::LEFT_CENTER,
+                        label,
+                        bold(11.0),
+                        t.marker_text,
+                    );
+                    let flag = Rect::from_min_max(pos2(x - 6.0, row.min.y), pos2(until.min(x + 160.0), row.max.y));
+                    if ui.rect_contains_pointer(flag) && (list.len() > 1 || until - x < 80.0) {
+                        let names: Vec<String> = list.iter().map(|m| m.name.clone()).collect();
+                        egui::Tooltip::always_open(ui.ctx().clone(), ui.layer_id(), ui.id().with(("marker_tip", lane)), egui::PopupAnchor::Pointer)
+                            .show(|ui| {
+                                for n in &names {
+                                    ui.label(n);
+                                }
+                            });
+                    }
                 }
                 // Click on the marker ruler: recall a marker; double-click adds one.
                 let resp = ui.interact(row, ui.id().with(("marker_ruler", lane)), Sense::click());
