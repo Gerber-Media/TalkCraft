@@ -67,6 +67,45 @@ enum Cmd {
     },
     Stop,
     Locate(Samples),
+    /// Play a sound now, beside the session (a jingle pad pressed while stopped).
+    Audition(Arc<Audition>),
+    StopAudition,
+}
+
+/// A sound played once, beside the transport: planar samples at their own rate, and a gain.
+pub struct Audition {
+    pub channels: Vec<Vec<f32>>,
+    pub sample_rate: u32,
+    pub gain: f32,
+}
+
+/// The audition being played and where it is.
+struct Voice {
+    sound: Arc<Audition>,
+    read: f64,
+}
+
+impl Voice {
+    /// The next stereo frame (linear interpolation), or `None` at the end.
+    fn next(&mut self, step: f64) -> Option<(f32, f32)> {
+        let len = self.sound.channels.first().map_or(0, Vec::len);
+        let i = self.read as usize;
+        if i + 1 >= len {
+            return None;
+        }
+        let t = (self.read - i as f64) as f32;
+        let at = |c: usize| {
+            let ch = self.sound.channels.get(c).or_else(|| self.sound.channels.first());
+            ch.map_or(0.0, |v| {
+                let a = v.get(i).copied().unwrap_or(0.0);
+                let b = v.get(i + 1).copied().unwrap_or(a);
+                a + (b - a) * t
+            })
+        };
+        let (l, r) = (at(0), at(1));
+        self.read += step;
+        Some((l * self.sound.gain, r * self.sound.gain))
+    }
 }
 
 struct Shared {
@@ -104,6 +143,9 @@ struct AudioState {
     garbage: Sender<Vec<Box<dyn Plugin>>>,
     /// Pitch-preserving rate change between the mix and the device.
     stretch: stretch::Stretch,
+    /// A sound playing beside the transport. The player keeps its own reference to every sound,
+    /// so letting go of one here never frees memory on the audio thread.
+    voice: Option<Voice>,
 }
 
 fn new_engine(sr: f32) -> MixEngine {
@@ -135,6 +177,7 @@ impl AudioState {
             input: None,
             recording: false,
             stretch: stretch::Stretch::default(),
+            voice: None,
         }
     }
 
@@ -187,6 +230,8 @@ impl AudioState {
                     self.read = 0.0;
                     self.stretch.reset();
                 }
+                Cmd::Audition(sound) => self.voice = Some(Voice { sound, read: 0.0 }),
+                Cmd::StopAudition => self.voice = None,
             }
         }
         if changed {
@@ -272,6 +317,7 @@ impl AudioState {
                 m.main = StripMeter::default();
                 m.tracks.clear();
             }
+            self.add_voice(out, channels);
             return;
         }
         let speed = f64::from(self.shared.speed.load(Ordering::Relaxed)) / 1000.0;
@@ -326,6 +372,31 @@ impl AudioState {
             stretch.reset();
         }
         self.stretch = stretch;
+        self.add_voice(out, channels);
+    }
+
+    /// Mixes the audition into the device buffer (stereo; mono devices get the left channel).
+    fn add_voice(&mut self, out: &mut [f32], channels: usize) {
+        let Some(v) = &mut self.voice else { return };
+        let step = f64::from(v.sound.sample_rate.max(1)) / self.device_rate.max(1.0);
+        let mut ended = false;
+        for frame in out.chunks_mut(channels) {
+            let Some((l, r)) = v.next(step) else {
+                ended = true;
+                break;
+            };
+            for (c, o) in frame.iter_mut().enumerate() {
+                let add = match c {
+                    0 => l,
+                    1 => r,
+                    _ => 0.0,
+                };
+                *o = (*o + add).clamp(-1.0, 1.0);
+            }
+        }
+        if ended {
+            self.voice = None;
+        }
     }
 
     /// The next frame of the mix (all main channels) at the device rate, rendering as needed.
@@ -384,6 +455,8 @@ pub struct Player {
     shared: Arc<Shared>,
     tx: Sender<Cmd>,
     side: Mutex<Side>,
+    /// Every audition sent to the audio thread, until it lets go (see `audition`).
+    auditions: Mutex<Vec<Arc<Audition>>>,
     #[cfg(not(target_arch = "wasm32"))]
     _stream: Option<cpal::Stream>,
     #[cfg(target_arch = "wasm32")]
@@ -459,6 +532,7 @@ impl Player {
                         }
                         log::info!("audio device: {name} @ {rate} Hz, {channels} ch");
                         Player {
+                            auditions: Mutex::new(Vec::new()),
                             shared,
                             tx,
                             side,
@@ -532,6 +606,7 @@ impl Player {
             log::warn!("clock thread failed: {e}");
         }
         Player {
+            auditions: Mutex::new(Vec::new()),
             shared,
             tx,
             side,
@@ -553,6 +628,7 @@ impl Player {
         _gtx: Sender<Vec<Box<dyn Plugin>>>,
     ) -> Player {
         Player {
+            auditions: Mutex::new(Vec::new()),
             shared,
             tx,
             side,
@@ -642,6 +718,20 @@ impl Player {
         self.shared.position.store(from, Ordering::Relaxed);
         self.shared.playing.store(true, Ordering::Relaxed);
         let _ = self.tx.send(Cmd::Play { from, end, looped });
+    }
+
+    /// Plays `sound` now, beside the transport (it replaces one still playing).
+    pub fn audition(&self, sound: Arc<Audition>) {
+        if let Ok(mut held) = self.auditions.lock() {
+            // Sounds the audio thread no longer has are freed here, on this thread.
+            held.retain(|a| Arc::strong_count(a) > 1);
+            held.push(sound.clone());
+        }
+        let _ = self.tx.send(Cmd::Audition(sound));
+    }
+
+    pub fn stop_audition(&self) {
+        let _ = self.tx.send(Cmd::StopAudition);
     }
 
     /// Feed live input (from a `record::Recorder`) into the mix for input monitoring.
@@ -842,6 +932,34 @@ mod tests {
         st.fill(&mut out, 2);
         assert!(shared.position.load(Ordering::Relaxed) >= 1000);
         assert!(!shared.playing.load(Ordering::Relaxed));
+    }
+
+    #[test]
+    fn an_audition_sounds_while_stopped_and_then_falls_silent() {
+        let s = Arc::new(soundcraft_model::Session::default());
+        let shared = Arc::new(Shared {
+            position: AtomicI64::new(0),
+            playing: AtomicBool::new(false),
+            speed: AtomicU32::new(1000),
+            rate: AtomicU32::new(1000),
+            meters: Mutex::new(MeterSnapshot::default()),
+            device_lost: AtomicBool::new(false),
+        });
+        let (tx, rx) = channel();
+        let mut st = AudioState::new(rx, Arc::clone(&shared), s, 48_000.0, channel().0);
+        // 0.05 s of a 24 kHz sound at half gain on a 48 kHz device: about 4800 frames.
+        let sound = Arc::new(Audition { channels: vec![vec![0.8; 1200]], sample_rate: 24_000, gain: 0.5 });
+        tx.send(Cmd::Audition(Arc::clone(&sound))).unwrap();
+        let mut out = vec![0.0f32; 2 * 1024];
+        st.fill(&mut out, 2);
+        assert!((out[0] - 0.4).abs() < 1e-3 && (out[1] - 0.4).abs() < 1e-3, "both channels, at the gain: {:?}", &out[..2]);
+        assert!(!shared.playing.load(Ordering::Relaxed), "the transport did not start");
+        for _ in 0..4 {
+            st.fill(&mut out, 2);
+        }
+        assert!(out.iter().all(|x| *x == 0.0), "silent after the end");
+        assert!(st.voice.is_none());
+        assert_eq!(Arc::strong_count(&sound), 1, "the audio thread let go (the test holds the last reference)");
     }
 
     #[test]

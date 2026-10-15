@@ -34,6 +34,7 @@ pub const UI_COMMANDS: &[(&str, &str, &str, Option<&str>)] = &[
     ("words.quote_clip", "Quote Clip...", "", None),
     ("ui.palette", "Palette Window", "", None),
     ("rundown.start", "Start Topic", "", None),
+    ("jingles.fire", "Play Jingle Pad", "", None),
     ("rundown.next", "Next Topic", "", None),
     ("transport.rate", "Playback Speed", "", None),
     ("ui.workspace", "Work Mode", "", None),
@@ -569,6 +570,10 @@ pub fn run_ui_command(app: &mut SoundApp, id: &str, p: &Value) -> Option<Result<
             p = json!({"name": crate::i18n::tr("✂ Cut")});
         }
         return Some(app.engine.execute(id, &p).map_err(|e| e.to_string()));
+    }
+    if id == "jingles.fire" {
+        let pad = p.get("pad").and_then(Value::as_u64).unwrap_or(0) as usize;
+        return Some(if crate::jingles_window::fire(app, pad) { Ok(json!({"pad": pad})) } else { Err(format!("pad {pad} has no audio file")) });
     }
     if id == "rundown.start" || id == "rundown.next" {
         return Some(crate::rundown_window::command(app, id, p));

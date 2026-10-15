@@ -569,6 +569,10 @@ const DE: &[(&str, &str)] = &[
     ("Quit TalkCraft", "TalkCraft beenden"),
     ("Quit", "Beenden"),
     // Windows, dialogs, tooltips and messages.
+    ("Place at the insertion point", "An der Einfügemarke platzieren"),
+    ("Playing {}", "Spielt {}"),
+    ("Cannot read {}", "Kann {} nicht lesen"),
+    ("No audio output", "Keine Audioausgabe"),
     ("✂ Cut", "✂ Schneiden"),
     ("Colour", "Farbe"),
     ("Marker colour", "Markerfarbe"),
@@ -611,8 +615,8 @@ const DE: &[(&str, &str)] = &[
     ("Choose audio file…", "Audiodatei wählen …"),
     ("Choose picture…", "Bild wählen …"),
     (
-        "Click: play it now (while recording or playing at the playhead, else at the insertion point) · drop an audio file or a picture here · right-click for more",
-        "Klick: jetzt abspielen (bei Aufnahme oder Wiedergabe an der Abspielposition, sonst an der Einfügemarke) · Audiodatei oder Bild hierher ziehen · Rechtsklick für mehr",
+        "Click: play it now (while recording or playing it also goes into the episode at the playhead) · drop an audio file or a picture here · right-click for more",
+        "Klick: sofort abspielen (bei Aufnahme oder Wiedergabe kommt er dabei an der Abspielposition in die Folge) · Audiodatei oder Bild hierher ziehen · Rechtsklick für mehr",
     ),
     ("Empty pad", "Pad leeren"),
     (

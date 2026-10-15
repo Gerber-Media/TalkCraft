@@ -14,6 +14,16 @@ use std::collections::HashMap;
 #[derive(Clone, Default)]
 struct Pictures(HashMap<String, Option<egui::TextureHandle>>);
 
+/// Decoded jingles (`None`: the file could not be read).
+#[derive(Clone, Default)]
+struct Sounds(HashMap<String, Option<std::sync::Arc<soundcraft_playback::Audition>>>);
+
+impl std::fmt::Debug for Sounds {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Sounds({})", self.0.len())
+    }
+}
+
 impl std::fmt::Debug for Pictures {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Pictures({})", self.0.len())
@@ -26,6 +36,8 @@ pub struct JinglesWindow {
     sort: crate::reorder::Reorder,
     /// The pad being renamed, and the name typed so far.
     renaming: Option<(usize, String)>,
+    /// Decoded pad sounds for pressing a pad while stopped, by file.
+    sounds: Sounds,
 }
 
 /// `window.jingles`: opens or closes the window.
@@ -86,6 +98,7 @@ enum Action {
     Picture(usize, String),
     RemovePad(usize),
     AddPad,
+    Place(usize),
     Move(usize, usize),
     Rename(usize, String),
     Color(usize, Option<[u8; 3]>),
@@ -154,7 +167,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                     }
                     let r = ui
                         .add_enabled(!path.is_empty() || pic.is_some(), button)
-                        .on_hover_text(tr("Click: play it now (while recording or playing at the playhead, else at the insertion point) · drop an audio file or a picture here · right-click for more"))
+                        .on_hover_text(tr("Click: play it now (while recording or playing it also goes into the episode at the playhead) · drop an audio file or a picture here · right-click for more"))
                         .on_disabled_hover_text(tr("Drop an audio file here, or set a path"));
                     if let Some(tex) = &pic {
                         let inner = r.rect.shrink(2.0);
@@ -228,6 +241,10 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                         }
                         if !pic_path.is_empty() && ui.button(tr("Remove picture")).clicked() {
                             actions.push(Action::Picture(i, String::new()));
+                            ui.close();
+                        }
+                        if !path.is_empty() && ui.button(tr("Place at the insertion point")).clicked() {
+                            actions.push(Action::Place(i));
                             ui.close();
                         }
                         if !path.is_empty() && ui.button(tr("Empty pad")).clicked() {
@@ -306,6 +323,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             }
             Action::Audio(i, p) => set_slot(app, "jingles", i, &p),
             Action::Picture(i, p) => set_slot(app, "jingle_images", i, &p),
+            Action::Place(i) => place(app, i + 1, app.engine.session().edit.selection.start),
             Action::AddPad => {
                 if let Err(e) = app.run("podcast.jingle_pad", json!({"add": true})) {
                     app.ui.status = e;
@@ -343,14 +361,68 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     }
 }
 
-/// Plays pad `pad` (1-based): during a take or playback at the playhead, so it sounds now and is in
-/// the episode, else at the insertion point. Remote guests hear it too. False when the pad is empty.
+/// Plays pad `pad` (1-based) now. During a take or playback it goes into the episode at the
+/// playhead (and sounds from there); while stopped it is only heard, nothing changes. Remote guests
+/// hear it too. False when the pad is empty.
 pub fn fire(app: &mut SoundApp, pad: usize) -> bool {
     let path = app.engine.session().podcast.jingles.get(pad.wrapping_sub(1)).cloned().unwrap_or_default();
     if path.trim().is_empty() {
         return false;
     }
-    let at = if app.is_playing() { app.position() } else { app.engine.session().edit.selection.start };
+    if app.is_playing() || app.engine.transport.recording {
+        let at = app.position();
+        place(app, pad, at);
+    } else {
+        audition(app, pad, &path);
+        crate::remote::announce_jingle(app, pad);
+    }
+    true
+}
+
+/// The jingle track's volume as a gain (the pad sounds as it will in the episode).
+fn jingle_gain(app: &SoundApp) -> f32 {
+    let s = app.engine.session();
+    let db = soundcraft_engine::cmd::podcast::jingle_track(s).and_then(|t| s.track(t)).map_or(0.0, |t| t.mixer.volume_db);
+    10f32.powf(db / 20.0)
+}
+
+/// Plays the pad's file now, beside the transport.
+fn audition(app: &mut SoundApp, pad: usize, path: &str) {
+    let name = soundcraft_engine::cmd::podcast::jingle_name(&app.engine.session().podcast, pad - 1);
+    let gain = jingle_gain(app);
+    let sound = app
+        .extra
+        .jingles
+        .sounds
+        .0
+        .entry(path.to_string())
+        .or_insert_with(|| {
+            let bytes = std::fs::read(path).ok()?;
+            let ext = std::path::Path::new(path).extension().and_then(|x| x.to_str()).map(str::to_ascii_lowercase);
+            let (_, buf) = soundcraft_audio_io::decode(&bytes, ext.as_deref()).ok()?;
+            Some(std::sync::Arc::new(soundcraft_playback::Audition { channels: buf.channels, sample_rate: buf.sample_rate, gain: 1.0 }))
+        })
+        .clone();
+    match (sound, &app.player) {
+        (Some(s), Some(p)) => {
+            // The gain follows the jingle track's fader, so a copy with today's gain.
+            let s = if (s.gain - gain).abs() > 1e-4 {
+                let fresh = std::sync::Arc::new(soundcraft_playback::Audition { channels: s.channels.clone(), sample_rate: s.sample_rate, gain });
+                app.extra.jingles.sounds.0.insert(path.to_string(), Some(fresh.clone()));
+                fresh
+            } else {
+                s
+            };
+            p.audition(s);
+            app.ui.status = trf("Playing {}", &[&name]);
+        }
+        (None, _) => app.ui.status = trf("Cannot read {}", &[&path]),
+        (_, None) => app.ui.status = tr("No audio output").to_string(),
+    }
+}
+
+/// Puts pad `pad`'s file into the episode at `at` (on the jingle track).
+fn place(app: &mut SoundApp, pad: usize, at: soundcraft_time::Samples) {
     match app.run("podcast.place_jingle", json!({"pad": pad, "at": at})) {
         Ok(_) => {
             crate::remote::announce_jingle(app, pad);
@@ -359,7 +431,6 @@ pub fn fire(app: &mut SoundApp, pad: usize) -> bool {
         }
         Err(e) => app.ui.status = e,
     }
-    true
 }
 
 #[cfg(test)]
@@ -385,6 +456,13 @@ mod tests {
         let pod = &app.engine.session().podcast;
         assert_eq!(soundcraft_engine::cmd::podcast::jingle_name(pod, 0), "Intro");
         assert_eq!(pod.jingles[0], "/tmp/intro-v3-final.wav");
+        // Pressed while stopped: heard only, the episode stays as it was.
+        let clips = |app: &SoundApp| app.engine.session().tracks.iter().map(|t| t.clips().len()).sum::<usize>();
+        let before = clips(&app);
+        let undo = app.engine.undo_history().len();
+        assert!(app.run("jingles.fire", json!({"pad": 1})).is_ok());
+        assert_eq!((clips(&app), app.engine.undo_history().len()), (before, undo), "nothing placed while stopped");
+        assert!(app.run("jingles.fire", json!({"pad": 7})).is_err(), "an empty pad");
     }
 
     fn frame(ctx: &egui::Context, app: &mut SoundApp, events: Vec<egui::Event>) {
