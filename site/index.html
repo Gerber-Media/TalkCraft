@@ -13,12 +13,13 @@
 <meta property="og:image" content="https://talkcraft.gerber.media/icon-256.png">
 <style>
 :root {
-  --bg: #f6f7f4; --surface: #ffffff; --text: #1d2420; --dim: #5b6660; --line: #dde3de;
-  --accent: #2f9e63; --accent-ink: #ffffff; --accent-soft: #e3f3ea; --code: #eef1ee;
+  /* The paper tones of the guest page (remote/guest), with the app's green. */
+  --bg: #f4f1ea; --surface: #ffffff; --text: #0b0b0c; --dim: #6b6b6b; --line: #e3ddd0;
+  --accent: #2f9e63; --accent-ink: #ffffff; --accent-soft: #e6efe4; --code: #efe9dc;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #121614; --surface: #1a201d; --text: #e7ece9; --dim: #9aa7a0; --line: #2a332e;
-    --accent: #3cb875; --accent-ink: #0d1a12; --accent-soft: #1d3326; --code: #222a26; }
+  :root { --bg: #171512; --surface: #201d19; --text: #ece7de; --dim: #a39d92; --line: #35302a;
+    --accent: #3cb875; --accent-ink: #0d1a12; --accent-soft: #1f2e22; --code: #2a2620; }
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -58,6 +59,12 @@ pre { padding: 12px 14px; overflow-x: auto; white-space: pre; }
 .note { background: var(--accent-soft); border-radius: 12px; padding: 14px 18px; }
 footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--dim); font-size: 15px; }
 footer h3 { color: var(--text); font-size: 16px; margin: 18px 0 6px; }
+.legal-nav { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.legal-nav button { font: inherit; font-size: 14px; font-weight: 600; min-width: 150px; padding: 6px 22px;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; }
+.legal-nav button:hover { border-color: var(--accent); }
+.legal-nav button[aria-expanded="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.legal { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 4px 20px; margin-top: 12px; color: var(--text); }
 details summary { cursor: pointer; color: var(--text); font-weight: 600; }
 .install { max-width: 620px; margin: 18px auto 0; text-align: left; }
 .install > p.small { text-align: center; margin: 0 0 6px; }
@@ -266,14 +273,16 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
 <footer>
   <p><span data-lang="de">Idee, Konzept und Gestaltung:</span><span data-lang="en">Idea, concept and design:</span> <b>Dirk Gerber</b> · <a href="https://gerber.media">GERBER.MEDIA</a>.
     <span data-lang="de">TalkCraft baut auf</span><span data-lang="en">TalkCraft builds on</span> <a href="https://github.com/storytold/soundcraft">SoundCraft</a>.</p>
-  <details id="impressum">
-    <summary>Impressum</summary>
+  <nav class="legal-nav" aria-label="Rechtliches">
+    <button type="button" aria-expanded="false" aria-controls="impressum">Impressum</button>
+    <button type="button" aria-expanded="false" aria-controls="datenschutz"><span data-lang="de">Datenschutz</span><span data-lang="en">Privacy</span></button>
+  </nav>
+  <div class="legal" id="impressum" hidden>
     <p>Angaben gemäß § 5 DDG<br>Dirk Gerber (GERBER.MEDIA)<br>Bei der Rolandsmühle 2<br>22763 Hamburg, Deutschland<br>
       E-Mail: <a href="mailto:hello@gerber.media">hello@gerber.media</a></p>
     <p>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV: Dirk Gerber, Anschrift wie oben.</p>
-  </details>
-  <details id="datenschutz">
-    <summary><span data-lang="de">Datenschutz</span><span data-lang="en">Privacy</span></summary>
+  </div>
+  <div class="legal" id="datenschutz" hidden>
     <div data-lang="de">
       <p><b>Verantwortlich:</b> Dirk Gerber, Anschrift und E-Mail siehe Impressum.</p>
       <p><b>Hosting:</b> Diese Seite liegt bei Codefloe Pages (devXY GmbH, Baar, Schweiz; Server bei Hetzner in Deutschland). Beim Aufruf verarbeitet der Hoster technisch notwendige Daten (IP-Adresse, Zeitpunkt, aufgerufene Datei, Browserkennung) in Server-Protokollen, die nach 30 Tagen gelöscht werden. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Seite). Details: <a href="https://codefloe.com/codefloe/legal/src/branch/main/PrivacyPolicy.md">Datenschutzerklärung von Codefloe</a>.</p>
@@ -290,7 +299,7 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
       <p><b>The app:</b> TalkCraft sends no usage data. It only connects when you make it (remote guests, publishing, downloading a transcription model).</p>
       <p><b>Your rights:</b> access, rectification, erasure, restriction, objection, and complaint to a supervisory authority (Art. 15–21, 77 GDPR). Write to the e-mail in the Impressum.</p>
     </div>
-  </details>
+  </div>
 </footer>
 </div>
 <script>
@@ -338,6 +347,20 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
       } else { select(pre); if (document.execCommand("copy")) done(); }
     });
   });
+  // Impressum and privacy: two buttons side by side, one panel open at a time (#impressum opens it).
+  var legal = document.querySelectorAll(".legal-nav button");
+  function showLegal(id) {
+    legal.forEach(function (b) {
+      var on = b.getAttribute("aria-controls") === id && b.getAttribute("aria-expanded") !== "true";
+      b.setAttribute("aria-expanded", on ? "true" : "false");
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on;
+    });
+  }
+  legal.forEach(function (b) { b.addEventListener("click", function () { showLegal(b.getAttribute("aria-controls")); }); });
+  if (location.hash === "#impressum" || location.hash === "#datenschutz") {
+    showLegal(location.hash.slice(1));
+    document.getElementById(location.hash.slice(1)).scrollIntoView();
+  }
   function select(el) { var r = document.createRange(); r.selectNodeContents(el); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 })();
 </script>
