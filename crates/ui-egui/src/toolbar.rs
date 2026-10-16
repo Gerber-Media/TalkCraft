@@ -9,6 +9,7 @@ use soundcraft_engine::edit::{SHUFFLE_LOCK, SNAP_TO_GRID};
 use soundcraft_model::{EditMode, Tool};
 use soundcraft_time::{TimeFormat, format_length};
 
+/// Height of one toolbar row; a narrow window wraps the groups onto further rows.
 pub const HEIGHT: f32 = 78.0;
 
 fn group(ui: &mut Ui, w: f32, h: f32, add: impl FnOnce(&mut Ui, Rect)) {
@@ -23,38 +24,32 @@ pub fn show(app: &mut SoundApp, ui: &mut Ui) {
     let t = Tokens::current();
     let full = ui.max_rect();
     ui.painter().rect_filled(full, 0.0, t.toolbar_bg);
-    ui.add_space(4.0);
-    // On a narrow window the toolbar scrolls sideways (trackpad or Shift+wheel) instead of cutting off.
-    egui::ScrollArea::horizontal()
-        .id_salt("toolbar_scroll")
-        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
-        .show(ui, |ui| toolbar_row(app, ui));
-}
-
-fn toolbar_row(app: &mut SoundApp, ui: &mut Ui) {
-    ui.horizontal(|ui| {
-        ui.add_space(8.0);
-        ui.spacing_mut().item_spacing.x = 8.0;
-        group(ui, 186.0, 64.0, |ui, _| crate::workspace::toolbar_switch(app, ui));
-        let editing = app.ui.workspace.edits();
-        if editing {
-            edit_modes(app, ui);
-        }
-        zoom_group(app, ui);
-        if editing {
-            tools(app, ui);
-        }
-        counters(app, ui);
-        if editing {
-            grid_nudge(app, ui);
-        }
-        transport(app, ui);
-        if app.ui.workspace.records() {
-            crate::readiness::toolbar(app, ui);
-        }
-        marker_group(app, ui);
-        loudness(app, ui);
-        output_meter(app, ui);
+    // Each group is one allocation, so on a narrow window whole groups wrap onto the next row
+    // (the panel grows with them) instead of disappearing off the right edge.
+    egui::Frame::NONE.inner_margin(egui::Margin::symmetric(8, 4)).show(ui, |ui| {
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = vec2(8.0, 6.0);
+            group(ui, 186.0, 64.0, |ui, _| crate::workspace::toolbar_switch(app, ui));
+            let editing = app.ui.workspace.edits();
+            if editing {
+                edit_modes(app, ui);
+            }
+            zoom_group(app, ui);
+            if editing {
+                tools(app, ui);
+            }
+            counters(app, ui);
+            if editing {
+                grid_nudge(app, ui);
+            }
+            transport(app, ui);
+            if app.ui.workspace.records() {
+                crate::readiness::toolbar(app, ui);
+            }
+            marker_group(app, ui);
+            loudness(app, ui);
+            output_meter(app, ui);
+        })
     });
 }
 

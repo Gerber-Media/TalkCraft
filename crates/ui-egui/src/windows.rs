@@ -668,10 +668,7 @@ pub fn shortcuts_window(app: &mut SoundApp, ctx: &egui::Context) {
     win(ctx, &mut open, "Keyboard Shortcuts", vec2(520.0, 480.0), |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
             egui::Grid::new("sc").num_columns(3).striped(true).show(ui, |ui| {
-                let engine = soundcraft_engine::command_specs().iter().map(|c| (c.shortcut, c.label, c.menu.join(" › ")));
-                let windows = crate::menus::UI_COMMANDS.iter().map(|c| (c.3, c.1, c.2.replace(" > ", " › ")));
-                for (shortcut, label, menu) in engine.chain(windows) {
-                    let Some(shortcut) = shortcut else { continue };
+                for (shortcut, label, menu) in shortcut_rows() {
                     ui.label(egui::RichText::new(crate::shortcuts::shortcut_label(shortcut, mac)).font(mono(11.0)));
                     ui.label(label);
                     ui.label(egui::RichText::new(menu).small());
@@ -681,6 +678,45 @@ pub fn shortcuts_window(app: &mut SoundApp, ctx: &egui::Context) {
         });
     });
     app.ui.show_shortcuts = open;
+}
+
+/// The shortcuts as the menus show them: translated, without the menus TalkCraft hides, then the
+/// commands that have a shortcut but no menu item. (shortcut, label, menu path)
+fn shortcut_rows() -> Vec<(&'static str, String, String)> {
+    fn walk(
+        n: &crate::menus::MenuNode,
+        trail: &mut Vec<String>,
+        extra: &[(&str, &str)],
+        seen: &mut std::collections::HashSet<String>,
+        rows: &mut Vec<(&'static str, String, String)>,
+    ) {
+        if n.children.is_empty() {
+            if let Some(id) = crate::menus::command_for_path(&n.path, extra)
+                && let Some(shortcut) = crate::menus::shortcut_for(&id)
+                && seen.insert(id)
+            {
+                rows.push((shortcut, crate::i18n::tr(&n.label).to_string(), trail.join(" › ")));
+            }
+            return;
+        }
+        trail.push(crate::i18n::tr(&n.label).to_string());
+        n.children.iter().for_each(|c| walk(c, trail, extra, seen, rows));
+        trail.pop();
+    }
+    let extra = crate::menus::ui_aliases();
+    let mut seen = std::collections::HashSet::new();
+    let mut rows = Vec::new();
+    crate::menus::tree().iter().for_each(|r| walk(r, &mut Vec::new(), &extra, &mut seen, &mut rows));
+    let engine = soundcraft_engine::command_specs().iter().filter(|c| c.menu.is_empty()).map(|c| (c.id, c.label, c.shortcut));
+    let windows = crate::menus::UI_COMMANDS.iter().filter(|c| c.2.is_empty()).map(|c| (c.0, c.1, c.3));
+    for (id, label, shortcut) in engine.chain(windows) {
+        if let Some(shortcut) = shortcut
+            && seen.insert(id.to_string())
+        {
+            rows.push((shortcut, crate::i18n::tr(label).to_string(), String::new()));
+        }
+    }
+    rows
 }
 
 /// Clip Effects: per-clip EQ, dynamics and gain (stored as `clip_fx.<clip>.*` values).

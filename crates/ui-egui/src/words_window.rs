@@ -197,15 +197,15 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             ui.horizontal_wrapped(|ui| {
                 if let Some((job, child)) = &mut w.task {
                     let p = job.progress();
-                    ui.add(egui::ProgressBar::new(p).desired_width(220.0).text(format!("Listening for every word… {:.0}%", p * 100.0)));
+                    ui.add(egui::ProgressBar::new(p).desired_width(220.0).text(crate::i18n::trf("Listening for every word… {}%", &[&format!("{:.0}", p * 100.0)])));
                     if ui.button(crate::i18n::tr("Cancel")).clicked() {
                         let _ = child.kill();
                         let _ = child.wait();
                         job.cleanup();
                         w.task = None;
                     }
-                } else if transcribe::missing(None).is_some() {
-                    ui.label(RichText::new(transcribe::missing(None).unwrap_or_default()).color(t.text_dim));
+                } else if let Some(hint) = crate::subtitle_editor::missing_hint() {
+                    ui.label(RichText::new(hint).color(t.text_dim));
                 } else if ui.button(crate::i18n::tr("Find Words")).on_hover_text(crate::i18n::tr("Transcribes the episode word by word, keeping the ähms and uhs")).clicked() {
                     find = true;
                 }

@@ -3,7 +3,8 @@ use serde_json::json;
 use soundcraft_ui_egui::{Services, SoundApp, midi_editor};
 
 fn frame(ctx: &egui::Context, app: &mut SoundApp, events: Vec<Event>) {
-    let raw = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1600.0, 1000.0))), events, ..Default::default() };
+    // Wide enough for a one-row toolbar, so the panel heights below stay reachable.
+    let raw = RawInput { screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(2400.0, 1000.0))), events, ..Default::default() };
     ctx.run_ui(raw, |ui| {
         app.logic(ui.ctx());
         app.ui(ui);

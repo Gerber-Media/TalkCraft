@@ -46,15 +46,17 @@ fn clip_menu_stays_open_while_moving_onto_delete() {
     let before = kick_clip_count(&h);
     assert!(before > 0, "the demo session should have a recorded Kick clip");
 
-    // Right-click the Kick clip, then move the pointer into the menu and down to Delete.
-    press(&mut h, 880.0, 240.0, PointerButton::Secondary);
+    // Right-click the Kick clip (first row; the toolbar may wrap, so read its place from the
+    // layout), then move the pointer into the menu and down to Delete.
+    let kick_y = h.state().edit_layout.rows.first().map(|(_, r)| r[1] + 20.0).expect("the Kick row is laid out");
+    press(&mut h, 880.0, kick_y, PointerButton::Secondary);
     for _ in 0..10 {
         step(&mut h);
     }
     // Where the menu drew its Delete item (the menu's last entry).
     let delete = h.get_all_by_label("Delete").last().map(|n| n.rect().center()).expect("the clip menu shows Delete");
     // Move (no click) into the menu, as a real pointer would, so the lane loses its hover.
-    for (x, y) in [(900.0, 300.0), (delete.x, delete.y)] {
+    for (x, y) in [(900.0, kick_y + 60.0), (delete.x, delete.y)] {
         h.state_mut().synthetic.push(Event::PointerMoved(pos2(x, y)));
         for _ in 0..10 {
             step(&mut h);

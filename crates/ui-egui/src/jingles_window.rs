@@ -398,14 +398,18 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             if ui.button(tr("From Selection…")).on_hover_text(tr("Cut a jingle in the timeline and put it on a pad")).clicked() {
                 actions.push(Action::ExportForm);
             }
-            ui.label(
+        });
+        // Below the buttons, wrapped to the pads' width, so the hint never widens the palette.
+        ui.add(
+            egui::Label::new(
                 RichText::new(tr(
                     "Pads are saved with the session. Keys 1–8 fire the first eight. The jingle track is the one locked against recording.",
                 ))
                 .small()
                 .color(t.text_dim),
-            );
-        });
+            )
+            .wrap(),
+        );
     });
     for a in actions {
         match a {

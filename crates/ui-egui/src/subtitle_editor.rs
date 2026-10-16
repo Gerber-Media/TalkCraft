@@ -172,22 +172,49 @@ fn poll(app: &mut SoundApp, ctx: &egui::Context) {
 }
 
 /// The transcription row: start, progress and cancel, or what is missing.
+/// What automatic transcription still needs, in the interface language; None when it is ready.
+pub fn missing_hint() -> Option<String> {
+    if transcribe::find_cli().is_none() {
+        Some(install_hint())
+    } else if transcribe::find_model(None).is_none() {
+        Some(crate::i18n::tr("No speech model yet: Window > Subtitles offers to download one.").to_string())
+    } else {
+        None
+    }
+}
+
+/// How to install whisper.cpp on this system, in the interface language.
+fn install_hint() -> String {
+    if cfg!(target_os = "macos") {
+        crate::i18n::tr("Automatic transcription needs whisper.cpp: brew install whisper-cpp").to_string()
+    } else if cfg!(windows) {
+        let dir = transcribe::settings_dir().map(|d| d.join("whisper").display().to_string()).unwrap_or_default();
+        crate::i18n::trf(
+            "Automatic transcription needs whisper.cpp: unpack whisper-bin-x64.zip from github.com/ggml-org/whisper.cpp/releases into {}",
+            &[&dir],
+        )
+    } else {
+        crate::i18n::tr("Automatic transcription needs whisper.cpp (whisper-cli on the PATH; Homebrew: brew install whisper-cpp)").to_string()
+    }
+}
+
 fn transcription_ui(ui: &mut egui::Ui, ed: &mut SubtitleEditor, t: &Tokens, start: &mut bool, error: &mut Option<String>) {
     match &mut ed.task {
         Some(Task::Transcribe { job, .. }) => {
             let p = job.progress();
-            ui.add(egui::ProgressBar::new(p).desired_width(200.0).text(format!(
-                "Transcribing {:.0} min of audio… {:.0}%",
-                job.seconds / 60.0,
-                p * 100.0
-            )));
+            ui.add(
+                egui::ProgressBar::new(p).desired_width(200.0).text(crate::i18n::trf(
+                    "Transcribing {} min of audio… {}%",
+                    &[&format!("{:.0}", job.seconds / 60.0), &format!("{:.0}", p * 100.0)],
+                )),
+            );
         }
         Some(Task::Download { part, .. }) => {
             let got = std::fs::metadata(&*part).map_or(0, |m| m.len()) as f32;
             ui.add(
                 egui::ProgressBar::new((got / MODEL_BYTES).clamp(0.0, 1.0))
                     .desired_width(200.0)
-                    .text(format!("Downloading speech model… {:.0} MB", got / 1e6)),
+                    .text(crate::i18n::trf("Downloading speech model… {} MB", &[&format!("{:.0}", got / 1e6)])),
             );
         }
         None => {}
@@ -211,7 +238,7 @@ fn transcription_ui(ui: &mut egui::Ui, ed: &mut SubtitleEditor, t: &Tokens, star
         return;
     }
     if transcribe::find_cli().is_none() {
-        ui.label(RichText::new(transcribe::install_hint()).color(t.text_dim));
+        ui.label(RichText::new(install_hint()).color(t.text_dim));
     } else if transcribe::find_model(None).is_none() {
         if ui.button(crate::i18n::trf("Download speech model (~{} MB)", &[&format!("{:.0}", MODEL_BYTES / 1e6)])).on_hover_text(transcribe::DEFAULT_MODEL_URL).clicked() {
             match start_download() {
@@ -326,7 +353,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
                 ui.add(egui::TextEdit::singleline(&mut ed.filter).hint_text(crate::i18n::tr("Search")).desired_width(140.0));
                 ui.label(RichText::new(crate::i18n::trf("{} cue(s)", &[&cues.len()])).color(t.text_dim));
             });
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 transcription_ui(ui, ed, &t, &mut transcribe_now, &mut error);
                 if ui
                     .add_enabled(!cues.is_empty(), egui::Button::new(crate::i18n::tr("Suggest Chapters…")))
@@ -374,7 +401,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             const DEL_W: f32 = 26.0;
             ui.horizontal(|ui| {
                 for (label, w) in [("#", NUM_W), ("Start", TIME_W), ("End", TIME_W), ("Speaker", SPEAKER_W), ("Text", 0.0)] {
-                    let r = RichText::new(label).color(t.text_dim);
+                    let r = RichText::new(crate::i18n::tr(label)).color(t.text_dim);
                     if w > 0.0 {
                         ui.add_sized([w, 16.0], egui::Label::new(r));
                     } else {

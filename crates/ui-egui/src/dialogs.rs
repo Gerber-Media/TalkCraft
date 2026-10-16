@@ -303,7 +303,7 @@ impl Dialogs {
             "track.group" => {
                 let s = e.session();
                 let members = s.tracks.iter().map(|t| (t.id.0, t.name.clone(), s.edit.selected_tracks.contains(&t.id))).collect();
-                Dialog::Group { name: format!("Group {}", s.groups.len() + 1), edit: true, mix: true, members }
+                Dialog::Group { name: crate::i18n::trf("Group {}", &[&(s.groups.len() + 1)]), edit: true, mix: true, members }
             }
             "setup.session" => Dialog::Session { frame_rate: e.session().frame_rate.label().into(), bit_depth: "24".into() },
             "file.score_setup" => {
@@ -519,7 +519,8 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
             ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
             match &mut d {
                 Dialog::NewTracks { count, format, kind, timebase, name } => {
-                    ui.horizontal(|ui| {
+                    // Wraps on a narrow window instead of cutting off the name field.
+                    ui.horizontal_wrapped(|ui| {
                         ui.label(crate::i18n::tr("Create"));
                         ui.add(egui::DragValue::new(count).range(1..=128));
                         ui.label(crate::i18n::tr("new"));
@@ -529,17 +530,17 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                             }
                         });
                         egui::ComboBox::from_id_salt("nt_kind")
-                            .selected_text(soundcraft_model::TrackKind::from_id(kind).map_or("Audio Track", |k| k.label()))
+                            .selected_text(crate::i18n::tr(soundcraft_model::TrackKind::from_id(kind).map_or("Audio Track", |k| k.label())))
                             .show_ui(ui, |ui| {
                                 for k in soundcraft_model::TrackKind::ALL.into_iter().filter(|k| !crate::podcast::hidden_track_kind(*k)) {
-                                    if ui.selectable_label(kind == k.id(), k.label()).clicked() {
+                                    if ui.selectable_label(kind == k.id(), crate::i18n::tr(k.label())).clicked() {
                                         *kind = k.id().to_string();
                                         *name = k.default_name().to_string();
                                     }
                                 }
                             });
-                        ui.label("in");
-                        egui::ComboBox::from_id_salt("nt_tb").selected_text(if timebase == "ticks" { "Ticks" } else { "Samples" }).show_ui(
+                        ui.label(crate::i18n::tr("in"));
+                        egui::ComboBox::from_id_salt("nt_tb").selected_text(crate::i18n::tr(if timebase == "ticks" { "Ticks" } else { "Samples" })).show_ui(
                             ui,
                             |ui| {
                                 ui.selectable_value(timebase, "samples".to_string(), crate::i18n::tr("Samples"));
@@ -710,17 +711,17 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                 }
                 Dialog::Fades { shape } => {
                     for s in soundcraft_model::FadeShape::ALL {
-                        ui.radio_value(shape, s.label().to_lowercase(), s.label());
+                        ui.radio_value(shape, s.label().to_lowercase(), crate::i18n::tr(s.label()));
                     }
                     if buttons(ui, "OK", enter) {
                         action = Some(("edit.fades_create".into(), json!({"shape": shape})));
                     }
                 }
                 Dialog::ShortenPauses { threshold, longer_ms, keep_ms, preview } => {
-                    ui.add(egui::Slider::new(threshold, -80.0..=-20.0).text("Silence below dB"));
-                    ui.add(egui::Slider::new(longer_ms, 300.0..=5000.0).text("Pauses longer than ms"));
+                    ui.add(egui::Slider::new(threshold, -80.0..=-20.0).text(crate::i18n::tr("Silence below dB")));
+                    ui.add(egui::Slider::new(longer_ms, 300.0..=5000.0).text(crate::i18n::tr("Pauses longer than ms")));
                     *keep_ms = keep_ms.min(*longer_ms);
-                    ui.add(egui::Slider::new(keep_ms, 0.0..=*longer_ms).text("Shorten them to ms"));
+                    ui.add(egui::Slider::new(keep_ms, 0.0..=*longer_ms).text(crate::i18n::tr("Shorten them to ms")));
                     let params = json!({"threshold_db": threshold, "longer_than_ms": longer_ms, "keep_ms": keep_ms});
                     ui.horizontal(|ui| {
                         if ui.button(crate::i18n::tr("Preview")).clicked() {
@@ -794,10 +795,10 @@ pub fn show(app: &mut SoundApp, ctx: &egui::Context) {
                     }
                 }
                 Dialog::StripSilence { threshold, min_ms, pre_ms, post_ms } => {
-                    ui.add(egui::Slider::new(threshold, -96.0..=0.0).text("Threshold dB"));
-                    ui.add(egui::Slider::new(min_ms, 0.0..=2000.0).text("Min strip duration ms"));
-                    ui.add(egui::Slider::new(pre_ms, 0.0..=500.0).text("Clip start pad ms"));
-                    ui.add(egui::Slider::new(post_ms, 0.0..=2000.0).text("Clip end pad ms"));
+                    ui.add(egui::Slider::new(threshold, -96.0..=0.0).text(crate::i18n::tr("Threshold dB")));
+                    ui.add(egui::Slider::new(min_ms, 0.0..=2000.0).text(crate::i18n::tr("Min strip duration ms")));
+                    ui.add(egui::Slider::new(pre_ms, 0.0..=500.0).text(crate::i18n::tr("Clip start pad ms")));
+                    ui.add(egui::Slider::new(post_ms, 0.0..=2000.0).text(crate::i18n::tr("Clip end pad ms")));
                     if buttons(ui, "Strip", enter) {
                         action = Some((
                             "edit.strip_silence".into(),
@@ -1485,13 +1486,13 @@ fn export_settings_ui(
         });
         ui.end_row();
         ui.label(crate::i18n::tr("Loudness"));
-        let current = LOUDNESS_PRESETS
-            .iter()
-            .find(|(_, v)| *v == x.loudness_lufs)
-            .map_or_else(|| x.loudness_lufs.map_or_else(|| "Off".to_string(), |l| format!("{l:.0} LUFS")), |(l, _)| (*l).to_string());
+        let current = LOUDNESS_PRESETS.iter().find(|(_, v)| *v == x.loudness_lufs).map_or_else(
+            || x.loudness_lufs.map_or_else(|| crate::i18n::tr("Off").to_string(), |l| format!("{l:.0} LUFS")),
+            |(l, _)| crate::i18n::tr(l).to_string(),
+        );
         egui::ComboBox::from_id_salt("ep_lufs").width(300.0).selected_text(current).show_ui(ui, |ui| {
             for (label, v) in LOUDNESS_PRESETS {
-                ui.selectable_value(&mut x.loudness_lufs, v, label);
+                ui.selectable_value(&mut x.loudness_lufs, v, crate::i18n::tr(label));
             }
         });
         ui.end_row();
