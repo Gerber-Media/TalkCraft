@@ -287,9 +287,9 @@ pub fn menu_bar(app: &mut SoundApp, ui: &mut egui::Ui) {
                 }
                 let title = format!(
                     "{}{}  —  {}",
-                    app.engine.session().name,
+                    app.session_title(),
                     if app.engine.is_dirty() { " *" } else { "" },
-                    if app.ui.window == MainWindow::Edit || app.ui.mix_separate { "Edit" } else { "Mix" }
+                    crate::i18n::tr(if app.ui.window == MainWindow::Edit || app.ui.mix_separate { "Edit window" } else { "Mix window" })
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(egui::RichText::new(title).color(t.text_dim));

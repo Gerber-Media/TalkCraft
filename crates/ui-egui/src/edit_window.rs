@@ -75,6 +75,11 @@ pub fn sample_at(s: &Session, tl: Rect, x: f32) -> Samples {
 
 pub const LANE_H: f32 = 46.0;
 
+/// A marker's name as shown: the mistake markers' standard name in the interface language.
+fn marker_name(m: &soundcraft_model::MemoryLocation) -> String {
+    if m.name == soundcraft_engine::podcast::CUT_MARKER { crate::i18n::tr(&m.name).to_string() } else { m.name.clone() }
+}
+
 pub fn track_height(t: &Track) -> f32 {
     let alt = if t.view == "playlists" { t.playlists.len().saturating_sub(1) as f32 * LANE_H } else { 0.0 };
     t.height.points() + alt
@@ -168,7 +173,7 @@ fn status_bar(app: &mut SoundApp, ui: &mut Ui) {
     // Fixed status messages are translated here; composed ones are translated where they are made.
     let left = crate::i18n::trf(
         "{} · {} Hz · {} · {} tracks · {}",
-        &[&s.name, &s.sample_rate.hz(), &crate::i18n::tr(depth), &s.tracks.len(), &crate::i18n::tr(&app.ui.status)],
+        &[&app.session_title(), &s.sample_rate.hz(), &crate::i18n::tr(depth), &s.tracks.len(), &crate::i18n::tr(&app.ui.status)],
     );
     ui.painter().text(pos2(r.min.x + 10.0, r.center().y), Align2::LEFT_CENTER, left, regular(11.0), t.text_dim);
     let undo = app.engine.undo_label().map_or(String::new(), |l| crate::i18n::trf("Undo {}", &[&crate::i18n::tr(l.trim_end_matches("..."))]));
@@ -605,7 +610,7 @@ fn draw_rulers(app: &mut SoundApp, ui: &mut Ui, area: Rect, tl: Rect, rulers: &[
                         col,
                         Stroke::NONE,
                     ));
-                    let label = if list.len() > 1 { format!("{} +{}", m.name, list.len() - 1) } else { m.name.clone() };
+                    let label = if list.len() > 1 { format!("{} +{}", marker_name(m), list.len() - 1) } else { marker_name(m) };
                     let clip = Rect::from_min_max(pos2(x + 6.0, row.min.y), pos2((until - 4.0).max(x + 6.0), row.max.y));
                     painter.with_clip_rect(clip.intersect(row)).text(
                         pos2(x + 8.0, row.center().y),
@@ -616,7 +621,7 @@ fn draw_rulers(app: &mut SoundApp, ui: &mut Ui, area: Rect, tl: Rect, rulers: &[
                     );
                     let flag = Rect::from_min_max(pos2(x - 6.0, row.min.y), pos2(until.min(x + 160.0), row.max.y));
                     if ui.rect_contains_pointer(flag) && (list.len() > 1 || until - x < 80.0) {
-                        let names: Vec<String> = list.iter().map(|m| m.name.clone()).collect();
+                        let names: Vec<String> = list.iter().map(|m| marker_name(m)).collect();
                         egui::Tooltip::always_open(ui.ctx().clone(), ui.layer_id(), ui.id().with(("marker_tip", lane)), egui::PopupAnchor::Pointer)
                             .show(|ui| {
                                 for n in &names {

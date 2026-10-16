@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Builds the product page https://talkcraft.gerber.media into site/out: fills in the newest GitHub
-# release's version and download links, copies icons and the README animations.
+# Builds the product pages https://talkcraft.gerber.media (and /anleitung/, the tutorial) into
+# site/out: fills in the newest GitHub release's version and download links and the shared footer,
+# copies icons, styles, the README animations and the tutorial pictures.
 #
 #   site/build.sh            build into site/out
 #   site/build.sh --publish  build and push site/out to the `pages` branch of the Codefloe repo
@@ -22,12 +23,15 @@ release="$(curl -fsSL ${auth[@]+"${auth[@]}"} "https://api.github.com/repos/$REP
 rm -rf "$OUT"
 mkdir -p "$OUT/media"
 /bin/cp -f "$HERE"/favicon.ico "$HERE"/favicon-32.png "$HERE"/apple-touch-icon.png "$HERE"/icon-256.png "$OUT/"
-/bin/cp -f "$HERE"/install.sh "$HERE"/install.ps1 "$OUT/"
+/bin/cp -f "$HERE"/install.sh "$HERE"/install.ps1 "$HERE"/style.css "$HERE"/site.js "$OUT/"
+mkdir -p "$OUT/anleitung" "$OUT/media/tutorial"
+# The tutorial's pictures, made by site/tutorial/make_media.sh.
+/bin/cp -f "$HERE"/media/tutorial/* "$OUT/media/tutorial/"
 /bin/cp -f "$ROOT"/docs/media/talkcraft-{hero,record,edit,publish}.gif "$OUT/media/"
 # Codefloe Pages serves the domain set in the repo settings; this file only documents it.
 echo "talkcraft.gerber.media" > "$OUT/CNAME"
 
-RELEASE_JSON="$release" python3 - "$HERE/index.html" "$OUT/index.html" <<'PY'
+RELEASE_JSON="$release" python3 - "$HERE" "$OUT" <<'PY'
 import json, os, re, sys
 rel = json.loads(os.environ["RELEASE_JSON"])
 assets = {a["name"]: a["browser_download_url"] for a in rel.get("assets", [])}
@@ -54,11 +58,15 @@ for key, pattern in {
     values["FILE_" + key] = name
     values["URL_" + key] = url
 
-html = open(sys.argv[1], encoding="utf-8").read()
-html = re.sub(r"\{\{(\w+)\}\}", lambda m: values[m.group(1)], html)
-if "{{" in html:
-    sys.exit("unfilled placeholder left in the page")
-open(sys.argv[2], "w", encoding="utf-8").write(html)
+src, out = sys.argv[1], sys.argv[2]
+# The footer (Impressum, privacy) is the same on every page.
+values["FOOTER"] = open(os.path.join(src, "footer.html"), encoding="utf-8").read().strip()
+for page in ["index.html", "anleitung/index.html"]:
+    html = open(os.path.join(src, page), encoding="utf-8").read()
+    html = re.sub(r"\{\{(\w+)\}\}", lambda m: values[m.group(1)], html)
+    if "{{" in html:
+        sys.exit(f"unfilled placeholder left in {page}")
+    open(os.path.join(out, page), "w", encoding="utf-8").write(html)
 print(f"site/out for TalkCraft {version}")
 PY
 

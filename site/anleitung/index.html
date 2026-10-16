@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="de" data-title-de="Anleitung – TalkCraft" data-title-en="Tutorial – TalkCraft">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anleitung – TalkCraft</title>
+<meta name="description" content="So arbeitest du mit TalkCraft: Folge anlegen, Mikrofone einrichten, Ferngäste einladen, aufnehmen, schneiden, untertiteln, exportieren und veröffentlichen – Schritt für Schritt mit Animationen.">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<meta property="og:title" content="TalkCraft – Anleitung">
+<meta property="og:description" content="Vom Mikrofon bis zum Feed, Schritt für Schritt.">
+<meta property="og:image" content="https://talkcraft.gerber.media/icon-256.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <a class="brand" href="../"><img src="../favicon-32.png" alt="">TalkCraft</a>
+  <nav class="lang"><a class="nav-link" href="../#downloads">Download</a><a href="?lang=de" data-set="de">Deutsch</a><a href="?lang=en" data-set="en">English</a></nav>
+</header>
+
+<div class="tut-hero">
+  <h1><span data-lang="de">So arbeitest du mit TalkCraft</span><span data-lang="en">Working with TalkCraft</span></h1>
+  <p class="tagline">
+    <span data-lang="de">Vom leeren Projekt bis zur veröffentlichten Folge, Schritt für Schritt. Die Animationen zeigen die echte App; ein Klick darauf hält sie an.</span>
+    <span data-lang="en">From an empty project to a published episode, step by step. The animations show the real app; click one to pause it.</span>
+  </p>
+  <p class="small">
+    <span data-lang="de">Tastenkürzel stehen für den Mac; unter Windows und Linux nimmst du Strg statt Cmd. Die Bilder zeigen das Menü im Fenster, wie unter Windows und Linux; auf dem Mac stehen dieselben Menüs oben in der Menüleiste.</span>
+    <span data-lang="en">Shortcuts are given for the Mac; on Windows and Linux use Ctrl instead of Cmd. The pictures show the menu inside the window, as on Windows and Linux; on the Mac the same menus are in the menu bar at the top.</span>
+  </p>
+</div>
+
+<nav class="toc" aria-label="Inhalt">
+  <a class="card" href="#anlegen"><span class="num">1</span>
+    <b data-lang="de">Folge anlegen</b><b data-lang="en">Set up an episode</b>
+    <span class="small" data-lang="de">Vorlage, Sprecher, Mikrofone</span><span class="small" data-lang="en">Template, speakers, microphones</span></a>
+  <a class="card" href="#aufnehmen"><span class="num">2</span>
+    <b data-lang="de">Aufnehmen</b><b data-lang="en">Record</b>
+    <span class="small" data-lang="de">Ferngäste, Ablaufplan, Jingles, Marker</span><span class="small" data-lang="en">Remote guests, run sheet, jingles, markers</span></a>
+  <a class="card" href="#schneiden"><span class="num">3</span>
+    <b data-lang="de">Schneiden und aufbereiten</b><b data-lang="en">Edit and polish</b>
+    <span class="small" data-lang="de">Fehler, Pausen, Füllwörter, Klang</span><span class="small" data-lang="en">Mistakes, pauses, filler words, sound</span></a>
+  <a class="card" href="#veroeffentlichen"><span class="num">4</span>
+    <b data-lang="de">Veröffentlichen</b><b data-lang="en">Publish</b>
+    <span class="small" data-lang="de">Untertitel, Export, Feed und Hoster</span><span class="small" data-lang="en">Subtitles, export, feed and hosts</span></a>
+</nav>
+
+<!-- 1 ------------------------------------------------------------------------------------------ -->
+<section class="chapter" id="anlegen">
+  <h2><span class="num">1</span><span data-lang="de">Folge anlegen</span><span data-lang="en">Set up an episode</span></h2>
+
+  <article class="step" id="neue-folge">
+    <h3 data-lang="de">Eine neue Folge</h3><h3 data-lang="en">A new episode</h3>
+    <p class="lead" data-lang="de">Die Podcast-Vorlage gibt jeder Stimme ihre eigene Spur. So lässt sich später jeder Sprecher für sich schneiden und im Klang anpassen.</p>
+    <p class="lead" data-lang="en">The podcast template gives every voice a track of its own, so each speaker can be cut and adjusted separately later.</p>
+    <figure class="anim" data-src="../media/tutorial/new-episode"><img alt="" width="1280" height="720" loading="lazy"></figure>
+    <ol class="steps" data-lang="de">
+      <li><b>Ablage › Neue Session …</b> (<kbd>Cmd</kbd>+<kbd>N</kbd>) öffnet den Dialog.</li>
+      <li>Namen eingeben, <b>Podcast-Folge</b> wählen und die Zahl der Sprecher einstellen. 48 kHz passt fast immer.</li>
+      <li><b>Anlegen</b>: Jeder Sprecher bekommt eine Spur mit fertiger Stimmkette (EQ, Gate, Kompressor, De-Esser), dazu eine Spur für Jingles und Musik und einen Master, der bei −1 dBTP begrenzt.</li>
+      <li>Später noch jemand dazu? <b>+</b> unter der Spurliste fügt einen weiteren Sprecher hinzu.</li>
+    </ol>
+    <ol class="steps" data-lang="en">
+      <li><b>File › New Session…</b> (<kbd>Cmd</kbd>+<kbd>N</kbd>) opens the dialog.</li>
+      <li>Enter a name, pick <b>Podcast episode</b> and set the number of speakers. 48 kHz suits almost everything.</li>
+      <li><b>Create</b>: every speaker gets a track with a ready voice chain (EQ, gate, compressor, de-esser), plus a track for jingles and music and a master limited at −1 dBTP.</li>
+      <li>Someone joins later? <b>+</b> below the track list adds another speaker.</li>
+    </ol>
+    <p class="tip" data-lang="de"><b>Arbeitsmodi:</b> Beim Start fragt TalkCraft, ob du aufnehmen, schneiden oder veröffentlichen willst, und zeigt nur die Werkzeuge dafür. Umschalten geht jederzeit links in der Werkzeugleiste.</p>
+    <p class="tip" data-lang="en"><b>Work modes:</b> at start TalkCraft asks whether you want to record, edit or publish and shows just the tools for that. Switch any time on the left of the toolbar.</p>
+  </article>
+
+  <article class="step" id="mikrofone">
+    <h3 data-lang="de">Mikrofone einrichten</h3><h3 data-lang="en">Set up the microphones</h3>
+    <p class="lead" data-lang="de">Einmal pro Studio-Aufbau: TalkCraft findet heraus, welches Mikrofon an welchem Eingang hängt, und sagt dir, ob der Pegel stimmt.</p>
+    <p class="lead" data-lang="en">Once per studio setup: TalkCraft finds out which microphone is on which input and tells you whether the level is right.</p>
+    <ol class="steps" data-lang="de">
+      <li><b>Einstellungen › Audio-Interface</b> öffnen und oben das Interface für Mikrofone (Eingang) und Kopfhörer (Ausgang) wählen.</li>
+      <li>Bei jedem Sprecher <b>Erkennen</b> klicken und ihn drei Sekunden sprechen lassen: TalkCraft ordnet seiner Spur den richtigen Eingang zu. Sitzen alle der Reihe nach an Eingang 1, 2, 3 …, genügt <b>Der Reihe nach zuordnen</b>.</li>
+      <li><b>Soundcheck › Starten (10 s)</b>: Alle sprechen ganz normal. Danach steht bei jedem Mikrofon, ob der Gain am Interface hoch oder runter muss. Gut sind Spitzen um −12 dBFS.</li>
+      <li>Zum Mithören die Direktüberwachung (Direct Monitoring) des Interfaces nutzen: Sie hat keine Verzögerung.</li>
+    </ol>
+    <ol class="steps" data-lang="en">
+      <li>Open <b>Setup › Audio Interface</b> and pick the interface for the microphones (input) and headphones (output) at the top.</li>
+      <li>Click <b>Detect</b> next to each speaker and let them talk for three seconds: TalkCraft gives their track the right input. If everyone sits on inputs 1, 2, 3 … in order, <b>Assign in order</b> is enough.</li>
+      <li><b>Soundcheck › Start (10 s)</b>: everyone talks normally. Afterwards each microphone says whether the gain on the interface should go up or down. Peaks around −12 dBFS are good.</li>
+      <li>To listen while recording, use the interface's direct monitoring: it has no delay.</li>
+    </ol>
+    <p class="tip" data-lang="de"><b>Interface abgezogen?</b> Dann beendet TalkCraft eine laufende Aufnahme sauber und behält alles bis dahin. Wird es wieder eingesteckt, nimmt TalkCraft es von selbst wieder.</p>
+    <p class="tip" data-lang="en"><b>Interface unplugged?</b> TalkCraft ends a running take cleanly and keeps everything so far. Plug it back in and TalkCraft picks it up again.</p>
+  </article>
+</section>
+
+<!-- 2 ------------------------------------------------------------------------------------------ -->
+<section class="chapter" id="aufnehmen">
+  <h2><span class="num">2</span><span data-lang="de">Aufnehmen</span><span data-lang="en">Record</span></h2>
+
+  <article class="step" id="fernaeste">
+    <h3 data-lang="de">Ferngäste einladen</h3><h3 data-lang="en">Invite remote guests</h3>
+    <p class="lead" data-lang="de">Gäste brauchen nur einen Browser und Kopfhörer, auch das Handy reicht. Ihre Stimme wird bei ihnen in voller Qualität aufgenommen, nicht die Leitung.</p>
+    <p class="lead" data-lang="en">Guests only need a browser and headphones; a phone will do. Their voice is recorded at full quality on their side, not the call.</p>
+    <div class="pair">
+      <figure class="anim" data-src="../media/tutorial/remote-guests"><img alt="" width="1280" height="720" loading="lazy"></figure>
+      <figure class="phone"><img data-lang="de" src="../media/tutorial/guest-page-de.png" width="390" height="760" loading="lazy" alt="Die Gästeseite auf dem Handy: Name, Mikrofon und Tipps für die Aufnahme mit dem Handy"><img data-lang="en" src="../media/tutorial/guest-page-en.png" width="390" height="760" loading="lazy" alt="The guest page on a phone: name, microphone and tips for recording on a phone">
+        <figcaption><span data-lang="de">So sieht es beim Gast aus</span><span data-lang="en">What the guest sees</span></figcaption></figure>
+    </div>
+    <ol class="steps" data-lang="de">
+      <li><b>Fenster › Ferngäste</b> und dort <b>Studio öffnen</b>: Im Browser öffnet sich die Studio-Seite mit dem Einladungslink.</li>
+      <li>Den Link an die Gäste schicken. Sie öffnen ihn, tragen ihren Namen ein, erlauben das Mikrofon und treten bei.</li>
+      <li>Jeder Gast erscheint als eigene Spur „Ferngast – Name“ mit Live-Pegel. <kbd>M</kbd> auf der Spur schaltet ihn im Gespräch stumm.</li>
+      <li><b>Record</b> startet auch bei jedem Gast die Aufnahme. Nach <b>Stop</b> kommt seine Datei von selbst und liegt passend zum Gespräch auf seiner Spur.</li>
+    </ol>
+    <ol class="steps" data-lang="en">
+      <li><b>Window › Remote Guests</b>, then <b>Open Studio</b>: the studio page opens in your browser with the invitation link.</li>
+      <li>Send the link to your guests. They open it, enter their name, allow the microphone and join.</li>
+      <li>Each guest shows up as a track of their own, “Ferngast – name”, with a live meter. <kbd>M</kbd> on the track mutes them in the call.</li>
+      <li><b>Record</b> starts the recording at every guest as well. After <b>Stop</b> their file arrives by itself and lands in sync on their track.</li>
+    </ol>
+    <p class="tip" data-lang="de"><b>Gast im Firmennetz?</b> Dort ist die direkte Verbindung oft gesperrt. Unter <b>Ausweich-Server</b> im Fenster Ferngäste lässt sich ein eigener TURN-Server eintragen; die Gästeseite wechselt nach 12 Sekunden ohne Verbindung dorthin.</p>
+    <p class="tip" data-lang="en"><b>Guest on a company network?</b> Direct connections are often blocked there. Under <b>Fallback server</b> in the Remote Guests window you can enter a TURN server of your own; the guest page switches to it after 12 seconds without a connection.</p>
+  </article>
+
+  <article class="step" id="aufnahme">
+    <h3 data-lang="de">Die Aufnahme</h3><h3 data-lang="en">The recording</h3>
+    <p class="lead" data-lang="de">Alles, was du während des Gesprächs brauchst, liegt griffbereit: der Ablaufplan, die Jingles und zwei Knöpfe für Kapitel und Versprecher.</p>
+    <p class="lead" data-lang="en">Everything you need during the talk is at hand: the run sheet, the jingles and two buttons for chapters and slips.</p>
+    <figure class="anim" data-src="../media/tutorial/recording"><img alt="" width="1280" height="720" loading="lazy"></figure>
+    <ol class="steps" data-lang="de">
+      <li>Im Modus <b>Aufnehmen</b> zeigt die Ampel <b>Startklar</b>, ob jedes Mikrofon Signal hat, nichts übersteuert und genug Speicher frei ist.</li>
+      <li><b>Fenster › Ablaufplan</b>: die Themen mit geplanten Minuten. <b>Nächstes Thema</b> (oder <kbd>Tab</kbd>) setzt ein Kapitel mit dem Namen des Themas und zeigt, wie lange es schon läuft.</li>
+      <li><b>Fenster › Jingles</b>: Ein Klick auf ein Pad oder die Tasten <kbd>1</kbd>–<kbd>8</kbd> spielt das Jingle ab, live in die Aufnahme und für die Gäste hörbar.</li>
+      <li><b>Record</b> (<kbd>Cmd</kbd>+<kbd>Leertaste</kbd>) nimmt alle Sprecherspuren auf. <b>+ Kapitel</b> (<kbd>Enter</kbd>) setzt einen Kapitelmarker, <b>Fehler</b> (<kbd>Umschalt</kbd>+<kbd>Enter</kbd>) einen roten Marker für einen Versprecher. Einfach weiterreden; geschnitten wird später.</li>
+    </ol>
+    <ol class="steps" data-lang="en">
+      <li>In <b>Record</b> mode the <b>Ready</b> light shows whether every microphone has a signal, nothing clips and there is enough disk space.</li>
+      <li><b>Window › Run Sheet</b>: the topics with their planned minutes. <b>Next topic</b> (or <kbd>Tab</kbd>) sets a chapter named after the topic and shows how long it has been running.</li>
+      <li><b>Window › Jingles</b>: a click on a pad or the keys <kbd>1</kbd>–<kbd>8</kbd> plays the jingle, live into the recording and audible to the guests.</li>
+      <li><b>Record</b> (<kbd>Cmd</kbd>+<kbd>Space</kbd>) records every speaker track. <b>+ Chapter</b> (<kbd>Enter</kbd>) sets a chapter marker, <b>Mistake</b> (<kbd>Shift</kbd>+<kbd>Enter</kbd>) a red marker for a slip. Just keep talking; cutting comes later.</li>
+    </ol>
+    <p class="tip" data-lang="de"><b>Zweiter Bildschirm:</b> Jingles, Ablaufplan und Ferngäste lassen sich mit <b>Eigenes Fenster</b> herauslösen, etwa auf einen Touchscreen. Unter <b>Fenster › Fernbedienung</b> wird ein Handy im selben WLAN per QR-Code zur Fernbedienung.</p>
+    <p class="tip" data-lang="en"><b>Second screen:</b> jingles, run sheet and remote guests detach with <b>Own window</b>, onto a touchscreen for example. <b>Window › Remote Control</b> turns a phone on the same Wi-Fi into a remote via a QR code.</p>
+  </article>
+</section>
+
+<!-- 3 ------------------------------------------------------------------------------------------ -->
+<section class="chapter" id="schneiden">
+  <h2><span class="num">3</span><span data-lang="de">Schneiden und aufbereiten</span><span data-lang="en">Edit and polish</span></h2>
+
+  <article class="step" id="fehler">
+    <h3 data-lang="de">Versprecher herausschneiden</h3><h3 data-lang="en">Cut out the slips</h3>
+    <p class="lead" data-lang="de">Die roten Marker aus der Aufnahme führen dich von Stelle zu Stelle. Jeder Schnitt wirkt auf alle Spuren, damit die Sprecher synchron bleiben.</p>
+    <p class="lead" data-lang="en">The red markers from the recording lead you from spot to spot. Each cut works on every track, so the speakers stay in sync.</p>
+    <figure class="anim" data-src="../media/tutorial/mistakes"><img alt="" width="1280" height="720" loading="lazy"></figure>
+    <ol class="steps" data-lang="de">
+      <li>In den Modus <b>Schneiden</b> wechseln. In der Werkzeugleiste steht, wie viele Fehler noch offen sind.</li>
+      <li>Der Pfeil nach rechts springt zum nächsten Fehler, der Pfeil nach links zum vorigen.</li>
+      <li>Den Versprecher auswählen (ziehen, oder <kbd>I</kbd> und <kbd>O</kbd> an der Abspielposition) und mit <kbd>Entf</kbd> löschen: Die Lücke schließt sich auf allen Spuren, jeder Schnitt bekommt eine kurze Blende.</li>
+      <li>Bleibt die Stelle doch drin, hakt der Haken den Marker ab.</li>
+    </ol>
+    <ol class="steps" data-lang="en">
+      <li>Switch to <b>Edit</b> mode. The toolbar shows how many mistakes are still open.</li>
+      <li>The right arrow jumps to the next mistake, the left arrow to the previous one.</li>
+      <li>Select the slip (drag, or <kbd>I</kbd> and <kbd>O</kbd> at the playhead) and press <kbd>Delete</kbd>: the gap closes on every track, and each cut gets a short fade.</li>
+      <li>Keeping it after all? The tick removes the marker.</li>
+    </ol>
+    <p class="tip" data-lang="de"><b>Zum Abhören:</b> <kbd>J</kbd>, <kbd>K</kbd> und <kbd>L</kbd> spulen zurück, halten an und spielen ab (zweimal <kbd>L</kbd> für 1,5-fach). Die Geschwindigkeit in der Werkzeugleiste geht von 0,5× bis 2×, die Stimmen behalten ihre Tonhöhe.</p>
+    <p class="tip" data-lang="en"><b>Listening:</b> <kbd>J</kbd>, <kbd>K</kbd> and <kbd>L</kbd> rewind, stop and play (press <kbd>L</kbd> twice for 1.5×). The speed in the toolbar goes from 0.5× to 2×, and the voices keep their pitch.</p>
+  </article>
+
+  <article class="step" id="pausen">
+    <h3 data-lang="de">Lange Pausen kürzen</h3><h3 data-lang="en">Shorten long pauses</h3>
+    <p class="lead" data-lang="de">Nachdenkpausen klingen in der fertigen Folge oft länger als im Gespräch. TalkCraft kürzt sie alle auf einmal, nur dort, wo wirklich niemand spricht.</p>
+    <p class="lead" data-lang="en">Pauses to think often sound longer in the finished episode than in the talk. TalkCraft shortens them all at once, only where nobody is speaking.</p>
+    <figure class="anim" data-src="../media/tutorial/pauses"><img alt="" width="1280" height="720" loading="lazy"></figure>
+    <ol class="steps" data-lang="de">
+      <li><b>Bearbeiten › Pausen kürzen …</b></li>
+      <li>Einstellen, was als Stille zählt (unter wie viel dB), ab welcher Länge eine Pause gekürzt wird und auf wie lang.</li>
+      <li><b>Vorschau</b> zählt die Stellen, ohne etwas zu ändern. <b>Kürzen</b> schneidet sie auf allen Spuren; Marker und Untertitel rücken mit.</li>
+    </ol>
+    <ol class="steps" data-lang="en">
+      <li><b>Edit › Shorten Pauses…</b></li>
+      <li>Set what counts as silence (below how many dB), from which length a pause is shortened, and to how long.</li>
+      <li><b>Preview</b> counts the spots without changing anything. <b>Shorten</b> cuts them on every track; markers and subtitles move along.</li>
+    </ol>
+  </article>
+
+  <article class="step" id="schnitt-am-text">
+    <h3 data-lang="de">Schnitt am Text</h3><h3 data-lang="en">Edit by text</h3>
+    <p class="lead" data-lang="de">Das Gespräch als Text, mit jedem Wort an seiner Zeit. „Ähm“, „äh“ und Co. sind markiert und lassen sich mit einem Klick herausschneiden.</p>
+    <p class="lead" data-lang="en">The talk as text, every word at its time. “Um”, “uh” and the like are marked and can be cut out in one click.</p>
+    <figure class="anim" data-src="../media/tutorial/text-edit"><img alt="" width="1280" height="720" loading="lazy"></figure>
+    <ol class="steps" data-lang="de">
+      <li><b>Fenster › Schnitt am Text</b> und <b>Wörter finden</b>: TalkCraft hört die Folge auf deinem Rechner Wort für Wort durch. Beim ersten Mal lädt es dafür einmalig ein Sprachmodell.</li>
+      <li><b>Alle Füllwörter auswählen</b>, oder einzelne Wörter anklicken; <kbd>Umschalt</kbd>-Klick wählt einen Bereich. Ein Rechtsklick spielt ein Wort ab.</li>
+      <li><b>… Wörter schneiden</b> (oder <kbd>Entf</kbd>) entfernt sie aus allen Spuren, als ein einziger Rückgängig-Schritt.</li>
+    </ol>
+    <ol class="steps" data-lang="en">
+      <li><b>Window › Edit by Text</b>, then <b>Find Words</b>: TalkCraft listens to the episode word by word on your computer. The first time it downloads a speech model once.</li>
+      <li><b>Select all fillers</b>, or click single words; <kbd>Shift</kbd>-click selects a range. A right-click plays a word.</li>
+      <li><b>Cut … word(s)</b> (or <kbd>Delete</kbd>) removes them from every track, as a single undo step.</li>
+    </ol>
+    <p class="tip" data-lang="de"><b>Für Social Media:</b> Die besten Sätze markieren und <b>Zitat-Clip …</b> wählen: Daraus wird ein kurzes Video im Hochformat für Instagram, TikTok und Co.</p>
+    <p class="tip" data-lang="en"><b>For social media:</b> select the best sentences and choose <b>Quote Clip…</b>: they become a short portrait video for Instagram, TikTok and the like.</p>
+  </article>
+
+  <article class="step" id="fertig-machen">
+    <h3 data-lang="de">Folge fertig machen</h3><h3 data-lang="en">Finish Episode</h3>
+    <p class="lead" data-lang="de">Die üblichen Schlussschritte für den Klang in einem Durchgang. Jeder lässt sich abwählen, und mit Vorher und Nachher hörst du den Unterschied.</p>
+    <p class="lead" data-lang="en">The usual final steps for the sound in one go. Each one can be left out, and Before and After let you hear the difference.</p>
+    <figure class="anim" data-src="../media/tutorial/finish"><img alt="" width="1280" height="720" loading="lazy"></figure>
+    <ol class="steps" data-lang="de">
+      <li><b>Bearbeiten › Folge fertig machen …</b></li>
+      <li>Häkchen setzen: Übersprechen entfernen, jeden Sprecher in sich ausgleichen, Sprecher aneinander angleichen, Atmer absenken, Mundgeräusche reparieren, Füllwörter schneiden, Pausen kürzen, Musik unter Sprache absenken, Rauschen mindern.</li>
+      <li><b>Folge fertig machen</b> klicken. Danach mit <b>Vorher</b> und <b>Nachher</b> vergleichen, oder <b>Alles zurücknehmen</b>.</li>
+    </ol>
+    <ol class="steps" data-lang="en">
+      <li><b>Edit › Finish Episode…</b></li>
+      <li>Tick what you want: remove crosstalk, level each speaker within their track, match the speakers, lower breaths, repair mouth clicks, cut filler words, shorten pauses, duck music under speech, reduce noise.</li>
+      <li>Click <b>Finish Episode</b>. Then compare <b>Before</b> and <b>After</b>, or <b>Undo All</b>.</li>
+    </ol>
+  </article>
+</section>
+
+<!-- 4 ------------------------------------------------------------------------------------------ -->
+<section class="chapter" id="veroeffentlichen">
+  <h2><span class="num">4</span><span data-lang="de">Veröffentlichen</span><span data-lang="en">Publish</span></h2>
+
+  <article class="step" id="untertitel">
+    <h3 data-lang="de">Untertitel und Transkript</h3><h3 data-lang="en">Subtitles and transcript</h3>
+    <p class="lead" data-lang="de">Untertitel machen die Folge durchsuchbar und barrierefrei. Die Transkription läuft auf deinem Rechner, die Aufnahme verlässt ihn dafür nicht.</p>
+    <p class="lead" data-lang="en">Subtitles make the episode searchable and accessible. Transcription runs on your computer; the recording never leaves it for that.</p>
+    <figure class="anim" data-src="../media/tutorial/subtitles"><img alt="" width="1280" height="720" loading="lazy"></figure>
+    <ol class="steps" data-lang="de">
+      <li><b>Fenster › Untertitel</b> (<kbd>Cmd</kbd>+<kbd>Ctrl</kbd>+<kbd>T</kbd>). Beim ersten Mal <b>Sprachmodell laden</b> (rund 570 MB, einmalig).</li>
+      <li><b>Transkribieren</b> füllt die Untertitel aus der Sprache, mit dem Namen des Sprechers. Jeder Text lässt sich direkt bearbeiten.</li>
+      <li><b>Exportieren …</b> schreibt SRT oder WebVTT, <b>Als Text exportieren …</b> das Transkript. <b>Kapitel vorschlagen …</b> sucht Kapitelgrenzen an langen Pausen und Sprecherwechseln.</li>
+    </ol>
+    <ol class="steps" data-lang="en">
+      <li><b>Window › Subtitles</b> (<kbd>Cmd</kbd>+<kbd>Ctrl</kbd>+<kbd>T</kbd>). The first time, <b>Download speech model</b> (about 570 MB, once).</li>
+      <li><b>Transcribe</b> fills in the subtitles from the speech, with the speaker's name. Every text can be edited right there.</li>
+      <li><b>Export…</b> writes SRT or WebVTT, <b>Export Text…</b> the transcript. <b>Suggest Chapters…</b> looks for chapter breaks at long pauses and speaker changes.</li>
+    </ol>
+  </article>
+
+  <article class="step" id="export">
+    <h3 data-lang="de">Exportieren</h3><h3 data-lang="en">Export</h3>
+    <p class="lead" data-lang="de">Eine Datei, die jede Podcast-App versteht: mit Kapiteln, Cover und der Lautheit, die Apple und Spotify erwarten.</p>
+    <p class="lead" data-lang="en">A file every podcast app understands: with chapters, cover and the loudness Apple and Spotify expect.</p>
+    <figure class="anim" data-src="../media/tutorial/export"><img alt="" width="1280" height="720" loading="lazy"></figure>
+    <ol class="steps" data-lang="de">
+      <li><b>Ablage › Folge exportieren …</b> (<kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>E</kbd>).</li>
+      <li>Format wählen: M4A (Standard), MP3 oder M4B für Hörbücher. Die Lautheit steht auf −16 LUFS, dem Stereo-Standard der Plattformen.</li>
+      <li>Titel, Podcast, Autor, Folgennummer und ein quadratisches Cover eintragen; die Marker werden zu Kapiteln. Shownotes mit Kapitelliste und die Untertitel entstehen gleich mit.</li>
+    </ol>
+    <ol class="steps" data-lang="en">
+      <li><b>File › Export Episode…</b> (<kbd>Cmd</kbd>+<kbd>Alt</kbd>+<kbd>E</kbd>).</li>
+      <li>Pick the format: M4A (default), MP3, or M4B for audiobooks. Loudness is set to −16 LUFS, the platforms' stereo standard.</li>
+      <li>Enter title, podcast, author, episode number and a square cover; the markers become chapters. Show notes with a chapter list and the subtitles come along.</li>
+    </ol>
+  </article>
+
+  <article class="step" id="feed">
+    <h3 data-lang="de">Veröffentlichen</h3><h3 data-lang="en">Publish</h3>
+    <p class="lead" data-lang="de">Die Checkliste sagt, was noch fehlt. Dann geht die Folge mit einem Klick in deinen eigenen Feed oder zu deinem Podcast-Hoster.</p>
+    <p class="lead" data-lang="en">The checklist says what is missing. Then one click sends the episode to your own feed or to your podcast host.</p>
+    <figure class="anim" data-src="../media/tutorial/publish"><img alt="" width="1280" height="720" loading="lazy"></figure>
+    <ol class="steps" data-lang="de">
+      <li>Den Modus <b>Veröffentlichen</b> wählen oder <b>Ablage › Folge veröffentlichen …</b></li>
+      <li>Die Checkliste prüft Titel, Beschreibung, Cover (quadratisch, 1400 bis 3000 Pixel), Kapitel, offene Fehler-Marker, Lautheit, Länge und Transkript.</li>
+      <li>Unter <b>Wohin</b> das Ziel wählen: der eigene RSS-Feed (per Git, SFTP, FTP oder WebDAV; den Feed einmal bei Apple Podcasts und Spotify einreichen) oder ein Hoster wie Buzzsprout, Transistor, Podigee, Podbean, Spreaker, Captivate oder RSS.com.</li>
+      <li><b>Exportieren und veröffentlichen</b>. Deine Zugangsdaten bleiben in deinem Einstellungsordner auf diesem Rechner.</li>
+    </ol>
+    <ol class="steps" data-lang="en">
+      <li>Pick the <b>Publish</b> mode, or <b>File › Publish Episode…</b></li>
+      <li>The checklist checks title, description, cover (square, 1400 to 3000 pixels), chapters, open mistake markers, loudness, length and transcript.</li>
+      <li>Under <b>Where to</b> pick the target: your own RSS feed (via Git, SFTP, FTP or WebDAV; submit the feed to Apple Podcasts and Spotify once) or a host such as Buzzsprout, Transistor, Podigee, Podbean, Spreaker, Captivate or RSS.com.</li>
+      <li><b>Export and Publish</b>. Your keys stay in your settings folder on this computer.</li>
+    </ol>
+    <p class="tip" data-lang="de"><b>Für Social Media:</b> <b>Social-Paket erstellen</b> legt Beitragstext, Kapitel, Cover und Shownotes in einen Ordner; <b>Audiogramm (MP4) …</b> macht ein Video mit Wellenform und Untertiteln.</p>
+    <p class="tip" data-lang="en"><b>For social media:</b> <b>Make social package</b> puts post text, chapters, cover and show notes in one folder; <b>Audiogram (MP4)…</b> makes a video with waveform and subtitles.</p>
+  </article>
+</section>
+
+<p class="cta"><a class="btn primary" href="../#downloads"><span data-lang="de">TalkCraft laden</span><span data-lang="en">Get TalkCraft</span></a></p>
+
+{{FOOTER}}
+</div>
+<script src="../site.js"></script>
+</body>
+</html>

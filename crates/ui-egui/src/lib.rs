@@ -351,7 +351,8 @@ pub struct SoundApp {
     record_start: Samples,
     /// Punch range to trim the take to (pre/post-roll recordings).
     punch: Option<Range>,
-    recorder_failed: bool,
+    /// No microphone input: opening it failed, or the host must not open one (picture runs).
+    pub recorder_failed: bool,
     /// Input this take lost to a slow disk, as last reported (ms).
     lost_shown: u64,
     /// Where the takes being recorded go, autosaved with the session so a crash can't lose them.
@@ -520,6 +521,12 @@ impl SoundApp {
     }
 
     /// Run a command; errors go to the status line. Returns the result.
+    /// The session's name as shown: a new, unnamed session's "Untitled" in the interface language.
+    pub fn session_title(&self) -> String {
+        let name = &self.engine.session().name;
+        if name == "Untitled" { crate::i18n::tr(name).to_string() } else { name.clone() }
+    }
+
     pub fn run(&mut self, id: &str, params: Value) -> Result<Value, String> {
         if matches!(id, "session.new" | "session.open" | "session.close" | "session.revert") && bounce::refuses_session_switch(self) {
             return Err(self.ui.status.clone());

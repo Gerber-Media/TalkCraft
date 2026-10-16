@@ -58,6 +58,9 @@ there's no warning. You can read the scripts first: [install.sh](site/install.sh
 [install.ps1](site/install.ps1). The normal downloads and help for the warnings are on
 [talkcraft.gerber.media](https://talkcraft.gerber.media/#erster-start).
 
+**Tutorial:** step by step with animations, from the first episode to publishing:
+[talkcraft.gerber.media/anleitung](https://talkcraft.gerber.media/anleitung/?lang=en).
+
 ## Workflow
 
 <table>
@@ -328,6 +331,9 @@ deshalb warnen macOS und Windows bei Dateien aus dem Browser. Dateien, die diese
 tragen keine Download-Markierung, also kommt keine Warnung. Die Skripte kannst du vorher lesen:
 [install.sh](site/install.sh), [install.ps1](site/install.ps1). Die normalen Downloads und Hilfe zu
 den Warnungen stehen auf [talkcraft.gerber.media](https://talkcraft.gerber.media/#erster-start).
+
+**Anleitung:** Schritt für Schritt mit Animationen, von der ersten Folge bis zum Veröffentlichen:
+[talkcraft.gerber.media/anleitung](https://talkcraft.gerber.media/anleitung/?lang=de).
 
 ## Arbeitsablauf
 

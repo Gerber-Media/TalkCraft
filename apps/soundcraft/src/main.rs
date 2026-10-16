@@ -84,12 +84,12 @@ impl eframe::App for App {
         let title = if self.0.native_menu_bar {
             format!(
                 "{}{} — TalkCraft — {}",
-                self.0.engine.session().name,
+                self.0.session_title(),
                 if self.0.engine.is_dirty() { " *" } else { "" },
-                if self.0.ui.window == soundcraft_ui_egui::MainWindow::Edit { "Edit" } else { "Mix" }
+                soundcraft_ui_egui::i18n::tr(if self.0.ui.window == soundcraft_ui_egui::MainWindow::Edit { "Edit window" } else { "Mix window" })
             )
         } else {
-            format!("{} — TalkCraft", self.0.engine.session().name)
+            format!("{} — TalkCraft", self.0.session_title())
         };
         set_title(ctx, title);
     }

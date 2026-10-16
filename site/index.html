@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" data-title-de="TalkCraft – Podcast-Studio für macOS, Windows und Linux" data-title-en="TalkCraft – podcast studio for macOS, Windows and Linux">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,93 +11,13 @@
 <meta property="og:title" content="TalkCraft – Podcast-Studio">
 <meta property="og:description" content="Aufnehmen, schneiden, untertiteln, veröffentlichen. Für macOS, Windows und Linux.">
 <meta property="og:image" content="https://talkcraft.gerber.media/icon-256.png">
-<style>
-:root {
-  /* The paper tones of the guest page (remote/guest), with the app's green. */
-  --bg: #f4f1ea; --surface: #ffffff; --text: #0b0b0c; --dim: #6b6b6b; --line: #e3ddd0;
-  --accent: #2f9e63; --accent-ink: #ffffff; --accent-press: #237a4b; --accent-soft: #e6efe4; --code: #efe9dc;
-}
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #171512; --surface: #201d19; --text: #ece7de; --dim: #a39d92; --line: #35302a;
-    --accent: #3cb875; --accent-ink: #0d1a12; --accent-press: #2c8f59; --accent-soft: #1f2e22; --code: #2a2620; }
-}
-* { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--text);
-  font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif; }
-a { color: var(--accent); }
-.wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
-header.top { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; }
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); text-decoration: none; }
-.brand img { width: 32px; height: 32px; }
-.lang a { color: var(--dim); text-decoration: none; margin-left: 12px; font-size: 15px; }
-.lang a[aria-current] { color: var(--text); font-weight: 600; }
-.hero { text-align: center; padding: 32px 0 24px; }
-.hero img.icon { width: 128px; height: 128px; }
-h1 { font-size: clamp(34px, 6vw, 52px); line-height: 1.1; margin: 12px 0 8px; letter-spacing: -0.02em; }
-.tagline { font-size: clamp(18px, 2.6vw, 22px); color: var(--dim); max-width: 680px; margin: 0 auto 24px; }
-.dl { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 8px 0 6px; }
-.btn { display: inline-block; padding: 12px 20px; border-radius: 10px; font-weight: 600; text-decoration: none;
-  border: 1px solid var(--line); background: var(--surface); color: var(--text); }
-.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.small { font-size: 14px; color: var(--dim); }
-.shot { margin: 28px auto 0; max-width: 960px; }
-.shot img, .flow img { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--line); }
-section { padding: 40px 0; }
-h2 { font-size: 28px; margin: 0 0 18px; letter-spacing: -0.01em; }
-.flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.flow p { margin: 10px 0 0; }
-.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
-.card h3 { margin: 0 0 6px; font-size: 18px; }
-.card p { margin: 0; color: var(--dim); }
-.platforms { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-.platforms ul { margin: 8px 0 0; padding-left: 18px; }
-code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; background: var(--code); border-radius: 6px; }
-code { padding: 1px 5px; }
-pre { padding: 12px 14px; overflow-x: auto; white-space: pre; }
-.note { background: var(--accent-soft); border-radius: 12px; padding: 14px 18px; }
-footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--dim); font-size: 15px; }
-footer h3 { color: var(--text); font-size: 16px; margin: 18px 0 6px; }
-/* Credits on the left, Impressum/Privacy on the right of the same line; below it when narrow. */
-.footer-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
-.footer-row > p { margin: 0; flex: 1 1 320px; }
-.legal-nav { display: flex; flex-wrap: wrap; gap: 10px; }
-/* Like the download button (.btn.primary), only lower; the open one is pressed in. */
-.legal-nav button { font: inherit; font-size: 14px; font-weight: 600; min-width: 150px; padding: 6px 22px;
-  border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
-.legal-nav button:hover { filter: brightness(1.08); }
-.legal-nav button[aria-expanded="true"] { background: var(--accent-press); border-color: var(--accent-press); box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.25); }
-.legal { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 4px 20px; margin-top: 12px; color: var(--text); }
-details summary { cursor: pointer; color: var(--text); font-weight: 600; }
-.install { max-width: 620px; margin: 18px auto 0; text-align: left; }
-.install > p.small { text-align: center; margin: 0 0 6px; }
-.install [data-shell] p { margin: 8px 0 4px; text-align: center; }
-.cmd { position: relative; margin: 6px 0 14px; }
-.cmd pre { margin: 0; padding-right: 100px; white-space: pre-wrap; word-break: break-all; }
-.copy { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); font: 600 13px/1 inherit;
-  font-family: inherit; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line);
-  background: var(--surface); color: var(--text); cursor: pointer; }
-.copy:hover { border-color: var(--accent); }
-.copy.done { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.cmd + p, p + .cmd { margin-top: 8px; }
-.howto { display: grid; gap: 12px; margin-top: 8px; }
-.howto summary { font-size: 18px; }
-.howto.howto p { margin: 10px 0; color: var(--text); }
-.howto.howto p.small { color: var(--dim); }
-.howto ol { padding-left: 22px; }
-.howto li { margin-bottom: 6px; }
-.howto pre { white-space: pre-wrap; word-break: break-all; }
-[data-lang] { display: none; }
-html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: revert; }
-@media (max-width: 760px) { .flow { grid-template-columns: 1fr; } section { padding: 28px 0; } }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="wrap">
 <header class="top">
   <a class="brand" href="./"><img src="favicon-32.png" alt="">TalkCraft</a>
-  <nav class="lang"><a href="?lang=de" data-set="de">Deutsch</a><a href="?lang=en" data-set="en">English</a></nav>
+  <nav class="lang"><a class="nav-link" href="anleitung/"><span data-lang="de">Anleitung</span><span data-lang="en">Tutorial</span></a><a href="?lang=de" data-set="de">Deutsch</a><a href="?lang=en" data-set="en">English</a></nav>
 </header>
 
 <div class="hero">
@@ -141,28 +61,111 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
   </div>
 </section>
 
-<section>
+<section id="funktionen">
   <h2><span data-lang="de">Was TalkCraft kann</span><span data-lang="en">What TalkCraft does</span></h2>
   <div class="features">
-    <div class="card"><h3 data-lang="de">Jede Stimme eine Spur</h3><h3 data-lang="en">A track per voice</h3>
-      <p data-lang="de">Vorlage mit Sprachkette pro Sprecher, Mikrofon-Erkennung und Soundcheck fürs Audio-Interface.</p>
-      <p data-lang="en">A template with a voice chain per speaker, microphone detection and a soundcheck for your interface.</p></div>
-    <div class="card"><h3 data-lang="de">Ferngäste ohne Installation</h3><h3 data-lang="en">Remote guests, nothing to install</h3>
-      <p data-lang="de">Gäste kommen per Link im Browser dazu und nehmen verlustfrei bei sich auf; die Datei landet synchron auf ihrer Spur.</p>
-      <p data-lang="en">Guests join from a browser link and record lossless on their side; the file lands in sync on their track.</p></div>
-    <div class="card"><h3 data-lang="de">Sprache aufbereiten</h3><h3 data-lang="en">Clean up speech</h3>
-      <p data-lang="de">Rauschen, Übersprechen, Atmer und Schmatzer reduzieren, Sprecher angleichen, Pausen kürzen, Füllwörter schneiden.</p>
-      <p data-lang="en">Reduce noise, crosstalk, breaths and mouth clicks, match speakers, shorten pauses, cut filler words.</p></div>
-    <div class="card"><h3 data-lang="de">Transkript und Untertitel</h3><h3 data-lang="en">Transcript and subtitles</h3>
-      <p data-lang="de">Transkription auf dem eigenen Rechner (Whisper), Schnitt am Text, SRT/WebVTT, Shownotes mit Kapiteln.</p>
-      <p data-lang="en">Transcription on your own computer (Whisper), editing by text, SRT/WebVTT, show notes with chapters.</p></div>
-    <div class="card"><h3 data-lang="de">Fertig für jede Plattform</h3><h3 data-lang="en">Ready for every platform</h3>
-      <p data-lang="de">M4A, MP3 oder M4B mit Kapiteln und Cover, auf −16 LUFS; Audiogramm-Videos für Social Media.</p>
-      <p data-lang="en">M4A, MP3 or M4B with chapters and cover at −16 LUFS; audiogram videos for social media.</p></div>
-    <div class="card"><h3 data-lang="de">Live-Produktion</h3><h3 data-lang="en">Live production</h3>
-      <p data-lang="de">On-Air-Anzeige, Jingle-Pads auf einem zweiten Bildschirm oder Touchscreen, Fernbedienung per Handy.</p>
-      <p data-lang="en">On Air display, jingle pads on a second screen or touchscreen, a phone as remote control.</p></div>
+    <div class="card">
+      <h3 data-lang="de">Aufnehmen</h3><h3 data-lang="en">Recording</h3>
+      <ul data-lang="de">
+        <li>Vorlage mit einer Spur pro Sprecher, jede mit Stimmkette (EQ, Gate, Kompressor, De-Esser)</li>
+        <li>Audio-Interface: Mikrofone erkennen, Soundcheck sagt, ob der Gain hoch oder runter muss</li>
+        <li>Startklar-Ampel, 3-2-1-Countdown und On-Air-Anzeige</li>
+        <li>Ein abgezogenes Interface beendet die Aufnahme sauber, nichts geht verloren</li>
+      </ul>
+      <ul data-lang="en">
+        <li>A template with a track per speaker, each with a voice chain (EQ, gate, compressor, de-esser)</li>
+        <li>Audio interface: finds each microphone, the soundcheck says whether the gain goes up or down</li>
+        <li>Ready light, 3-2-1 countdown and an On Air display</li>
+        <li>An unplugged interface ends the take cleanly, nothing is lost</li>
+      </ul></div>
+    <div class="card">
+      <h3 data-lang="de">Ferngäste</h3><h3 data-lang="en">Remote guests</h3>
+      <ul data-lang="de">
+        <li>Gäste kommen per Link über den Browser dazu, auch vom Handy, ohne Installation</li>
+        <li>Jeder Gast nimmt verlustfrei bei sich auf; die Datei landet synchron auf seiner Spur</li>
+        <li>Stummschalten, Verbindungsqualität, Ausweich-Server für Firmennetze</li>
+      </ul>
+      <ul data-lang="en">
+        <li>Guests join from a browser link, phones too, nothing to install</li>
+        <li>Each guest records lossless on their side; the file lands in sync on their track</li>
+        <li>Muting, connection quality, a fallback server for company networks</li>
+      </ul></div>
+    <div class="card">
+      <h3 data-lang="de">Live-Produktion</h3><h3 data-lang="en">Live production</h3>
+      <ul data-lang="de">
+        <li>Ablaufplan mit geplanten Minuten; jedes Thema wird ein Kapitel</li>
+        <li>Jingle-Pads mit Bild, Tasten 1–8, auf Wunsch auf einem zweiten Bildschirm oder Touchscreen</li>
+        <li>Kapitel und Fehler-Marker per Tastendruck, ein Handy als Fernbedienung</li>
+      </ul>
+      <ul data-lang="en">
+        <li>A run sheet with planned minutes; every topic becomes a chapter</li>
+        <li>Jingle pads with pictures, keys 1–8, on a second screen or touchscreen if you like</li>
+        <li>Chapter and mistake markers at a keystroke, a phone as remote control</li>
+      </ul></div>
+    <div class="card">
+      <h3 data-lang="de">Schneiden</h3><h3 data-lang="en">Editing</h3>
+      <ul data-lang="de">
+        <li>Von Fehler-Marker zu Fehler-Marker springen und auf allen Spuren zugleich schneiden</li>
+        <li>Lange Pausen auf einen Schlag kürzen; Marker und Untertitel rücken mit</li>
+        <li>Schnitt am Text: Füllwörter wie „ähm“ finden und herausschneiden</li>
+        <li>Jeder Schnitt mit kurzer Blende, Rückgängig auch nach einem Neustart</li>
+      </ul>
+      <ul data-lang="en">
+        <li>Jump from mistake to mistake and cut on every track at once</li>
+        <li>Shorten long pauses in one go; markers and subtitles move along</li>
+        <li>Edit by text: find filler words like “um” and cut them out</li>
+        <li>Every cut with a short fade, undo even after a restart</li>
+      </ul></div>
+    <div class="card">
+      <h3 data-lang="de">Klang</h3><h3 data-lang="en">Sound</h3>
+      <ul data-lang="de">
+        <li>„Folge fertig machen“: Sprecher angleichen, Übersprechen und Atmer absenken, Rauschen mindern</li>
+        <li>Musik automatisch unter Sprache absenken</li>
+        <li>Lautheit live in der Werkzeugleiste, Ausgabe auf −16 LUFS</li>
+      </ul>
+      <ul data-lang="en">
+        <li>Finish Episode: match speakers, lower crosstalk and breaths, reduce noise</li>
+        <li>Duck music under speech automatically</li>
+        <li>Loudness live in the toolbar, output at −16 LUFS</li>
+      </ul></div>
+    <div class="card">
+      <h3 data-lang="de">Text und Untertitel</h3><h3 data-lang="en">Text and subtitles</h3>
+      <ul data-lang="de">
+        <li>Transkription auf dem eigenen Rechner (Whisper), nichts geht ins Netz</li>
+        <li>Untertitel mit Sprechern, SRT und WebVTT, Transkript als Text</li>
+        <li>Kapitelvorschläge aus Gesprächspausen und Sprecherwechseln</li>
+      </ul>
+      <ul data-lang="en">
+        <li>Transcription on your own computer (Whisper), nothing goes online</li>
+        <li>Subtitles with speakers, SRT and WebVTT, the transcript as text</li>
+        <li>Chapter suggestions from pauses and speaker changes</li>
+      </ul></div>
+    <div class="card">
+      <h3 data-lang="de">Ausgabe</h3><h3 data-lang="en">Output</h3>
+      <ul data-lang="de">
+        <li>M4A, MP3 oder M4B mit Kapiteln, Cover und Tags; WAV, FLAC, AIFF</li>
+        <li>Shownotes mit Kapitelliste und chapters.json (Podcasting 2.0)</li>
+        <li>Audiogramm-Videos und Zitat-Clips im Hochformat für Social Media</li>
+      </ul>
+      <ul data-lang="en">
+        <li>M4A, MP3 or M4B with chapters, cover and tags; WAV, FLAC, AIFF</li>
+        <li>Show notes with a chapter list and chapters.json (Podcasting 2.0)</li>
+        <li>Audiogram videos and portrait quote clips for social media</li>
+      </ul></div>
+    <div class="card">
+      <h3 data-lang="de">Veröffentlichen</h3><h3 data-lang="en">Publishing</h3>
+      <ul data-lang="de">
+        <li>Checkliste: Titel, Cover, Kapitel, offene Fehler, Lautheit, Transkript</li>
+        <li>Eigener RSS-Feed (Git, SFTP, FTP, WebDAV) oder Hoster wie Buzzsprout, Podigee, Transistor</li>
+        <li>Zugangsdaten bleiben auf deinem Rechner</li>
+      </ul>
+      <ul data-lang="en">
+        <li>A checklist: title, cover, chapters, open mistakes, loudness, transcript</li>
+        <li>Your own RSS feed (Git, SFTP, FTP, WebDAV) or hosts like Buzzsprout, Podigee, Transistor</li>
+        <li>Your keys stay on your computer</li>
+      </ul></div>
   </div>
+  <p class="cta"><a class="btn primary" href="anleitung/"><span data-lang="de">Schritt für Schritt: die Anleitung</span><span data-lang="en">Step by step: the tutorial</span></a></p>
 </section>
 
 <section id="downloads">
@@ -274,101 +277,8 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
   </div>
 </section>
 
-<footer>
-  <div class="footer-row">
-  <p><span data-lang="de">Idee, Konzept und Gestaltung:</span><span data-lang="en">Idea, concept and design:</span> <b>Dirk Gerber</b> · <a href="https://gerber.media">GERBER.MEDIA</a>.
-    <span data-lang="de">TalkCraft baut auf</span><span data-lang="en">TalkCraft builds on</span> <a href="https://github.com/storytold/soundcraft">SoundCraft</a>.</p>
-  <nav class="legal-nav" aria-label="Rechtliches">
-    <button type="button" aria-expanded="false" aria-controls="impressum">Impressum</button>
-    <button type="button" aria-expanded="false" aria-controls="datenschutz"><span data-lang="de">Datenschutz</span><span data-lang="en">Privacy</span></button>
-  </nav>
-  </div>
-  <div class="legal" id="impressum" hidden>
-    <p>Angaben gemäß § 5 DDG<br>Dirk Gerber (GERBER.MEDIA)<br>Bei der Rolandsmühle 2<br>22763 Hamburg, Deutschland<br>
-      E-Mail: <a href="mailto:hello@gerber.media">hello@gerber.media</a></p>
-    <p>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV: Dirk Gerber, Anschrift wie oben.</p>
-  </div>
-  <div class="legal" id="datenschutz" hidden>
-    <div data-lang="de">
-      <p><b>Verantwortlich:</b> Dirk Gerber, Anschrift und E-Mail siehe Impressum.</p>
-      <p><b>Hosting:</b> Diese Seite liegt bei Codefloe Pages (devXY GmbH, Baar, Schweiz; Server bei Hetzner in Deutschland). Beim Aufruf verarbeitet der Hoster technisch notwendige Daten (IP-Adresse, Zeitpunkt, aufgerufene Datei, Browserkennung) in Server-Protokollen, die nach 30 Tagen gelöscht werden. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO (sicherer Betrieb der Seite). Details: <a href="https://codefloe.com/codefloe/legal/src/branch/main/PrivacyPolicy.md">Datenschutzerklärung von Codefloe</a>.</p>
-      <p><b>Keine Cookies, kein Tracking:</b> Die Seite setzt keine Cookies, zählt keine Besucher und lädt keine Schriften oder Skripte von anderen Servern.</p>
-      <p><b>Downloads und Links:</b> Die Installer liegen bei GitHub (GitHub, Inc., USA). Erst wenn du einen Download oder Link anklickst, verbindet sich dein Browser mit GitHub; dann gilt die <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement">Datenschutzerklärung von GitHub</a>.</p>
-      <p><b>Die App:</b> TalkCraft selbst sendet keine Nutzungsdaten. Verbindungen entstehen nur, wenn du sie auslöst (z. B. Ferngäste, Veröffentlichen, Modell-Download für die Transkription).</p>
-      <p><b>Deine Rechte:</b> Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Beschwerde bei einer Aufsichtsbehörde (Art. 15–21, 77 DSGVO). Schreib dafür an die E-Mail im Impressum.</p>
-    </div>
-    <div data-lang="en">
-      <p><b>Controller:</b> Dirk Gerber, address and e-mail see Impressum.</p>
-      <p><b>Hosting:</b> This page is hosted on Codefloe Pages (devXY GmbH, Baar, Switzerland; servers at Hetzner in Germany). The host processes technically necessary data (IP address, time, file requested, browser identifier) in server logs that are deleted after 30 days, based on Art. 6(1)(f) GDPR (running the site securely). Details: <a href="https://codefloe.com/codefloe/legal/src/branch/main/PrivacyPolicy.md">Codefloe's privacy policy</a>.</p>
-      <p><b>No cookies, no tracking:</b> no cookies, no visitor counting, no fonts or scripts from other servers.</p>
-      <p><b>Downloads and links:</b> the installers are hosted on GitHub (GitHub, Inc., USA). Your browser connects to GitHub only when you click a download or link; then <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub's privacy statement</a> applies.</p>
-      <p><b>The app:</b> TalkCraft sends no usage data. It only connects when you make it (remote guests, publishing, downloading a transcription model).</p>
-      <p><b>Your rights:</b> access, rectification, erasure, restriction, objection, and complaint to a supervisory authority (Art. 15–21, 77 GDPR). Write to the e-mail in the Impressum.</p>
-    </div>
-  </div>
-</footer>
+{{FOOTER}}
 </div>
-<script>
-// English unless the browser prefers German; ?lang=de|en forces one.
-(function () {
-  var q = new URLSearchParams(location.search).get("lang");
-  var prefs = [q].concat(navigator.languages || [], navigator.language).filter(Boolean);
-  var lang = "en";
-  for (var i = 0; i < prefs.length; i++) {
-    var p = String(prefs[i]).slice(0, 2).toLowerCase();
-    if (p === "de" || p === "en") { lang = p; break; }
-  }
-  document.documentElement.lang = lang;
-  document.title = lang === "de" ? "TalkCraft – Podcast-Studio für macOS, Windows und Linux" : "TalkCraft – podcast studio for macOS, Windows and Linux";
-  document.querySelectorAll(".lang a").forEach(function (a) { if (a.dataset.set === lang) a.setAttribute("aria-current", "true"); });
-  // The download for this computer first and highlighted.
-  var ua = navigator.userAgent, os = /Windows/.test(ua) ? "win" : /Mac OS X|Macintosh/.test(ua) && !/iPhone|iPad/.test(ua) ? "mac" : /Linux/.test(ua) && !/Android/.test(ua) ? "linux" : null;
-  if (os) {
-    var dl = document.getElementById("dl");
-    dl.querySelectorAll(".btn").forEach(function (b) { b.classList.toggle("primary", b.dataset.os === os); });
-    var mine = dl.querySelector('[data-os="' + os + '"]');
-    if (mine) dl.insertBefore(mine, dl.firstChild);
-    // First-launch help for this computer open, the others collapsed.
-    var help = document.querySelector('.howto [data-os="' + os + '"]');
-    if (help) { help.open = true; help.parentNode.insertBefore(help, help.parentNode.firstChild); }
-    // Only this computer's install command in the hero.
-    var shell = os === "win" ? "win" : "unix";
-    document.querySelectorAll(".install [data-shell]").forEach(function (d) { d.hidden = d.dataset.shell !== shell; });
-  }
-  // A copy button on every command.
-  var label = lang === "de" ? ["Kopieren", "Kopiert ✔"] : ["Copy", "Copied ✔"];
-  document.querySelectorAll("pre").forEach(function (pre) {
-    var box = document.createElement("div"), btn = document.createElement("button");
-    box.className = "cmd";
-    btn.type = "button"; btn.className = "copy"; btn.textContent = label[0];
-    pre.parentNode.insertBefore(box, pre);
-    box.appendChild(pre); box.appendChild(btn);
-    btn.addEventListener("click", function () {
-      var text = pre.textContent.trim(), done = function () {
-        btn.textContent = label[1]; btn.classList.add("done");
-        setTimeout(function () { btn.textContent = label[0]; btn.classList.remove("done"); }, 1800);
-      };
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(done, function () { select(pre); });
-      } else { select(pre); if (document.execCommand("copy")) done(); }
-    });
-  });
-  // Impressum and privacy: two buttons side by side, one panel open at a time (#impressum opens it).
-  var legal = document.querySelectorAll(".legal-nav button");
-  function showLegal(id) {
-    legal.forEach(function (b) {
-      var on = b.getAttribute("aria-controls") === id && b.getAttribute("aria-expanded") !== "true";
-      b.setAttribute("aria-expanded", on ? "true" : "false");
-      document.getElementById(b.getAttribute("aria-controls")).hidden = !on;
-    });
-  }
-  legal.forEach(function (b) { b.addEventListener("click", function () { showLegal(b.getAttribute("aria-controls")); }); });
-  if (location.hash === "#impressum" || location.hash === "#datenschutz") {
-    showLegal(location.hash.slice(1));
-    document.getElementById(location.hash.slice(1)).scrollIntoView();
-  }
-  function select(el) { var r = document.createRange(); r.selectNodeContents(el); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }
-})();
-</script>
+<script src="site.js"></script>
 </body>
 </html>

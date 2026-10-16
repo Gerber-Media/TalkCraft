@@ -256,7 +256,9 @@ impl Dialogs {
                 Dialog::ExportEpisode { path: format!("{home}/{name}.{ext}"), settings: Box::new(settings) }
             }
             "setup.preferences" | "setup.transcription_settings" => Dialog::Preferences { settings: Box::new(e.session().podcast.clone()) },
-            "session.new" => Dialog::NewSession { name: "Episode".into(), sample_rate: 48_000, template: "podcast".into(), speakers: 2 },
+            "session.new" => {
+                Dialog::NewSession { name: crate::i18n::tr("Episode").into(), sample_rate: 48_000, template: "podcast".into(), speakers: 2 }
+            }
             "file.bounce_mix" => Dialog::Bounce {
                 // Beside the session when it has been saved, else in the default folder.
                 path: format!(
