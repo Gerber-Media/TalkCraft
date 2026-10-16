@@ -1,6 +1,6 @@
 //! Work modes: "I want to … record a podcast / edit a podcast". Recording shows what a session
 //! needs (Record, inputs, remote guests, jingles, markers); editing shows the cutting tools,
-//! subtitles and export; Publish shows the editing tools with the Publish window open; All shows both. Only menus, shortcuts, toolbar and track headers
+//! subtitles and export; Publish shows the timeline without the cutting tools, with the Publish window open; All shows both. Only menus, shortcuts, toolbar and track headers
 //! follow the mode: the session and every command stay the same, so switching never loses
 //! anything. TalkCraft asks at start (Setup can turn that off: then it starts with All).
 
@@ -58,6 +58,11 @@ impl Workspace {
 
     pub fn edits(self) -> bool {
         self != Workspace::Record
+    }
+
+    /// The cutting tools (edit modes, tools, grid, zoom) are in the toolbar: Edit and All.
+    pub fn cuts(self) -> bool {
+        matches!(self, Workspace::Edit | Workspace::All)
     }
 }
 

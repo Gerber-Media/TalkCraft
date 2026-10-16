@@ -1706,7 +1706,8 @@ fn lane_interaction(app: &mut SoundApp, ui: &mut Ui, track: &Track, lane: Rect, 
     };
     // Effective tool under the Smart tool.
     // Recording: the timeline only places the insertion point and selects, it never edits.
-    let tool = if app.ui.workspace.edits() { tool } else { Tool::Selector };
+    // Publishing hides the tool group, so no hidden tool (e.g. the scissors) stays in effect.
+    let tool = if app.ui.workspace.cuts() { tool } else { Tool::Selector };
     let eff = match tool {
         Tool::Selector if !app.ui.workspace.edits() => Tool::Selector,
         // TalkCraft: at a clip's edge every pointer tool trims (pull a cut back out).

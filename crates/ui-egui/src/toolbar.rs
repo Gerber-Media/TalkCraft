@@ -30,16 +30,15 @@ pub fn show(app: &mut SoundApp, ui: &mut Ui) {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing = vec2(8.0, 6.0);
             group(ui, 186.0, 64.0, |ui, _| crate::workspace::toolbar_switch(app, ui));
-            let editing = app.ui.workspace.edits();
-            if editing {
+            // Each mode shows only its groups: recording and publishing leave out the cutting tools.
+            let cutting = app.ui.workspace.cuts();
+            if cutting {
                 edit_modes(app, ui);
-            }
-            zoom_group(app, ui);
-            if editing {
+                zoom_group(app, ui);
                 tools(app, ui);
             }
             counters(app, ui);
-            if editing {
+            if cutting {
                 grid_nudge(app, ui);
             }
             transport(app, ui);
