@@ -157,6 +157,9 @@ fn detached(
             header(app, ui, id, true);
             body(app, ui, true);
         });
+        // Keys typed while this window has the focus reach only this viewport: the jingle keys
+        // 1–8, Space and the other shortcuts must work here too (e.g. on a second screen).
+        crate::shortcuts::handle(app, ui.ctx());
         let s = state_mut(app, id);
         if let (Some(o), Some(i)) = (outer, inner) {
             s.outer = Some([o.min.x, o.min.y, i.width(), i.height()]);
