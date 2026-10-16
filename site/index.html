@@ -59,6 +59,13 @@ pre { padding: 12px 14px; overflow-x: auto; white-space: pre; }
 footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--dim); font-size: 15px; }
 footer h3 { color: var(--text); font-size: 16px; margin: 18px 0 6px; }
 details summary { cursor: pointer; color: var(--text); font-weight: 600; }
+.howto { display: grid; gap: 12px; margin-top: 8px; }
+.howto summary { font-size: 18px; }
+.howto.howto p { margin: 10px 0; color: var(--text); }
+.howto.howto p.small { color: var(--dim); }
+.howto ol { padding-left: 22px; }
+.howto li { margin-bottom: 6px; }
+.howto pre { white-space: pre-wrap; word-break: break-all; }
 [data-lang] { display: none; }
 html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: revert; }
 @media (max-width: 760px) { .flow { grid-template-columns: 1fr; } section { padding: 28px 0; } }
@@ -84,8 +91,8 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
     <a class="btn" data-os="linux" href="{{URL_APPIMAGE}}"><span data-lang="de">Für Linux laden</span><span data-lang="en">Download for Linux</span></a>
   </div>
   <p class="small">
-    <span data-lang="de">Version {{VERSION}} (Beta) · kostenlos · quelloffen (MIT/Apache-2.0) · <a href="#downloads">alle Dateien</a></span>
-    <span data-lang="en">Version {{VERSION}} (beta) · free · open source (MIT/Apache-2.0) · <a href="#downloads">all files</a></span>
+    <span data-lang="de">Version {{VERSION}} (Beta) · kostenlos · quelloffen (MIT/Apache-2.0) · <a href="#downloads">alle Dateien</a> · <a href="#erster-start">Hilfe zum ersten Start</a></span>
+    <span data-lang="en">Version {{VERSION}} (beta) · free · open source (MIT/Apache-2.0) · <a href="#downloads">all files</a> · <a href="#erster-start">first-launch help</a></span>
   </p>
   <div class="shot"><img src="media/talkcraft-hero.gif" width="900" height="540" alt="TalkCraft: der Schnitt mit farbigen Namensschildern, Kapiteln und zwei Sprechern"></div>
 </div>
@@ -139,8 +146,8 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
     <div class="card"><h3>Linux</h3><p class="small">x86_64</p>
       <ul><li><a href="{{URL_APPIMAGE}}">{{FILE_APPIMAGE}}</a></li><li><a href="{{URL_DEB}}">.deb</a> · <a href="{{URL_RPM}}">.rpm</a> · <a href="{{URL_TGZ}}">.tar.gz</a></li></ul></div>
   </div>
-  <p class="note" data-lang="de">Die Installer sind noch nicht signiert. macOS fragt beim ersten Start einmal nach (Rechtsklick › Öffnen), Windows zeigt eine SmartScreen-Warnung („Weitere Informationen › Trotzdem ausführen“).</p>
-  <p class="note" data-lang="en">The installers are not signed yet. macOS asks once on first launch (right-click › Open), Windows shows a SmartScreen warning ("More info › Run anyway").</p>
+  <p class="note" data-lang="de">Die Installer sind noch nicht signiert. Darum warnen macOS und Windows beim ersten Öffnen. Wie du sie trotzdem öffnest, steht unter <a href="#erster-start">Erster Start</a>.</p>
+  <p class="note" data-lang="en">The installers are not signed yet, so macOS and Windows warn the first time. How to open them anyway: <a href="#erster-start">First launch</a>.</p>
   <details>
     <summary><span data-lang="de">Download prüfen</span><span data-lang="en">Check a download</span></summary>
     <p data-lang="de">Prüfsummen aller Dateien stehen in <a href="{{URL_SUMS}}">SHA256SUMS.txt</a>. Im Download-Ordner:</p>
@@ -152,6 +159,80 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
   </details>
   <p class="small"><span data-lang="de">Quellcode, Änderungen und frühere Versionen:</span><span data-lang="en">Source code, changes and earlier versions:</span>
     <a href="https://github.com/Gerber-Media/TalkCraft">github.com/Gerber-Media/TalkCraft</a></p>
+</section>
+
+<section id="erster-start">
+  <h2><span data-lang="de">Erster Start: die Warnungen</span><span data-lang="en">First launch: the warnings</span></h2>
+  <div data-lang="de">
+    <p><b>Warum warnen macOS und Windows?</b> Beide Systeme vertrauen Programmen aus dem Internet erst, wenn sie mit einem kostenpflichtigen Zertifikat des Herstellers signiert sind (Apple: Developer ID mit Notarisierung, Windows: Code-Signing-Zertifikat). TalkCraft ist ein kostenloses Projekt und hat dieses Zertifikat noch nicht. Die Warnung heißt also „unbekannter Hersteller“, nicht „Schadsoftware gefunden“. Ob die Datei unverändert ist, kannst du oben unter <a href="#downloads">Download prüfen</a> selbst nachsehen.</p>
+    <p>Das musst du nur einmal machen. Danach startet TalkCraft ohne Rückfrage.</p>
+  </div>
+  <div data-lang="en">
+    <p><b>Why do macOS and Windows warn?</b> Both trust software from the internet only when the maker has signed it with a paid certificate (Apple: Developer ID plus notarization, Windows: a code signing certificate). TalkCraft is a free project and doesn't have one yet. So the warning means "unknown developer", not "malware found". You can check that the file is unchanged under <a href="#downloads">Check a download</a>.</p>
+    <p>You only need to do this once. After that TalkCraft starts without asking.</p>
+  </div>
+  <div class="howto">
+    <details class="card" data-os="mac">
+      <summary>macOS</summary>
+      <div data-lang="de">
+        <p>macOS meldet sich zweimal: beim Öffnen der DMG-Datei und beim ersten Start der App. Beide Male gehst du so vor:</p>
+        <ol>
+          <li>Doppelklicke die Datei. Es erscheint <i>„… wurde nicht geöffnet. Apple konnte nicht überprüfen, ob … frei von Schadsoftware ist“</i>. Klicke <b>Fertig</b> (nicht „In den Papierkorb legen“).</li>
+          <li>Öffne <b>Systemeinstellungen › Datenschutz &amp; Sicherheit</b> und scrolle ganz nach unten zu „Sicherheit“.</li>
+          <li>Dort steht <i>„… wurde blockiert, um deinen Mac zu schützen“</i>. Klicke <b>Dennoch öffnen</b>, bestätige mit Passwort oder Touch ID und im nächsten Fenster noch einmal mit <b>Dennoch öffnen</b>.</li>
+        </ol>
+        <p>Danach ziehst du TalkCraft in den Ordner „Programme“ und startest es von dort; beim ersten Start wiederholst du die drei Schritte. Der Knopf erscheint nur etwa eine Stunde nach dem Öffnungsversuch.</p>
+        <p class="small">Der alte Weg „Rechtsklick › Öffnen“ funktioniert seit macOS 15 nicht mehr.</p>
+        <p><b>Schneller über das Terminal:</b> Entferne die Download-Markierung, bevor du die DMG öffnest. Dann warnt weder die DMG noch die App:</p>
+        <pre>xattr -d com.apple.quarantine ~/Downloads/{{FILE_DMG}}</pre>
+        <p>Ist TalkCraft schon installiert:</p>
+        <pre>xattr -dr com.apple.quarantine /Applications/TalkCraft.app</pre>
+      </div>
+      <div data-lang="en">
+        <p>macOS asks twice: when you open the DMG file and when you first start the app. Both times:</p>
+        <ol>
+          <li>Double-click the file. You see <i>"… Not Opened. Apple could not verify … is free of malware"</i>. Click <b>Done</b> (not "Move to Trash").</li>
+          <li>Open <b>System Settings › Privacy &amp; Security</b> and scroll down to "Security".</li>
+          <li>It says <i>"… was blocked to protect your Mac"</i>. Click <b>Open Anyway</b>, confirm with your password or Touch ID, and click <b>Open Anyway</b> once more.</li>
+        </ol>
+        <p>Then drag TalkCraft into Applications and start it from there; on the first start repeat the three steps. The button only shows for about an hour after the attempt.</p>
+        <p class="small">The old "right-click › Open" trick no longer works since macOS 15.</p>
+        <p><b>Faster in Terminal:</b> remove the download flag before opening the DMG, and neither the DMG nor the app will warn:</p>
+        <pre>xattr -d com.apple.quarantine ~/Downloads/{{FILE_DMG}}</pre>
+        <p>If TalkCraft is already installed:</p>
+        <pre>xattr -dr com.apple.quarantine /Applications/TalkCraft.app</pre>
+      </div>
+    </details>
+    <details class="card" data-os="win">
+      <summary>Windows</summary>
+      <div data-lang="de">
+        <ol>
+          <li><b>Im Browser:</b> Edge meldet eventuell <i>„… wird nicht häufig heruntergeladen“</i>. Fahre über den Download, klicke <b>…</b> › <b>Beibehalten</b> › <b>Mehr anzeigen</b> › <b>Trotzdem beibehalten</b>.</li>
+          <li><b>Beim Öffnen des Installers:</b> <i>„Der Computer wurde durch Windows geschützt“</i>. Klicke auf <b>Weitere Informationen</b>, dann auf <b>Trotzdem ausführen</b>.</li>
+          <li><b>Benutzerkontensteuerung:</b> <i>„Herausgeber: Unbekannt“</i> – mit <b>Ja</b> bestätigen.</li>
+        </ol>
+        <p>Die installierte App startest du über das Startmenü, dort kommt keine Warnung mehr.</p>
+        <p><b>ZIP ohne Installation:</b> Bevor du entpackst, Rechtsklick auf die ZIP-Datei › <b>Eigenschaften</b> › unten <b>Zulassen</b> anhaken › OK. Sonst warnt Windows bei jedem Start.</p>
+        <p class="small">Ist auf Windows 11 die „Intelligente App-Steuerung“ eingeschaltet, blockiert sie unsignierte Programme ohne Ausnahme. Dann geht es erst mit einer signierten Version von TalkCraft.</p>
+      </div>
+      <div data-lang="en">
+        <ol>
+          <li><b>In the browser:</b> Edge may say <i>"… isn't commonly downloaded"</i>. Hover the download, click <b>…</b> › <b>Keep</b> › <b>Show more</b> › <b>Keep anyway</b>.</li>
+          <li><b>Opening the installer:</b> <i>"Windows protected your PC"</i>. Click <b>More info</b>, then <b>Run anyway</b>.</li>
+          <li><b>User Account Control:</b> <i>"Publisher: Unknown"</i> – click <b>Yes</b>.</li>
+        </ol>
+        <p>Start the installed app from the Start menu; it won't warn again.</p>
+        <p><b>Portable ZIP:</b> before extracting, right-click the ZIP › <b>Properties</b> › tick <b>Unblock</b> › OK. Otherwise Windows warns on every start.</p>
+        <p class="small">If Smart App Control is on (Windows 11), it blocks unsigned programs with no exception. Then you'll need a signed TalkCraft release.</p>
+      </div>
+    </details>
+    <details class="card" data-os="linux">
+      <summary>Linux</summary>
+      <p data-lang="de">Linux warnt nicht, aber die AppImage muss ausführbar sein: Rechtsklick › Eigenschaften › „Als Programm ausführen“, oder im Terminal:</p>
+      <p data-lang="en">Linux doesn't warn, but the AppImage has to be executable: right-click › Properties › "Allow executing as program", or in a terminal:</p>
+      <pre>chmod +x {{FILE_APPIMAGE}} &amp;&amp; ./{{FILE_APPIMAGE}}</pre>
+    </details>
+  </div>
 </section>
 
 <footer>
@@ -204,6 +285,9 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
     dl.querySelectorAll(".btn").forEach(function (b) { b.classList.toggle("primary", b.dataset.os === os); });
     var mine = dl.querySelector('[data-os="' + os + '"]');
     if (mine) dl.insertBefore(mine, dl.firstChild);
+    // First-launch help for this computer open, the others collapsed.
+    var help = document.querySelector('.howto [data-os="' + os + '"]');
+    if (help) { help.open = true; help.parentNode.insertBefore(help, help.parentNode.firstChild); }
   }
 })();
 </script>

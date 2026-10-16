@@ -3,8 +3,8 @@
 # packaging/. A tag `v*` publishes them as a GitHub Release; a manual run ("Run workflow") only
 # builds them and keeps them as downloadable artifacts of the run.
 #
-# Signing is optional. Without the secrets the installers are unsigned: macOS asks once
-# (right-click › Open), Windows SmartScreen warns ("More info › Run anyway").
+# Signing is optional. Without the secrets the installers are unsigned: macOS blocks the first
+# launch (System Settings › Privacy & Security › Open Anyway), Windows SmartScreen warns ("More info › Run anyway").
 #   macOS:   APPLE_CERTIFICATE (base64 .p12), APPLE_CERTIFICATE_PASSWORD, KEYCHAIN_PASSWORD,
 #            and for notarisation APPLE_ID, APPLE_PASSWORD (app-specific), APPLE_TEAM_ID
 #   Windows: WINDOWS_CERTIFICATE (base64 .pfx), WINDOWS_CERTIFICATE_PASSWORD
