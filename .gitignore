@@ -11,3 +11,4 @@ plan/
 plans/
 .DS_Store
 packaging/talkcraft-version
+site/out/

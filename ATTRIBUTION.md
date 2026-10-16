@@ -51,4 +51,5 @@ emoji-icon-font: OFL-1.1/MIT).
 | `assets/app-icon/soundcraft.ico` | SoundCraft contributors | original, rendered from `icon.svg` | MIT OR Apache-2.0 |
 | `assets/app-icon/hicolor/` | SoundCraft contributors | original, rendered from `icon.svg` (16–512 px PNGs and the scalable SVG) | MIT OR Apache-2.0 |
 | `remote/guest/` (logo, favicons) | GERBER.MEDIA | original TalkCraft parrot icon (`assets/app-icon/source/parrot.py`), copied in sizes for the guest web page | MIT OR Apache-2.0 |
+| `site/` (icon, favicons) | GERBER.MEDIA | original TalkCraft parrot icon (`assets/app-icon/source/parrot.py`), copied in sizes for the product page talkcraft.gerber.media | MIT OR Apache-2.0 |
 | `docs/images/` | SoundCraft contributors | screenshots of SoundCraft rendered from the synthesised demo session | MIT OR Apache-2.0 |
