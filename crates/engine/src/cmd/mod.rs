@@ -37,6 +37,7 @@ mod transport;
 mod video;
 mod view;
 mod view_more;
+mod voice;
 mod vst3;
 mod zoom_toggle;
 
@@ -110,6 +111,7 @@ pub fn command_specs() -> &'static [CommandSpec] {
         let mut v = Vec::new();
         v.extend(file::specs());
         v.extend(podcast::specs());
+        v.extend(voice::specs());
         v.extend(subtitles::specs());
         v.extend(edit::specs());
         v.extend(edit_more::specs());

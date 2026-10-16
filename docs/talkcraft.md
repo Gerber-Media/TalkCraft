@@ -5,7 +5,7 @@ where possible; the fork adds podcast commands, a slimmer interface and remote g
 is for whoever works on it next (people and agents): where things live, why they are built the way
 they are, and the traps already stepped in. `AGENTS.md` still holds for everything else.
 
-Last updated: 2026-10-14 (Settings tabs).
+Last updated: 2026-10-16 (speech clean-up).
 
 ## Where things live
 
@@ -19,6 +19,7 @@ Last updated: 2026-10-14 (Settings tabs).
 | History panel | `crates/ui-egui/src/panels.rs` (`undo_history`), `Engine::history_go` |
 | Version number | `packaging/version.env`, `crates/engine/build.rs`, `packaging/env.sh` |
 | German interface | `crates/ui-egui/src/i18n.rs` (English text is the key) |
+| Speech clean-up (crosstalk, leveler, breaths, clicks, voice match) | `crates/dsp/src/voice.rs`, `crates/engine/src/cmd/voice.rs` |
 
 Crate names stay `soundcraft-*` and the Cargo version stays SoundCraft's, so upstream merges stay
 simple. Only the apps are called `talkcraft`.
@@ -260,3 +261,29 @@ background job is a separate step.
   local settings or user names show, then cross-faded with ffmpeg (palettegen/paletteuse). The
   phone frame is the real remote-control page in Playwright (iPhone 13) against a mock state.
   Never show the remote control's QR code or address: it contains the local network address.
+
+## Speech clean-up (`dsp/src/voice.rs`, `cmd/voice.rs`)
+
+Edit › Clean Up Speech, the clip menu's Clean Up Speech and Finish Episode.
+
+- **Envelopes, not new files, where possible.** Crosstalk removal, the leveler and breath reduction
+  write clip gain envelopes, added on top of any envelope already there (so they combine and stay
+  editable). Only mouth-click repair and voice matching render new audio, like `clip.denoise`;
+  click repair keeps the file when it found nothing.
+- **Work on a 10 ms level envelope.** Analysis keeps one value per block, never per sample, so an
+  hour costs a few hundred kilobytes. Envelopes are thinned with a swinging-door pass (0.3 dB):
+  a gate that opens and closes costs four points per opening.
+- **Crosstalk = a gate across tracks.** A track stays open where it rises 8 dB above its own
+  background *and* is at most 9 dB below the loudest track; bleed from the other speaker is
+  usually 10–20 dB down. 30 ms early, 250 ms hold, 40 ms ramps; gaps shorter than the ramps stay
+  open. With one track it is an adaptive noise gate.
+- **Speech detection without pauses.** The background is the quietest tenth of the blocks; a clip
+  without any pause would put it in the speech. Anything above −45 dBFS counts as speech then.
+- **Breaths** are 0.12–1.2 s of noise (many zero crossings) 6 dB above the room and 12 dB below the
+  voice, next to speech. They are lowered (12 dB), never cut: cutting changes the timing.
+- **Voice match** compares long-term speech spectra (frames with speech only), smoothed over a
+  third of an octave, 60 Hz–12 kHz, loudness-neutral between 200 Hz and 4 kHz, limited to ±9 dB.
+  Levels stay the job of Match Speaker Levels.
+- The clip envelope lookup is a binary search now (`model/src/clip.rs`): the mixer asks every 32
+  samples and generated envelopes can be long.
+- Tested with synthetic voices only; on real recordings the thresholds may need tuning.

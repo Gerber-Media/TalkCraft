@@ -323,21 +323,18 @@ pub(crate) fn bound_sequence(s: &mut Sequence) {
 }
 
 fn env_value(env: &[(Samples, f32)], at: Samples) -> f32 {
-    let mut prev: Option<(Samples, f32)> = None;
-    for &(t, v) in env {
-        if t >= at {
-            return match prev {
-                Some((pt, pv)) if t > pt => {
-                    let elapsed = i128::from(at).saturating_sub(i128::from(pt));
-                    let span = i128::from(t).saturating_sub(i128::from(pt));
-                    pv + (v - pv) * (elapsed as f32 / span as f32)
-                }
-                _ => v,
-            };
+    // Binary search: the mixer asks every 32 samples, and generated envelopes (gate, leveler,
+    // breaths) hold thousands of points on long clips.
+    let i = env.partition_point(|&(t, _)| t < at);
+    let Some(&(t, v)) = env.get(i) else { return env.last().map_or(0.0, |&(_, v)| v) };
+    match i.checked_sub(1).and_then(|j| env.get(j)) {
+        Some(&(pt, pv)) if t > pt => {
+            let elapsed = i128::from(at).saturating_sub(i128::from(pt));
+            let span = i128::from(t).saturating_sub(i128::from(pt));
+            pv + (v - pv) * (elapsed as f32 / span as f32)
         }
-        prev = Some((t, v));
+        _ => v,
     }
-    prev.map_or(0.0, |(_, v)| v)
 }
 
 pub(crate) fn db_to_gain(db: f32) -> f32 {

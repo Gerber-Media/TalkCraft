@@ -119,6 +119,8 @@ pub struct UiState {
     pub auto_update_config: bool,
     /// Finish Episode's steps as last ticked: denoise, match speakers, fillers, pauses, duck.
     pub finish_steps: Option<[bool; 5]>,
+    /// Finish Episode's speech steps: mouth clicks, crosstalk, leveler, breaths.
+    pub finish_speech: Option<[bool; 4]>,
     /// Listening rate that keeps the pitch (1 = normal; the toolbar's 1× button).
     #[serde(default = "default_rate")]
     pub playback_rate: f32,
@@ -213,6 +215,7 @@ impl Default for UiState {
             reduce_motion: false,
             auto_update_config: false,
             finish_steps: None,
+            finish_speech: None,
             workspace: workspace::Workspace::All,
             // Tests start without the question; the app asks on a fresh install.
             ask_workspace: false,

@@ -439,6 +439,10 @@ const MENU_WINDOWS: &[(&str, &str)] = &[
     ("Edit > Shorten Pauses...", "edit.truncate_silence"),
     ("Edit > Match Speaker Levels", "podcast.match_speakers"),
     ("Edit > Auto-Duck Music", "podcast.auto_duck"),
+    ("Edit > Clean Up Speech > Remove Crosstalk", "podcast.remove_crosstalk"),
+    ("Edit > Clean Up Speech > Level Speech", "clip.level"),
+    ("Edit > Clean Up Speech > Reduce Breaths", "clip.reduce_breaths"),
+    ("Edit > Clean Up Speech > Remove Mouth Clicks", "clip.declick"),
     ("Window > Subtitles", "window.subtitles"),
     ("Window > Edit by Text", "window.words"),
     ("Window > Jingles", "window.jingles"),
@@ -533,6 +537,16 @@ pub fn invoke_menu(app: &mut SoundApp, id: &str, path: &str) {
                 &[&(v["ducked_db"]), &(v["speech_ranges"])],
             );
         }
+        Ok(v) if id == "podcast.remove_crosstalk" => {
+            let parts: Vec<String> = v["tracks"]
+                .as_array()
+                .map(|a| a.iter().map(|t| format!("{} {} s", t["track"].as_str().unwrap_or("?"), t["lowered_s"])).collect())
+                .unwrap_or_default();
+            app.ui.status = crate::i18n::trf("Crosstalk lowered (clip gain): {}", &[&(parts.join(", "))]);
+        }
+        Ok(v) if id == "clip.level" => app.ui.status = crate::i18n::trf("Speech levelled in {} clip(s) (clip gain)", &[&v["clips"]]),
+        Ok(v) if id == "clip.reduce_breaths" => app.ui.status = crate::i18n::trf("{} breath(s) lowered (clip gain)", &[&v["breaths"]]),
+        Ok(v) if id == "clip.declick" => app.ui.status = crate::i18n::trf("{} mouth click(s) repaired", &[&v["clicks"]]),
         Ok(_) => {}
         Err(e) => app.ui.status = e,
     }

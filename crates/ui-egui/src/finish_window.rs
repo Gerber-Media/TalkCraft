@@ -16,6 +16,10 @@ pub struct FinishWindow {
     pub pauses: bool,
     pub fillers: bool,
     pub duck: bool,
+    pub clicks: bool,
+    pub crosstalk: bool,
+    pub level: bool,
+    pub breaths: bool,
     /// What each step did.
     pub report: Vec<(bool, String)>,
     /// History steps before and after the run.
@@ -33,6 +37,10 @@ impl Default for FinishWindow {
             pauses: true,
             fillers: true,
             duck: true,
+            clicks: false,
+            crosstalk: true,
+            level: true,
+            breaths: false,
             report: Vec::new(),
             before_after: None,
             loaded: false,
@@ -69,6 +77,26 @@ pub fn run(app: &mut SoundApp) {
         } else {
             step(app, &mut report, "Reduce noise", "clip.denoise", json!({"clips": clips, "reduction_db": 12.0}), |_| tr("done").to_string());
         }
+    }
+    if w.clicks {
+        step(app, &mut report, "Repair mouth clicks", "clip.declick", json!({}), |v| trf("{} click(s)", &[&v["clicks"]]));
+    }
+    if w.crosstalk {
+        // Only between two or more speakers; with one it would just be a gate.
+        if soundcraft_engine::podcast::record_targets(app.engine.session()).len() >= 2 {
+            step(app, &mut report, "Lower crosstalk", "podcast.remove_crosstalk", json!({}), |v| {
+                let a = v["tracks"].as_array().cloned().unwrap_or_default();
+                a.iter().map(|t| format!("{} {} s", t["track"].as_str().unwrap_or("?"), t["lowered_s"])).collect::<Vec<_>>().join(", ")
+            });
+        } else {
+            report.push((false, format!("{}: {}", tr("Lower crosstalk"), tr("only one speaker track"))));
+        }
+    }
+    if w.level {
+        step(app, &mut report, "Level each speaker within the track", "clip.level", json!({}), |v| trf("{} clip(s)", &[&v["clips"]]));
+    }
+    if w.breaths {
+        step(app, &mut report, "Lower breaths", "clip.reduce_breaths", json!({}), |v| trf("{} breath(s)", &[&v["breaths"]]));
     }
     if w.match_speakers {
         step(app, &mut report, "Match speaker levels", "podcast.match_speakers", json!({}), |v| {
@@ -116,6 +144,10 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             let w = &mut app.extra.finish;
             (w.denoise, w.match_speakers, w.fillers, w.pauses, w.duck) = (d, m, f, p, k);
         }
+        if let Some([c, x, l, b]) = app.ui.finish_speech {
+            let w = &mut app.extra.finish;
+            (w.clicks, w.crosstalk, w.level, w.breaths) = (c, x, l, b);
+        }
     }
     let mut open = true;
     let mut start = false;
@@ -132,6 +164,10 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
             );
             ui.add_space(4.0);
             ui.checkbox(&mut w.denoise, tr("Reduce background noise (takes a while on long episodes)"));
+            ui.checkbox(&mut w.clicks, tr("Repair mouth clicks"));
+            ui.checkbox(&mut w.crosstalk, tr("Remove crosstalk between the speakers"));
+            ui.checkbox(&mut w.level, tr("Level each speaker within the track"));
+            ui.checkbox(&mut w.breaths, tr("Lower breaths"));
             ui.checkbox(&mut w.match_speakers, tr("Match speaker levels"));
             ui.checkbox(&mut w.fillers, tr("Cut the filler words selected in Edit by Text"));
             ui.checkbox(&mut w.pauses, tr("Shorten long pauses"));
@@ -167,6 +203,7 @@ pub fn window(app: &mut SoundApp, ctx: &egui::Context) {
     app.extra.finish.show = open;
     let w = &app.extra.finish;
     app.ui.finish_steps = Some([w.denoise, w.match_speakers, w.fillers, w.pauses, w.duck]);
+    app.ui.finish_speech = Some([w.clicks, w.crosstalk, w.level, w.breaths]);
     if start {
         run(app);
     }
@@ -186,7 +223,7 @@ mod tests {
         app.engine.execute("session.new", &json!({"name": "S", "template": "podcast", "speakers": 2})).unwrap();
         run(&mut app);
         let report = app.extra.finish.report.clone();
-        assert_eq!(report.len(), 4, "denoise is off by default: {report:?}");
+        assert_eq!(report.len(), 6, "denoise, clicks and breaths are off by default: {report:?}");
         // Nothing to do on an empty session: the skipped steps say why, nothing breaks.
         assert!(report.iter().any(|(ok, _)| !ok));
     }

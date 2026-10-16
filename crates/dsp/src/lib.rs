@@ -24,6 +24,7 @@ pub mod pitch_detect;
 pub mod plugins;
 pub mod spectrum;
 mod util;
+pub mod voice;
 
 pub use offline::FadeShape;
 pub use osc::Waveform;

@@ -371,7 +371,7 @@ fn place_jingle(e: &mut Engine, p: &Value) -> Result<Value> {
 }
 
 /// The speaker tracks: `tracks`, else every audio track that records (not locked).
-fn speaker_tracks(e: &Engine, p: &Value) -> Vec<soundcraft_model::TrackId> {
+pub(super) fn speaker_tracks(e: &Engine, p: &Value) -> Vec<soundcraft_model::TrackId> {
     match p.get("tracks").and_then(Value::as_array) {
         Some(a) => a.iter().filter_map(Value::as_u64).map(soundcraft_model::TrackId).collect(),
         None => crate::podcast::record_targets(e.session()),

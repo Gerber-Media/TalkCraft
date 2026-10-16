@@ -2131,6 +2131,62 @@ fn clip_context_menu(app: &mut SoundApp, ui: &mut Ui, clip: Option<ClipId>, trac
             }
         }
     });
+    ui.menu_button(crate::i18n::tr("Clean Up Speech"), |ui| {
+        if ui
+            .button(crate::i18n::tr("Level Speech"))
+            .on_hover_text(crate::i18n::tr("Evens out this speaker: quiet passages up, loud ones down (clip gain, undoable)"))
+            .clicked()
+        {
+            match app.run("clip.level", json!({"clips": [c.0]})) {
+                Ok(v) => app.ui.status = crate::i18n::trf("Speech levelled in {} clip(s) (clip gain)", &[&v["clips"]]),
+                Err(e) => app.ui.status = e,
+            }
+        }
+        if ui
+            .button(crate::i18n::tr("Reduce Breaths"))
+            .on_hover_text(crate::i18n::tr("Finds breaths between phrases and lowers them by 12 dB (clip gain, undoable)"))
+            .clicked()
+        {
+            match app.run("clip.reduce_breaths", json!({"clips": [c.0]})) {
+                Ok(v) => app.ui.status = crate::i18n::trf("{} breath(s) lowered (clip gain)", &[&v["breaths"]]),
+                Err(e) => app.ui.status = e,
+            }
+        }
+        if ui.button(crate::i18n::tr("Remove Mouth Clicks")).on_hover_text(crate::i18n::tr("Repairs mouth clicks and lip smacks; undoable")).clicked()
+        {
+            match app.run("clip.declick", json!({"clips": [c.0]})) {
+                Ok(v) => app.ui.status = crate::i18n::trf("{} mouth click(s) repaired", &[&v["clicks"]]),
+                Err(e) => app.ui.status = e,
+            }
+        }
+        // Other audio tracks with something on them can serve as the reference voice.
+        let s = app.engine.session();
+        let own = s.find_clip(c).map(|(t, _)| t);
+        let others: Vec<(u64, String)> = s
+            .tracks
+            .iter()
+            .filter(|t| Some(t.id) != own && t.kind == soundcraft_model::TrackKind::Audio && !t.clips().is_empty())
+            .map(|t| (t.id.0, t.name.clone()))
+            .collect();
+        if !others.is_empty() {
+            ui.menu_button(crate::i18n::tr("Match Voice to"), |ui| {
+                for (id, name) in others {
+                    if ui
+                        .button(&name)
+                        .on_hover_text(crate::i18n::tr(
+                            "Gives this clip the tonal balance of the speaker on another track (e.g. a different microphone); undoable",
+                        ))
+                        .clicked()
+                    {
+                        match app.run("podcast.match_voice", json!({"clips": [c.0], "reference": id})) {
+                            Ok(v) => app.ui.status = crate::i18n::trf("Voice of {} clip(s) matched to {}", &[&v["clips"], &name]),
+                            Err(e) => app.ui.status = e,
+                        }
+                    }
+                }
+            });
+        }
+    });
     if ui
         .button(crate::i18n::tr("Sync to Other Tracks"))
         .on_hover_text(crate::i18n::tr("Moves this clip so its audio lines up with the rest (e.g. a guest's own recording against the call)"))
