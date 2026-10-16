@@ -600,7 +600,8 @@ mod tests {
         };
         app.run("publish.start", json!({})).unwrap();
         let mut status = json!({});
-        for _ in 0..600 {
+        // Up to two minutes: on machines that scan every new process, each git step takes seconds.
+        for _ in 0..2400 {
             status = app.run("publish.status", json!({})).unwrap();
             if status["running"] == json!(false) {
                 break;
