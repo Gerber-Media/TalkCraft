@@ -59,6 +59,17 @@ pre { padding: 12px 14px; overflow-x: auto; white-space: pre; }
 footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--dim); font-size: 15px; }
 footer h3 { color: var(--text); font-size: 16px; margin: 18px 0 6px; }
 details summary { cursor: pointer; color: var(--text); font-weight: 600; }
+.install { max-width: 620px; margin: 18px auto 0; text-align: left; }
+.install > p.small { text-align: center; margin: 0 0 6px; }
+.install [data-shell] p { margin: 8px 0 4px; text-align: center; }
+.cmd { position: relative; margin: 6px 0 14px; }
+.cmd pre { margin: 0; padding-right: 100px; white-space: pre-wrap; word-break: break-all; }
+.copy { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); font: 600 13px/1 inherit;
+  font-family: inherit; padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--text); cursor: pointer; }
+.copy:hover { border-color: var(--accent); }
+.copy.done { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.cmd + p, p + .cmd { margin-top: 8px; }
 .howto { display: grid; gap: 12px; margin-top: 8px; }
 .howto summary { font-size: 18px; }
 .howto.howto p { margin: 10px 0; color: var(--text); }
@@ -94,6 +105,13 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
     <span data-lang="de">Version {{VERSION}} (Beta) · kostenlos · quelloffen (MIT/Apache-2.0) · <a href="#downloads">alle Dateien</a> · <a href="#erster-start">Hilfe zum ersten Start</a></span>
     <span data-lang="en">Version {{VERSION}} (beta) · free · open source (MIT/Apache-2.0) · <a href="#downloads">all files</a> · <a href="#erster-start">first-launch help</a></span>
   </p>
+  <div class="install">
+    <p class="small"><span data-lang="de">Oder ohne Sicherheitswarnungen per Befehl installieren:</span><span data-lang="en">Or install with one command, without security warnings:</span></p>
+    <div data-shell="unix"><p class="small"><span data-lang="de">macOS und Linux, im Terminal</span><span data-lang="en">macOS and Linux, in Terminal</span></p>
+      <pre>curl -fsSL https://talkcraft.gerber.media/install.sh | sh</pre></div>
+    <div data-shell="win"><p class="small"><span data-lang="de">Windows, in PowerShell</span><span data-lang="en">Windows, in PowerShell</span></p>
+      <pre>irm https://talkcraft.gerber.media/install.ps1 | iex</pre></div>
+  </div>
   <div class="shot"><img src="media/talkcraft-hero.gif" width="900" height="540" alt="TalkCraft: der Schnitt mit farbigen Namensschildern, Kapiteln und zwei Sprechern"></div>
 </div>
 
@@ -165,11 +183,21 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
   <h2><span data-lang="de">Erster Start: die Warnungen</span><span data-lang="en">First launch: the warnings</span></h2>
   <div data-lang="de">
     <p><b>Warum warnen macOS und Windows?</b> Beide Systeme vertrauen Programmen aus dem Internet erst, wenn sie mit einem kostenpflichtigen Zertifikat des Herstellers signiert sind (Apple: Developer ID mit Notarisierung, Windows: Code-Signing-Zertifikat). TalkCraft ist ein kostenloses Projekt und hat dieses Zertifikat noch nicht. Die Warnung heißt also „unbekannter Hersteller“, nicht „Schadsoftware gefunden“. Ob die Datei unverändert ist, kannst du oben unter <a href="#downloads">Download prüfen</a> selbst nachsehen.</p>
-    <p>Das musst du nur einmal machen. Danach startet TalkCraft ohne Rückfrage.</p>
+    <p><b>Am einfachsten:</b> Installiere TalkCraft per Befehl. Dann kommt gar keine Warnung, denn die Warnungen hängen an einer Markierung, die nur der Browser heruntergeladenen Dateien gibt. Der Befehl lädt die neueste Version von GitHub, prüft die Prüfsumme und installiert sie. Was er genau tut, kannst du vorher lesen: <a href="install.sh">install.sh</a>, <a href="install.ps1">install.ps1</a>.</p>
+    <p class="small">macOS und Linux, im Terminal:</p>
+    <pre>curl -fsSL https://talkcraft.gerber.media/install.sh | sh</pre>
+    <p class="small">Windows, in PowerShell (Windows fragt danach nur noch nach Administratorrechten):</p>
+    <pre>irm https://talkcraft.gerber.media/install.ps1 | iex</pre>
+    <p>Lieber den normalen Download? Dann musst du die Warnungen einmal bestätigen, danach startet TalkCraft ohne Rückfrage:</p>
   </div>
   <div data-lang="en">
     <p><b>Why do macOS and Windows warn?</b> Both trust software from the internet only when the maker has signed it with a paid certificate (Apple: Developer ID plus notarization, Windows: a code signing certificate). TalkCraft is a free project and doesn't have one yet. So the warning means "unknown developer", not "malware found". You can check that the file is unchanged under <a href="#downloads">Check a download</a>.</p>
-    <p>You only need to do this once. After that TalkCraft starts without asking.</p>
+    <p><b>Easiest:</b> install TalkCraft with one command and there's no warning at all, because the warnings hang on a mark that only the browser puts on downloaded files. The command fetches the newest version from GitHub, checks its checksum and installs it. Read what it does first if you like: <a href="install.sh">install.sh</a>, <a href="install.ps1">install.ps1</a>.</p>
+    <p class="small">macOS and Linux, in Terminal:</p>
+    <pre>curl -fsSL https://talkcraft.gerber.media/install.sh | sh</pre>
+    <p class="small">Windows, in PowerShell (Windows then only asks for administrator rights):</p>
+    <pre>irm https://talkcraft.gerber.media/install.ps1 | iex</pre>
+    <p>Prefer the normal download? Then confirm the warnings once; after that TalkCraft starts without asking:</p>
   </div>
   <div class="howto">
     <details class="card" data-os="mac">
@@ -183,7 +211,7 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
         </ol>
         <p>Danach ziehst du TalkCraft in den Ordner „Programme“ und startest es von dort; beim ersten Start wiederholst du die drei Schritte. Der Knopf erscheint nur etwa eine Stunde nach dem Öffnungsversuch.</p>
         <p class="small">Der alte Weg „Rechtsklick › Öffnen“ funktioniert seit macOS 15 nicht mehr.</p>
-        <p><b>Schneller über das Terminal:</b> Entferne die Download-Markierung, bevor du die DMG öffnest. Dann warnt weder die DMG noch die App:</p>
+        <p><b>Schon heruntergeladen?</b> Entferne im Terminal die Download-Markierung, bevor du die DMG öffnest. Dann warnt weder die DMG noch die App:</p>
         <pre>xattr -d com.apple.quarantine ~/Downloads/{{FILE_DMG}}</pre>
         <p>Ist TalkCraft schon installiert:</p>
         <pre>xattr -dr com.apple.quarantine /Applications/TalkCraft.app</pre>
@@ -197,7 +225,7 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
         </ol>
         <p>Then drag TalkCraft into Applications and start it from there; on the first start repeat the three steps. The button only shows for about an hour after the attempt.</p>
         <p class="small">The old "right-click › Open" trick no longer works since macOS 15.</p>
-        <p><b>Faster in Terminal:</b> remove the download flag before opening the DMG, and neither the DMG nor the app will warn:</p>
+        <p><b>Already downloaded?</b> Remove the download flag in Terminal before opening the DMG, and neither the DMG nor the app will warn:</p>
         <pre>xattr -d com.apple.quarantine ~/Downloads/{{FILE_DMG}}</pre>
         <p>If TalkCraft is already installed:</p>
         <pre>xattr -dr com.apple.quarantine /Applications/TalkCraft.app</pre>
@@ -288,7 +316,29 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
     // First-launch help for this computer open, the others collapsed.
     var help = document.querySelector('.howto [data-os="' + os + '"]');
     if (help) { help.open = true; help.parentNode.insertBefore(help, help.parentNode.firstChild); }
+    // Only this computer's install command in the hero.
+    var shell = os === "win" ? "win" : "unix";
+    document.querySelectorAll(".install [data-shell]").forEach(function (d) { d.hidden = d.dataset.shell !== shell; });
   }
+  // A copy button on every command.
+  var label = lang === "de" ? ["Kopieren", "Kopiert ✔"] : ["Copy", "Copied ✔"];
+  document.querySelectorAll("pre").forEach(function (pre) {
+    var box = document.createElement("div"), btn = document.createElement("button");
+    box.className = "cmd";
+    btn.type = "button"; btn.className = "copy"; btn.textContent = label[0];
+    pre.parentNode.insertBefore(box, pre);
+    box.appendChild(pre); box.appendChild(btn);
+    btn.addEventListener("click", function () {
+      var text = pre.textContent.trim(), done = function () {
+        btn.textContent = label[1]; btn.classList.add("done");
+        setTimeout(function () { btn.textContent = label[0]; btn.classList.remove("done"); }, 1800);
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done, function () { select(pre); });
+      } else { select(pre); if (document.execCommand("copy")) done(); }
+    });
+  });
+  function select(el) { var r = document.createRange(); r.selectNodeContents(el); var s = getSelection(); s.removeAllRanges(); s.addRange(r); }
 })();
 </script>
 </body>

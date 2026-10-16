@@ -34,6 +34,30 @@ place. It runs natively on macOS, Windows and Linux and is written in Rust. Unde
 full SoundCraft engine (mixer, plugins, automation, CLI, MCP server); the menus leave out what a
 podcast does not need.
 
+## Install
+
+The easiest way, with no security warnings:
+
+macOS and Linux, in Terminal:
+
+```sh
+curl -fsSL https://talkcraft.gerber.media/install.sh | sh
+```
+
+Windows, in PowerShell:
+
+```powershell
+irm https://talkcraft.gerber.media/install.ps1 | iex
+```
+
+The script fetches the newest release from GitHub, checks it against `SHA256SUMS.txt` and installs
+it (macOS: `/Applications`, Linux: `~/.local/bin/talkcraft` plus a menu entry, Windows: the MSI).
+The installers aren't signed with a paid Apple or Microsoft certificate, so macOS and Windows warn
+about files downloaded in a browser. Files fetched by these commands carry no download mark, so
+there's no warning. You can read the scripts first: [install.sh](site/install.sh),
+[install.ps1](site/install.ps1). The normal downloads and help for the warnings are on
+[talkcraft.gerber.media](https://talkcraft.gerber.media/#erster-start).
+
 ## Workflow
 
 <table>
@@ -228,7 +252,7 @@ and tarball (Linux) and a static web build. See `docs/releasing.md`. Locally on 
 packaging/macos/package.sh --arch aarch64   # dist/release/talkcraft-<version>-macos-aarch64.dmg
 ```
 
-Unsigned builds are for testing: Gatekeeper and SmartScreen warn about them.
+Unsigned builds make Gatekeeper and SmartScreen warn; the install scripts above avoid that.
 
 **Downloads:** the installers for macOS, Windows and Linux are built on GitHub
 ([Gerber-Media/TalkCraft › Releases](https://github.com/Gerber-Media/TalkCraft/releases)) by
@@ -280,6 +304,30 @@ braucht.
 <p align="center">
   Idee, Konzept und Gestaltung: <b>Dirk Gerber</b> · <a href="https://gerber.media">gerber.media</a>
   </p>
+
+## Installieren
+
+Am einfachsten, ohne Sicherheitswarnungen:
+
+macOS und Linux, im Terminal:
+
+```sh
+curl -fsSL https://talkcraft.gerber.media/install.sh | sh
+```
+
+Windows, in PowerShell:
+
+```powershell
+irm https://talkcraft.gerber.media/install.ps1 | iex
+```
+
+Das Skript lädt die neueste Version von GitHub, prüft sie gegen `SHA256SUMS.txt` und installiert
+sie (macOS: `/Applications`, Linux: `~/.local/bin/talkcraft` samt Menüeintrag, Windows: das MSI).
+Die Installer sind nicht mit einem kostenpflichtigen Apple- oder Microsoft-Zertifikat signiert,
+deshalb warnen macOS und Windows bei Dateien aus dem Browser. Dateien, die diese Befehle laden,
+tragen keine Download-Markierung, also kommt keine Warnung. Die Skripte kannst du vorher lesen:
+[install.sh](site/install.sh), [install.ps1](site/install.ps1). Die normalen Downloads und Hilfe zu
+den Warnungen stehen auf [talkcraft.gerber.media](https://talkcraft.gerber.media/#erster-start).
 
 ## Arbeitsablauf
 
@@ -494,7 +542,7 @@ Tarball (Linux) sowie einen statischen Web-Build, siehe `docs/releasing.md`. Lok
 packaging/macos/package.sh --arch aarch64   # dist/release/talkcraft-<version>-macos-aarch64.dmg
 ```
 
-Unsignierte Builds sind zum Testen gedacht: Gatekeeper und SmartScreen warnen davor.
+Bei unsignierten Builds warnen Gatekeeper und SmartScreen; die Installationsskripte oben umgehen das.
 
 **Downloads:** Die Installer für macOS, Windows und Linux baut GitHub
 ([Gerber-Media/TalkCraft › Releases](https://github.com/Gerber-Media/TalkCraft/releases)) mit

@@ -22,6 +22,7 @@ release="$(curl -fsSL ${auth[@]+"${auth[@]}"} "https://api.github.com/repos/$REP
 rm -rf "$OUT"
 mkdir -p "$OUT/media"
 /bin/cp -f "$HERE"/favicon.ico "$HERE"/favicon-32.png "$HERE"/apple-touch-icon.png "$HERE"/icon-256.png "$OUT/"
+/bin/cp -f "$HERE"/install.sh "$HERE"/install.ps1 "$OUT/"
 /bin/cp -f "$ROOT"/docs/media/talkcraft-{hero,record,edit,publish}.gif "$OUT/media/"
 # Codefloe Pages serves the domain set in the repo settings; this file only documents it.
 echo "talkcraft.gerber.media" > "$OUT/CNAME"
