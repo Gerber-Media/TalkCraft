@@ -15,11 +15,11 @@
 :root {
   /* The paper tones of the guest page (remote/guest), with the app's green. */
   --bg: #f4f1ea; --surface: #ffffff; --text: #0b0b0c; --dim: #6b6b6b; --line: #e3ddd0;
-  --accent: #2f9e63; --accent-ink: #ffffff; --accent-soft: #e6efe4; --code: #efe9dc;
+  --accent: #2f9e63; --accent-ink: #ffffff; --accent-press: #237a4b; --accent-soft: #e6efe4; --code: #efe9dc;
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #171512; --surface: #201d19; --text: #ece7de; --dim: #a39d92; --line: #35302a;
-    --accent: #3cb875; --accent-ink: #0d1a12; --accent-soft: #1f2e22; --code: #2a2620; }
+    --accent: #3cb875; --accent-ink: #0d1a12; --accent-press: #2c8f59; --accent-soft: #1f2e22; --code: #2a2620; }
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -60,10 +60,11 @@ pre { padding: 12px 14px; overflow-x: auto; white-space: pre; }
 footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--dim); font-size: 15px; }
 footer h3 { color: var(--text); font-size: 16px; margin: 18px 0 6px; }
 .legal-nav { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+/* Like the download button (.btn.primary), only lower; the open one is pressed in. */
 .legal-nav button { font: inherit; font-size: 14px; font-weight: 600; min-width: 150px; padding: 6px 22px;
-  border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--text); cursor: pointer; }
-.legal-nav button:hover { border-color: var(--accent); }
-.legal-nav button[aria-expanded="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+.legal-nav button:hover { filter: brightness(1.08); }
+.legal-nav button[aria-expanded="true"] { background: var(--accent-press); border-color: var(--accent-press); box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.25); }
 .legal { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 4px 20px; margin-top: 12px; color: var(--text); }
 details summary { cursor: pointer; color: var(--text); font-weight: 600; }
 .install { max-width: 620px; margin: 18px auto 0; text-align: left; }
