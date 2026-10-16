@@ -37,9 +37,14 @@ install_mac() {
   mkdir -p "$TMP/mnt"
   hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$TMP/mnt" "$TMP/talkcraft-$VERSION-macos-universal.dmg" >/dev/null 2>&1 \
     || die "DMG ließ sich nicht öffnen." "could not open the DMG."
-  dest="${TALKCRAFT_APPS:-/Applications}"
-  if [ ! -w "$dest" ]; then dest="$HOME/Applications"; fi
-  mkdir -p "$dest"
+  if [ -n "${TALKCRAFT_APPS:-}" ]; then
+    dest="$TALKCRAFT_APPS"  # a folder asked for is used (and created), never swapped for another
+  elif [ -w /Applications ]; then
+    dest=/Applications
+  else
+    dest="$HOME/Applications"
+  fi
+  mkdir -p "$dest" || die "Ordner $dest lässt sich nicht anlegen." "can't create $dest."
   rm -rf "$dest/TalkCraft.app"
   ditto "$TMP/mnt/TalkCraft.app" "$dest/TalkCraft.app"
   hdiutil detach "$TMP/mnt" >/dev/null 2>&1 || true
