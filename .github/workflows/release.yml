@@ -97,11 +97,23 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [macos, windows, linux]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # build provenance (Sigstore)
+      attestations: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: assets
           merge-multiple: true
+      # Checksums: `shasum -a 256 -c SHA256SUMS.txt` next to the downloads.
+      - name: Checksums
+        run: cd assets && sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      # Proof that each file was built here from this commit:
+      # `gh attestation verify FILE -R Gerber-Media/TalkCraft`.
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: assets/*
       - uses: softprops/action-gh-release@v2
         with:
           files: assets/*

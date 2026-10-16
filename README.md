@@ -234,6 +234,11 @@ Unsigned builds are for testing: Gatekeeper and SmartScreen warn about them.
 ([Gerber-Media/TalkCraft › Releases](https://github.com/Gerber-Media/TalkCraft/releases)) by
 `.github/workflows/release.yml` whenever a version tag `v…` is pushed.
 
+**Checking a download:** every release lists the files' checksums in `SHA256SUMS.txt`
+(`shasum -a 256 -c SHA256SUMS.txt --ignore-missing` in the download folder). GitHub also proves
+that a file was built from this repository by that workflow:
+`gh attestation verify talkcraft-….dmg -R Gerber-Media/TalkCraft`.
+
 ## Who made it
 
 TalkCraft is **Dirk Gerber**'s podcast studio ([GERBER.MEDIA](https://gerber.media)). Dirk had the
@@ -494,6 +499,11 @@ Unsignierte Builds sind zum Testen gedacht: Gatekeeper und SmartScreen warnen da
 **Downloads:** Die Installer für macOS, Windows und Linux baut GitHub
 ([Gerber-Media/TalkCraft › Releases](https://github.com/Gerber-Media/TalkCraft/releases)) mit
 `.github/workflows/release.yml`, sobald ein Versions-Tag `v…` hochgeladen wird.
+
+**Download prüfen:** Zu jedem Release gehört `SHA256SUMS.txt` mit den Prüfsummen aller Dateien
+(`shasum -a 256 -c SHA256SUMS.txt --ignore-missing` im Download-Ordner). Außerdem bestätigt
+GitHub, dass eine Datei aus diesem Repository von diesem Workflow gebaut wurde:
+`gh attestation verify talkcraft-….dmg -R Gerber-Media/TalkCraft`.
 
 ## Wer steckt dahinter
 
