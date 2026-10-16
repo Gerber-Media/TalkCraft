@@ -59,7 +59,10 @@ pre { padding: 12px 14px; overflow-x: auto; white-space: pre; }
 .note { background: var(--accent-soft); border-radius: 12px; padding: 14px 18px; }
 footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--dim); font-size: 15px; }
 footer h3 { color: var(--text); font-size: 16px; margin: 18px 0 6px; }
-.legal-nav { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+/* Credits on the left, Impressum/Privacy on the right of the same line; below it when narrow. */
+.footer-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; }
+.footer-row > p { margin: 0; flex: 1 1 320px; }
+.legal-nav { display: flex; flex-wrap: wrap; gap: 10px; }
 /* Like the download button (.btn.primary), only lower; the open one is pressed in. */
 .legal-nav button { font: inherit; font-size: 14px; font-weight: 600; min-width: 150px; padding: 6px 22px;
   border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
@@ -272,12 +275,14 @@ html[lang="de"] [data-lang="de"], html[lang="en"] [data-lang="en"] { display: re
 </section>
 
 <footer>
+  <div class="footer-row">
   <p><span data-lang="de">Idee, Konzept und Gestaltung:</span><span data-lang="en">Idea, concept and design:</span> <b>Dirk Gerber</b> · <a href="https://gerber.media">GERBER.MEDIA</a>.
     <span data-lang="de">TalkCraft baut auf</span><span data-lang="en">TalkCraft builds on</span> <a href="https://github.com/storytold/soundcraft">SoundCraft</a>.</p>
   <nav class="legal-nav" aria-label="Rechtliches">
     <button type="button" aria-expanded="false" aria-controls="impressum">Impressum</button>
     <button type="button" aria-expanded="false" aria-controls="datenschutz"><span data-lang="de">Datenschutz</span><span data-lang="en">Privacy</span></button>
   </nav>
+  </div>
   <div class="legal" id="impressum" hidden>
     <p>Angaben gemäß § 5 DDG<br>Dirk Gerber (GERBER.MEDIA)<br>Bei der Rolandsmühle 2<br>22763 Hamburg, Deutschland<br>
       E-Mail: <a href="mailto:hello@gerber.media">hello@gerber.media</a></p>
